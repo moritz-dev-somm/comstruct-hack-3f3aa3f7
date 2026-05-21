@@ -207,8 +207,9 @@ Checklist (combine LATEST reply with THREAD CONTEXT — once answered, stays ans
 missing_checklist: any of ["delivery_date","shipping_cost"] still null after combining.
 
 Answered-questions tracking (REQUIRED):
-- answered_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply addresses (even partially). Copy each string VERBATIM from the OPEN QUESTION list. [] if none.
+- answered_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply addresses (even partially, even implicitly). Copy each string VERBATIM from the OPEN QUESTION list (English). [] if none.
 - still_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply did NOT address. Copy verbatim. [] if all answered.
+When in doubt, lean towards "answered". A vague answer is still an answer — it should NOT show up in still_open_questions, only in unclear_points.
 
 Always provide:
 - reply_language: ISO 639-1.
@@ -225,6 +226,7 @@ Also:
 - wants_human: true ONLY if supplier explicitly asks to talk to a person.
 
 unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
+unclear_points_en: the SAME list as unclear_points, but in ENGLISH. Same order, same length. Used for cross-turn matching. [] when unclear_points is [].
 
 Finally pick suggested_outbound (policy may override):
 - "confirm" when fully_confirmed AND missing_checklist empty AND no issues AND still_open_questions empty
@@ -235,7 +237,7 @@ Finally pick suggested_outbound (policy may override):
 - "acknowledge_issues" when confirmed_with_issue
 - "escalate_silent" otherwise
 
-Always reply with strict JSON. No prose.`;
+Always reply by calling the classify_reply tool. No prose.`;
 
 const EMPTY_CHECKLIST: ReplyChecklist = {
   order_confirmed: false,
