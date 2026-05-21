@@ -19,7 +19,7 @@ export const Route = createFileRoute("/procurement/analytics")({
   component: Analytics,
 });
 
-const COLORS = ["#2F6879", "#5C9BAB", "#94C2CB", "#D2A24C", "#B0B6BA"];
+const COLORS = ["#C8281E", "#1D4F9E", "#3F8A56", "#D9883A", "#7A5A8F"];
 
 function Analytics() {
   const { orders } = useOrders();

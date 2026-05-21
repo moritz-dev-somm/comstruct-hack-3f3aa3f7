@@ -5,17 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * comstruct — Swiss Modernist palette.
+ * Warm off-white canvas, bold red CTA, Helvetica only, zero shadows, light-only.
+ * All color values in oklch.
  */
 
 @theme inline {
@@ -62,46 +54,66 @@
 }
 
 :root {
-  /* comstruct brand: petrol teal, tuned for outdoor / construction-site readability.
-   * Foreground pushed to near-black, muted-foreground darkened, borders darker,
-   * primary deeper for stronger contrast in glare. */
-  --radius: 0.75rem;
-  --background: oklch(0.985 0.002 240);
-  --foreground: oklch(0.18 0.03 220);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 220);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 220);
-  --primary: oklch(0.36 0.07 217);
-  --primary-foreground: oklch(0.99 0.002 240);
-  --secondary: oklch(0.93 0.008 230);
-  --secondary-foreground: oklch(0.18 0.03 220);
-  --muted: oklch(0.94 0.005 240);
-  --muted-foreground: oklch(0.35 0.03 220);
-  --accent: oklch(0.9 0.03 215);
-  --accent-foreground: oklch(0.18 0.03 220);
-  --destructive: oklch(0.5 0.25 27.325);
-  --destructive-foreground: oklch(0.99 0.003 247.858);
-  --border: oklch(0.78 0.015 230);
-  --input: oklch(0.82 0.012 230);
-  --ring: oklch(0.36 0.07 217);
-  --chart-1: oklch(0.36 0.07 217);
-  --chart-2: oklch(0.55 0.18 155);
-  --chart-3: oklch(0.45 0.1 210);
-  --chart-4: oklch(0.65 0.16 85);
-  --chart-5: oklch(0.55 0.22 30);
-  --sidebar: oklch(0.98 0.002 240);
-  --sidebar-foreground: oklch(0.18 0.03 220);
-  --sidebar-primary: oklch(0.36 0.07 217);
-  --sidebar-primary-foreground: oklch(0.99 0.002 240);
-  --sidebar-accent: oklch(0.9 0.03 215);
-  --sidebar-accent-foreground: oklch(0.18 0.03 220);
-  --sidebar-border: oklch(0.78 0.015 230);
-  --sidebar-ring: oklch(0.36 0.07 217);
-  --brand: oklch(0.36 0.07 217);
-  --brand-foreground: oklch(0.99 0.002 240);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Chivo Mono", ui-monospace, SFMono-Regular, monospace;
+  --radius: 0.5rem;
+
+  /* Warm off-white canvas (#F5F2ED) */
+  --background: oklch(0.961 0.008 80);
+  /* Near-black with blue undertone (#161A1F) */
+  --foreground: oklch(0.196 0.012 250);
+
+  --card: oklch(0.987 0.005 80);
+  --card-foreground: oklch(0.196 0.012 250);
+  --popover: oklch(0.987 0.005 80);
+  --popover-foreground: oklch(0.196 0.012 250);
+
+  /* Bold warm red (#C8281E) */
+  --primary: oklch(0.555 0.196 28);
+  --primary-foreground: oklch(1 0 0);
+
+  /* Muted warm gray secondary (#C9C5BD) */
+  --secondary: oklch(0.81 0.008 80);
+  --secondary-foreground: oklch(0.196 0.012 250);
+
+  --muted: oklch(0.92 0.006 80);
+  --muted-foreground: oklch(0.485 0.008 250);
+
+  --accent: oklch(0.94 0.006 80);
+  --accent-foreground: oklch(0.196 0.012 250);
+
+  /* Destructive: steel blue (#1D4F9E) — red is reserved for CTAs */
+  --destructive: oklch(0.46 0.15 258);
+  --destructive-foreground: oklch(1 0 0);
+
+  --border: oklch(0.885 0.006 80);
+  --input: oklch(0.885 0.006 80);
+  --ring: oklch(0.555 0.196 28);
+
+  --chart-1: oklch(0.5 0.15 258);   /* steel blue */
+  --chart-2: oklch(0.58 0.19 28);   /* warm red */
+  --chart-3: oklch(0.5 0.12 150);   /* forest green */
+  --chart-4: oklch(0.7 0.16 60);    /* amber */
+  --chart-5: oklch(0.45 0.1 310);   /* muted purple */
+
+  --sidebar: oklch(0.945 0.006 80);
+  --sidebar-foreground: oklch(0.196 0.012 250);
+  --sidebar-primary: oklch(0.555 0.196 28);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.94 0.006 80);
+  --sidebar-accent-foreground: oklch(0.196 0.012 250);
+  --sidebar-border: oklch(0.885 0.006 80);
+  --sidebar-ring: oklch(0.555 0.196 28);
+
+  /* Brand mark — collapses onto primary red so existing bg-brand usages re-skin. */
+  --brand: oklch(0.555 0.196 28);
+  --brand-foreground: oklch(1 0 0);
+
+  /* Swiss modernism: one family, weight + tracking do the work. */
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  /* Overlay-based elevation (used in lieu of shadows) */
+  --elevate-1: rgba(0, 0, 0, 0.03);
+  --elevate-2: rgba(0, 0, 0, 0.08);
 }
 
 @theme inline {
@@ -109,51 +121,15 @@
   --color-brand-foreground: var(--brand-foreground);
 }
 
-.dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
-  --brand: oklch(0.62 0.08 217);
-  --brand-foreground: oklch(0.15 0.02 220);
-}
-
 @layer base {
   * {
     border-color: var(--color-border);
+    /* Zero box shadows everywhere — borders and overlays only. */
+    box-shadow: none !important;
   }
 
   html {
-    /* Bump base font size for outdoor / glove use. Most Tailwind text-* sizes
-     * scale from this rem. Mobile gets the biggest bump. */
+    /* Bump base font size for outdoor / glove use. */
     font-size: 18px;
   }
   @media (min-width: 1024px) {
@@ -168,14 +144,12 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
-    font-weight: 500;
   }
 
   /* Glove-friendly minimum tap target: 48px on any interactive control. */
   button, a, [role="button"], input, select, textarea {
     min-height: 48px;
   }
-  /* Don't enforce min-height on inline links inside prose / chat bubbles. */
   p a, span a, li a, a.inline-link {
     min-height: 0;
   }

@@ -78,8 +78,8 @@ function ProcurementLayout() {
                 <n.icon className="size-4" />
                 <span className="flex-1">{n.label}</span>
                 {"badge" in n && n.badge ? (
-                  <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${
-                    active ? "bg-brand-foreground text-brand" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                  <span className={`text-[10px] font-bold rounded-sm px-1.5 py-0.5 ${
+                    active ? "bg-brand-foreground text-brand" : "bg-muted text-foreground border border-border"
                   }`}>
                     {n.badge}
                   </span>
