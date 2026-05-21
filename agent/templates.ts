@@ -532,46 +532,81 @@ function bilingual(
 }
 
 /* ---------- Clarification request ---------- */
-const CLARIFY: Record<SupplierLanguage, { subject: string; greeting: string; intro: (id: string) => string; outro: string; sign: string }> = {
+type ClarifyStrings = {
+  subject: string;
+  greeting: string;
+  introSingle: (id: string) => string;
+  introMulti: (id: string) => string;
+  outroSingle: string;
+  outroMulti: string;
+  sign: string;
+  fallback: string;
+};
+const CLARIFY: Record<SupplierLanguage, ClarifyStrings> = {
   en: {
     subject: "Clarification needed",
     greeting: "Hello,",
-    intro: (id) => `Thank you for your reply on order ${id}. To finalise on our side, could you confirm the following specific point(s)?`,
-    outro: "A short line per point is enough — no need to repeat the rest of the order.",
+    introSingle: (id) => `Thank you for your reply on order ${id}. To finalise on our side, could you confirm the following:`,
+    introMulti: (id) => `Thank you for your reply on order ${id}. To finalise on our side, could you confirm the following specific points?`,
+    outroSingle: "A short line is enough — no need to repeat the rest of the order.",
+    outroMulti: "A short line per point is enough — no need to repeat the rest of the order.",
     sign: "Thanks,",
+    fallback: "Could you confirm the specific point you left open in your last reply?",
   },
   de: {
     subject: "Klärung benötigt",
     greeting: "Guten Tag,",
-    intro: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Für den finalen Abschluss bitten wir Sie um Bestätigung der folgenden konkreten Punkte:`,
-    outro: "Eine kurze Zeile pro Punkt genügt — die übrige Bestellung muss nicht wiederholt werden.",
+    introSingle: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Für den finalen Abschluss bitten wir Sie um Bestätigung des folgenden Punktes:`,
+    introMulti: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Für den finalen Abschluss bitten wir Sie um Bestätigung der folgenden konkreten Punkte:`,
+    outroSingle: "Eine kurze Zeile genügt — die übrige Bestellung muss nicht wiederholt werden.",
+    outroMulti: "Eine kurze Zeile pro Punkt genügt — die übrige Bestellung muss nicht wiederholt werden.",
     sign: "Vielen Dank,",
+    fallback: "Könnten Sie bitte den in Ihrer letzten Antwort offen gebliebenen Punkt bestätigen?",
   },
   fr: {
     subject: "Clarification nécessaire",
     greeting: "Bonjour,",
-    intro: (id) => `Merci pour votre réponse concernant la commande ${id}. Pour finaliser de notre côté, pourriez-vous confirmer les points précis suivants ?`,
-    outro: "Une ligne par point suffit — inutile de répéter le reste de la commande.",
+    introSingle: (id) => `Merci pour votre réponse concernant la commande ${id}. Pour finaliser de notre côté, pourriez-vous confirmer le point suivant ?`,
+    introMulti: (id) => `Merci pour votre réponse concernant la commande ${id}. Pour finaliser de notre côté, pourriez-vous confirmer les points précis suivants ?`,
+    outroSingle: "Une courte ligne suffit — inutile de répéter le reste de la commande.",
+    outroMulti: "Une ligne par point suffit — inutile de répéter le reste de la commande.",
     sign: "Merci,",
+    fallback: "Pourriez-vous confirmer le point précis resté en suspens dans votre dernière réponse ?",
   },
   it: {
     subject: "Chiarimento necessario",
     greeting: "Salve,",
-    intro: (id) => `Grazie per la risposta sull'ordine ${id}. Per finalizzarlo dalla nostra parte, potreste confermare i seguenti punti specifici?`,
-    outro: "Una riga per punto è sufficiente — non serve ripetere il resto dell'ordine.",
+    introSingle: (id) => `Grazie per la risposta sull'ordine ${id}. Per finalizzarlo dalla nostra parte, potreste confermare il seguente punto?`,
+    introMulti: (id) => `Grazie per la risposta sull'ordine ${id}. Per finalizzarlo dalla nostra parte, potreste confermare i seguenti punti specifici?`,
+    outroSingle: "Una breve riga è sufficiente — non serve ripetere il resto dell'ordine.",
+    outroMulti: "Una riga per punto è sufficiente — non serve ripetere il resto dell'ordine.",
     sign: "Grazie,",
+    fallback: "Potreste confermare il punto specifico rimasto in sospeso nella vostra ultima risposta?",
   },
 };
 
-function renderClarifyBlock(s: (typeof CLARIFY)[SupplierLanguage], orderId: string, points: string[]): string {
-  const bullets = points.length ? points.map((p) => `- ${p}`).join("\n") : "- (please reply with concrete details on availability, price, and delivery)";
-  return [s.greeting, ``, s.intro(orderId), bullets, ``, s.outro, ``, s.sign, COMPANY.agentName, `${COMPANY.contact} · ${COMPANY.phone}`].join("\n");
+function clarifyParts(s: ClarifyStrings, points: string[]) {
+  const effective = points.length ? points : [s.fallback];
+  const single = effective.length === 1;
+  return {
+    intro: single ? s.introSingle : s.introMulti,
+    outro: single ? s.outroSingle : s.outroMulti,
+    effective,
+    single,
+  };
 }
-function renderClarifyHtml(s: (typeof CLARIFY)[SupplierLanguage], orderId: string, points: string[]): string {
-  const items = (points.length ? points : ["(please reply with concrete details on availability, price, and delivery)"])
-    .map((p) => `<li>${escapeHtml(p)}</li>`)
-    .join("");
-  return `<p>${escapeHtml(s.greeting)}</p><p>${escapeHtml(s.intro(orderId))}</p><ul>${items}</ul><p>${escapeHtml(s.outro)}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+
+function renderClarifyBlock(s: ClarifyStrings, orderId: string, points: string[]): string {
+  const { intro, outro, effective, single } = clarifyParts(s, points);
+  const body = single ? effective[0] : effective.map((p) => `- ${p}`).join("\n");
+  return [s.greeting, ``, intro(orderId), body, ``, outro, ``, s.sign, COMPANY.agentName, `${COMPANY.contact} · ${COMPANY.phone}`].join("\n");
+}
+function renderClarifyHtml(s: ClarifyStrings, orderId: string, points: string[]): string {
+  const { intro, outro, effective, single } = clarifyParts(s, points);
+  const body = single
+    ? `<p>${escapeHtml(effective[0])}</p>`
+    : `<ul>${effective.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`;
+  return `<p>${escapeHtml(s.greeting)}</p><p>${escapeHtml(intro(orderId))}</p>${body}<p>${escapeHtml(outro)}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
 }
 
 export function composeClarificationRequestEmail(
