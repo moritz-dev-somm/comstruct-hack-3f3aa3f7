@@ -159,7 +159,7 @@ export function VoiceButton({
       (typeof navigator !== "undefined" && navigator.language) ||
       "en-US";
     rec.interimResults = true;
-    rec.continuous = false; // single utterance — most reliable on mobile
+    rec.continuous = true; // keep recording until user sends/cancels
     rec.maxAlternatives = 1;
 
     rec.onresult = (e) => {
