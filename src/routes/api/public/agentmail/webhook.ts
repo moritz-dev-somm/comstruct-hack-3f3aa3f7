@@ -98,8 +98,8 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         const threadId = String(
           (message.thread_id as string | undefined) ??
             (message.threadId as string | undefined) ??
-            (thread?.thread_id as string | undefined) ??
-            (thread?.threadId as string | undefined) ??
+            (threadPayload?.thread_id as string | undefined) ??
+            (threadPayload?.threadId as string | undefined) ??
             "",
         );
         const inboxId = String(
