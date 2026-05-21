@@ -58,6 +58,7 @@ type Row = {
   use_cases: UseCase[] | null;
   use_cases_en: UseCase[] | null;
   enriched_at: string | null;
+  image_url: string | null;
 };
 
 export function rowToProduct(r: Row): Product {
