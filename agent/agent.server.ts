@@ -151,6 +151,8 @@ export type ReplyClassification = {
   answerable_questions?: string[];
   /** Questions that require a human to answer. */
   unanswerable_questions?: string[];
+  /** Specific vague points / unanswered items we should re-ask the supplier about. */
+  unclear_points?: string[];
   /** Hint from the classifier as to which outbound action fits. Policy may override. */
   suggested_outbound?: SuggestedOutbound;
   /** Number of automated targeted follow-ups already sent for the missing fields. */
