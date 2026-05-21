@@ -132,28 +132,30 @@ function labelForCategory(category: string): string {
 type QuickOrder = {
   id: string;
   date: string;
-  items: string[];
-  total: string;
+  skus: string[]; // real catalog SKUs — resolved against live products at render time
+  totalOverride?: string; // optional display total; otherwise computed from products
 };
 
+// Demo "past orders" wired to real catalog SKUs so "Add all to cart" actually works.
+// SKUs that don't exist in the current catalog are silently skipped.
 const QUICK_REORDER_ORDERS: QuickOrder[] = [
   {
     id: "#E-4821",
     date: "12 May 2026",
-    items: ["Drywall screws TX25", "Gypsum board 12.5mm", "Joint tape 50m", "Corner bead"],
-    total: "€347.50",
+    // Drywall / finishing: screws + bit + spachtel + tape
+    skus: ["C001", "C002", "C032", "C062", "C027"],
   },
   {
     id: "#E-4789",
     date: "03 May 2026",
-    items: ["Safety helmet white", "Work gloves L", "Dust masks FFP2 pack", "Safety glasses"],
-    total: "€128.00",
+    // PPE refresh: helmet, gloves, mask, glasses
+    skus: ["C073", "C019", "C023", "C021", "C024"],
   },
   {
     id: "#E-4755",
     date: "22 Apr 2026",
-    items: ["Anchor bolts M10x80", "Sealant gun", "Silicone transparent 310ml", "Foam gun cleaner"],
-    total: "€215.80",
+    // Anchoring + sealing: dübel + silicone + foam + cleaner
+    skus: ["C005", "C006", "C039", "C042", "C076"],
   },
 ];
 
@@ -521,13 +523,10 @@ function Home() {
             send={send}
             onSelectCategory={setSelectedCategory}
             inputRef={inputRef}
-            onAddQuickOrder={(items) => {
+            onAddQuickOrder={(skus) => {
               let added = 0;
-              for (const itemName of items) {
-                const product = products.find((p) =>
-                  p.name.toLowerCase().includes(itemName.toLowerCase()) ||
-                  itemName.toLowerCase().includes(p.name.toLowerCase())
-                );
+              for (const sku of skus) {
+                const product = products.find((p) => p.sku === sku);
                 if (product) {
                   cart.add({
                     productId: product.sku,
@@ -548,6 +547,7 @@ function Home() {
                 toast.info("No matching products found in catalog");
               }
             }}
+            products={products}
           />
         ) : (
           <ConversationView
@@ -641,14 +641,16 @@ function HeroView({
   inputRef,
   onAddQuickOrder,
   categoryTiles,
+  products,
 }: {
   input: string;
   setInput: (v: string) => void;
   send: (v: string) => void;
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  onAddQuickOrder: (items: string[]) => void;
+  onAddQuickOrder: (skus: string[]) => void;
   categoryTiles: CategoryTileData[];
+  products: Product[];
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
@@ -709,63 +711,56 @@ function HeroView({
           </div>
         </div>
 
-        {/* Quick Reorder — dummy orders for now */}
-        <div className="mt-10">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-wide">
-            <div className="flex-1 h-px bg-border" />
-            quick reorder
-            <div className="flex-1 h-px bg-border" />
-          </div>
-          <div className="mt-4 space-y-3">
-            {([
-              {
-                id: "#E-4821",
-                date: "12 May 2026",
-                items: ["Drywall screws TX25", "Gypsum board 12.5mm", "Joint tape 50m", "Corner bead"],
-                total: "€347.50",
-              },
-              {
-                id: "#E-4789",
-                date: "03 May 2026",
-                items: ["Safety helmet white", "Work gloves L", "Dust masks FFP2 pack", "Safety glasses"],
-                total: "€128.00",
-              },
-              {
-                id: "#E-4755",
-                date: "22 Apr 2026",
-                items: ["Anchor bolts M10x80", "Sealant gun", "Silicone transparent 310ml", "Foam gun cleaner"],
-                total: "€215.80",
-              },
-            ] as QuickOrder[]).map((order) => (
-              <div
-                key={order.id}
-                className="w-full rounded-xl border bg-card p-4 transition-colors hover:border-brand/40"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold">{order.id}</div>
-                    <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="size-3.5" />
-                      {order.date}
+        {/* Quick Reorder — demo orders wired to real catalog SKUs */}
+        {products.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-wide">
+              <div className="flex-1 h-px bg-border" />
+              quick reorder
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="mt-4 space-y-3">
+              {QUICK_REORDER_ORDERS.map((order) => {
+                const resolved = order.skus
+                  .map((sku) => products.find((p) => p.sku === sku))
+                  .filter((p): p is Product => Boolean(p));
+                if (resolved.length === 0) return null;
+                const total =
+                  order.totalOverride ??
+                  `€${resolved.reduce((sum, p) => sum + p.price, 0).toFixed(2)}`;
+                const names = resolved.map((p) => p.name);
+                return (
+                  <div
+                    key={order.id}
+                    className="w-full rounded-xl border bg-card p-4 transition-colors hover:border-brand/40"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold">{order.id}</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock className="size-3.5" />
+                          {order.date}
+                        </div>
+                      </div>
+                      <span className="text-sm font-semibold">{total}</span>
                     </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {names.slice(0, 3).join(" · ")}
+                      {names.length > 3 && ` · +${names.length - 3} more`}
+                    </div>
+                    <button
+                      onClick={() => onAddQuickOrder(resolved.map((p) => p.sku))}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                    >
+                      <ShoppingCart className="size-3.5" />
+                      Add all to cart
+                    </button>
                   </div>
-                  <span className="text-sm font-semibold">{order.total}</span>
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  {order.items.slice(0, 3).join(" · ")}
-                  {order.items.length > 3 && ` · +${order.items.length - 3} more`}
-                </div>
-                <button
-                  onClick={() => onAddQuickOrder(order.items)}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                >
-                  <ShoppingCart className="size-3.5" />
-                  Add all to cart
-                </button>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Decorative icon row — SubBase-style colored tiles, anchored at bottom */}
         <div className="mt-12 flex items-center justify-center gap-3 flex-wrap">
