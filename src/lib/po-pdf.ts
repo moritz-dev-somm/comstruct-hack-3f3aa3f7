@@ -48,7 +48,13 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function generatePurchaseOrderPdf(order: Order): jsPDF {
+export function generatePurchaseOrderPdf(
+  order: Order,
+  opts?: { supplier?: SupplierBlock; itemsOverride?: Order["items"]; subtotalOverride?: number },
+): jsPDF {
+  const supplierBlock: SupplierBlock = opts?.supplier ?? DEFAULT_SUPPLIER;
+  const items = opts?.itemsOverride ?? order.items;
+  const subtotal = opts?.subtotalOverride ?? order.subtotal;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const page = { w: 210, h: 297, m: 15 };
 
