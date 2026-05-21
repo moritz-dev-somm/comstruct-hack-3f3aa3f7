@@ -30,6 +30,8 @@ import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
 import { ScanButton } from "@/components/ScanButton";
+import { useServerFn } from "@tanstack/react-start";
+import { startNegotiationForOrder } from "../../agent/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
 
 const CHOCOLATE_THRESHOLD = 500;
