@@ -471,7 +471,13 @@ export const humanFollowupNegotiation = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const neg = await loadNegotiation(data.negotiationId);
-      const email = composeHumanReplyEmail(neg.order_snapshot, data.message);
+      const lang = pickLang(neg.order_snapshot, neg.supplier_language);
+      const translated = await translateForSupplier(data.message, lang);
+      const email = composeHumanReplyEmail(
+        neg.order_snapshot,
+        { messageEn: translated.en, messageNative: translated.native },
+        lang,
+      );
       const replyMessageId = await sendReplyOrFresh(neg, email);
       const sb = adminClient();
       await sb
