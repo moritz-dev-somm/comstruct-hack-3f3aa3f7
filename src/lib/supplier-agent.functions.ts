@@ -268,3 +268,35 @@ export const listInboxMessages = createServerFn({ method: "POST" })
       return { ok: false as const, error: message, messages: [] };
     }
   });
+
+export const getInboxMessage = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      inboxId: z.string().min(1),
+      messageId: z.string().min(1),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const res = await agentMail().inboxes.messages.get(data.inboxId, data.messageId);
+      const anyM = res as unknown as Record<string, unknown>;
+      return {
+        ok: true as const,
+        message: {
+          id: String(anyM.messageId ?? anyM.id ?? data.messageId),
+          threadId: anyM.threadId ? String(anyM.threadId) : null,
+          from: String(anyM.from ?? ""),
+          to: Array.isArray(anyM.to) ? anyM.to.map(String) : [],
+          cc: Array.isArray(anyM.cc) ? anyM.cc.map(String) : [],
+          subject: String(anyM.subject ?? ""),
+          text: String((anyM.text as string | undefined) ?? (anyM.extractedText as string | undefined) ?? ""),
+          html: (anyM.html as string | undefined) ?? null,
+          receivedAt: String(anyM.receivedAt ?? anyM.createdAt ?? ""),
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("getInboxMessage failed:", message);
+      return { ok: false as const, error: message };
+    }
+  });
