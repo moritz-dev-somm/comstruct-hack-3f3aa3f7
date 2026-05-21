@@ -111,6 +111,67 @@ function buildThreads(messages: InboxMessage[], inboxAddress: string): Thread[] 
   return Array.from(byKey.values()).sort((a, b) => (a.lastAt > b.lastAt ? -1 : 1));
 }
 
+type Verdict =
+  | "fully_confirmed"
+  | "confirmed_with_issue"
+  | "declined"
+  | "needs_clarification"
+  | "unclear";
+
+type VerdictInfo = {
+  verdict: Verdict;
+  replyMessageId: string | null;
+  lastReplyAt: string | null;
+};
+
+type NegotiationLite = {
+  id: string;
+  thread_id: string | null;
+  reply_message_id: string | null;
+  last_reply_at: string | null;
+  classification: { verdict?: Verdict } | null;
+};
+
+const VERDICT_META: Record<Verdict, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
+  fully_confirmed: {
+    label: "Approved",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+    Icon: CheckCircle2,
+  },
+  confirmed_with_issue: {
+    label: "Partial",
+    cls: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+    Icon: AlertTriangle,
+  },
+  declined: {
+    label: "Declined",
+    cls: "border-destructive/40 bg-destructive/10 text-destructive",
+    Icon: XCircle,
+  },
+  needs_clarification: {
+    label: "Question",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: HelpCircle,
+  },
+  unclear: {
+    label: "Unclear",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Circle,
+  },
+};
+
+function VerdictPill({ verdict, size = "sm" }: { verdict: Verdict; size?: "sm" | "md" }) {
+  const m = VERDICT_META[verdict];
+  const h = size === "md" ? "h-6 text-[11px]" : "h-5 text-[10px]";
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 ${h} rounded-full border font-semibold ${m.cls}`}>
+      <m.Icon className="size-3" />
+      {m.label}
+    </span>
+  );
+}
+
+
 function AgentPage() {
   const [inbox] = useState<StoredInbox | null>(() => loadInbox());
   const [openId, setOpenId] = useState<string | null>(null);
