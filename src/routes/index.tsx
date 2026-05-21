@@ -1158,33 +1158,3 @@ function ApprovalBanner() {
 }
 
 export type {};
-
-function ProductImage({
-  sku,
-  name,
-  className = "",
-  iconSize = "text-4xl",
-}: {
-  sku: string;
-  name: string;
-  className?: string;
-  iconSize?: string;
-}) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return (
-      <div className={`bg-muted/50 rounded grid place-items-center ${iconSize} ${className}`}>
-        📦
-      </div>
-    );
-  }
-  return (
-    <img
-      src={`/products/${sku}.jpg`}
-      alt={name}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className={`object-cover rounded bg-muted/50 ${className}`}
-    />
-  );
-}
