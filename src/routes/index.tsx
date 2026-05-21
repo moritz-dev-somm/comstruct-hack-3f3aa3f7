@@ -335,6 +335,7 @@ function Home() {
   function reset() {
     setMessages([]);
     setRecommendedIds([]);
+    setFollowups([]);
     setSelectedCategory(null);
     setSearchResults(null);
     setSearchExtracted(null);
