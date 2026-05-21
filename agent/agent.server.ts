@@ -148,6 +148,8 @@ export type ReplyClassification = {
   answerable_questions?: string[];
   unanswerable_questions?: string[];
   unclear_points?: string[];
+  /** Same as unclear_points but in ENGLISH — language-stable for cross-turn matching. */
+  unclear_points_en?: string[];
   /** Subset of priorOpenQuestions the latest reply addresses (verbatim). */
   answered_open_questions?: string[];
   /** Subset of priorOpenQuestions still not addressed by the latest reply. */
@@ -157,13 +159,24 @@ export type ReplyClassification = {
   clarification_count?: number;
 };
 
+export type ThreadMessage = {
+  role: "agent" | "supplier";
+  /** ISO 639-1 best effort. */
+  lang?: string;
+  /** Plain text body (no HTML). */
+  text: string;
+  at?: string;
+};
+
 export type ThreadContext = {
-  /** Open questions the agent has asked and is waiting on. */
+  /** Open questions the agent has asked and is waiting on (ENGLISH, canonical). */
   priorOpenQuestions: string[];
   /** Checklist fields the supplier already answered in earlier turns. */
   priorAnsweredChecklist: ChecklistField[];
   /** Short bullets of facts the supplier already gave us. */
   priorAnswersSummary?: string[];
+  /** Full raw transcript (oldest → newest), excluding the LATEST supplier reply. */
+  transcript?: ThreadMessage[];
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
