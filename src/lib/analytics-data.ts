@@ -218,14 +218,15 @@ export function computeForemen(rows: NegotiationRow[]): ForemanAgg[] {
   // No foreman field in DB — group by project as a stand-in.
   const map = new Map<string, { orders: number; spend: number }>();
   for (const r of rows) {
-    const p = r.project ?? r.order_snapshot?.project ?? "Ohne Projekt";
+    const p = r.project ?? r.order_snapshot?.project ?? "No project";
     const cur = map.get(p) ?? { orders: 0, spend: 0 };
     cur.orders += 1;
     cur.spend += r.order_snapshot?.subtotal ?? 0;
     map.set(p, cur);
   }
   return Array.from(map, ([project, v]) => ({
-    foreman: `Polier ${project}`,
+    foreman: `Foreman ${project}`,
+
     project,
     orders: v.orders,
     spend: Math.round(v.spend),
