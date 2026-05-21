@@ -6,7 +6,14 @@ import {
   adminClient,
   HARDCODED_SUPPLIER_EMAIL,
 } from "@agent/agent.server";
-import { composeOrderEmail, composeNudgeEmail } from "@agent/templates";
+import {
+  composeOrderEmail,
+  composeNudgeEmail,
+  composeConfirmationEmail,
+  composeDeclineAckEmail,
+  composeHumanReplyEmail,
+  type SupplierLanguage,
+} from "@agent/templates";
 import type { Order } from "@/lib/orders";
 
 const itemShape = z.object({
