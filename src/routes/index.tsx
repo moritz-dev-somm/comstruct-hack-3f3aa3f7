@@ -239,16 +239,19 @@ function Home() {
 
   // Auto-run hybrid catalog search after every completed assistant turn.
   // Each new turn refines the search with the full chat log.
-  const lastSearchTurnRef = useRef(0);
+  const lastSearchedTurnRef = useRef(0);
   useEffect(() => {
     if (streaming) return;
     if (messages.length === 0) return;
-    if (messages.length === lastSearchTurnRef.current) return;
     const last = messages[messages.length - 1];
     if (last?.role !== "assistant" || !last.content) return;
     if (!messages.some((m) => m.role === "user")) return;
-    lastSearchTurnRef.current = messages.length;
-    runHybridSearch();
+    if (messages.length === lastSearchedTurnRef.current) return;
+    const turnAtCall = messages.length;
+    runHybridSearch().then((ok) => {
+      // Only mark this turn as searched on success, so failed searches retry on the next effect tick.
+      if (ok) lastSearchedTurnRef.current = turnAtCall;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, messages]);
 
