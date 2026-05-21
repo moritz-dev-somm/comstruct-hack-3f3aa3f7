@@ -21,11 +21,14 @@ export type Database = {
           consumable: string | null
           created_at: string
           description: string | null
+          description_en: string | null
           enriched_at: string | null
           hazardous: boolean
           id: string
           keywords: string[]
+          keywords_en: string[]
           name: string
+          name_en: string | null
           price_eur: number
           sku: string
           source_category: string | null
@@ -33,8 +36,10 @@ export type Database = {
           supplier: string | null
           typical_site: string | null
           unit: string
+          unit_en: string | null
           updated_at: string
           use_cases: Json
+          use_cases_en: Json
         }
         Insert: {
           attributes?: Json
@@ -42,11 +47,14 @@ export type Database = {
           consumable?: string | null
           created_at?: string
           description?: string | null
+          description_en?: string | null
           enriched_at?: string | null
           hazardous?: boolean
           id?: string
           keywords?: string[]
+          keywords_en?: string[]
           name: string
+          name_en?: string | null
           price_eur?: number
           sku: string
           source_category?: string | null
@@ -54,8 +62,10 @@ export type Database = {
           supplier?: string | null
           typical_site?: string | null
           unit?: string
+          unit_en?: string | null
           updated_at?: string
           use_cases?: Json
+          use_cases_en?: Json
         }
         Update: {
           attributes?: Json
@@ -63,11 +73,14 @@ export type Database = {
           consumable?: string | null
           created_at?: string
           description?: string | null
+          description_en?: string | null
           enriched_at?: string | null
           hazardous?: boolean
           id?: string
           keywords?: string[]
+          keywords_en?: string[]
           name?: string
+          name_en?: string | null
           price_eur?: number
           sku?: string
           source_category?: string | null
@@ -75,8 +88,10 @@ export type Database = {
           supplier?: string | null
           typical_site?: string | null
           unit?: string
+          unit_en?: string | null
           updated_at?: string
           use_cases?: Json
+          use_cases_en?: Json
         }
         Relationships: []
       }
