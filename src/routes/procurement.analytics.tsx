@@ -50,9 +50,9 @@ function Analytics() {
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [foremanDrawer, setForemanDrawer] = useState<string | null>(null);
 
-  const spendRef = useRef<HTMLDivElement>(null);
-  const supplierRef = useRef<HTMLDivElement>(null);
-  const approvalRef = useRef<HTMLDivElement>(null);
+  const spendRef = useRef<HTMLDivElement | null>(null);
+  const supplierRef = useRef<HTMLDivElement | null>(null);
+  const approvalRef = useRef<HTMLDivElement | null>(null);
 
   const kpis = useMemo(() => scaleKPIs(period), [period]);
   const series = useMemo(() => buildDailySeries(period), [period]);
@@ -65,8 +65,9 @@ function Analytics() {
   const topDay = useMemo(() => series.reduce((m, d) => (d.spend > m.spend ? d : m), series[0]), [series]);
   const quietDay = useMemo(() => series.find((d) => d.spend === 0) ?? series[0], [series]);
 
-  const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
+  const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) =>
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
 
   const exportCSV = () => {
     const csvContent = `Projekt,Polier,Bestellungen,Ausgaben CHF,Lieferant,Kategorie,Datum
