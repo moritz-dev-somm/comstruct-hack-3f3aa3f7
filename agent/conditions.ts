@@ -2,60 +2,149 @@ import type { ChecklistField, ReplyClassification } from "./agent.server";
 
 /**
  * Inbound-policy layer. Given the LLM classification and the negotiation's
- * counter state, decide which outbound action the agent should take.
+ * accumulated state, decide which outbound action the agent should take.
  *
- * The classifier provides a `suggested_outbound` hint, but this layer has the
- * final word — it enforces the safety rules:
- *  - never auto-confirm with unmet checklist or issues
- *  - never loop more than once on either follow-up or clarification
+ * Safety rules:
+ *  - Hard cap of 5 supplier replies per negotiation → human review.
+ *  - Never auto-confirm with unmet checklist or unresolved issues.
+ *  - Declines, item-unavailable, supplier-asks-for-human, or any
+ *    question we cannot auto-answer → human review (no automatic email).
+ *  - Auto-approve only if lead time is reasonable AND shipping cost is low.
  */
 
+export const REPLY_CAP = 5;
+export const AUTO_LEAD_TIME_DAYS_MAX = 14;
+export const AUTO_SHIPPING_EUR_FLOOR = 20;
+export const AUTO_SHIPPING_PERCENT_MAX = 0.05;
+
 export type AgentAction =
-  | { kind: "send_confirmation" }
+  | { kind: "send_confirmation"; reason?: string }
   | { kind: "send_checklist_followup"; fields: ChecklistField[] }
   | { kind: "send_answer_questions"; questions: string[] }
-  | { kind: "send_clarification_request" }
-  | { kind: "send_decline_ack" }
-  | { kind: "send_issues_ack" }
+  | { kind: "send_clarification_request"; pendingChecklist: ChecklistField[] }
   | { kind: "escalate_silent"; reason: string }
   | { kind: "no_op"; reason: string };
 
 export type CounterState = {
   followup_count: number;
   clarification_count: number;
+  reply_count: number;
+  /** Checklist fields the supplier has answered at any point in the thread. */
+  answered_checklist: ChecklistField[];
+  order_subtotal_eur: number;
 };
 
-export function decideAction(
-  cls: ReplyClassification,
-  state: CounterState,
-): AgentAction {
-  const missing = cls.missing_checklist ?? [];
+const HUMAN_REQUEST_RE =
+  /(talk to|speak (?:to|with)|a real person|human|sales rep|account manager|mit jemandem (?:sprechen|reden)|persönlich(?:e[rsn])? kontakt|sprechen|parler (?:à|avec)|un commercial|une personne|parlare con|persona reale|operatore)/i;
+
+const UNAVAILABLE_RE =
+  /(out of stock|unavailable|nicht (?:verfügbar|lieferbar|am lager)|ausverkauft|nicht (?:mehr )?vorrätig|indisponible|en rupture|esaurito|non disponibile)/i;
+
+function pendingFromAnswered(answered: ChecklistField[]): ChecklistField[] {
+  const all: ChecklistField[] = ["delivery_date", "shipping_cost"];
+  return all.filter((f) => !answered.includes(f));
+}
+
+function isAcceptableLeadTime(cls: ReplyClassification): boolean {
+  const days = cls.lead_time_days;
+  if (typeof days === "number" && Number.isFinite(days)) return days <= AUTO_LEAD_TIME_DAYS_MAX;
+  // If we don't have a number, defer to human.
+  return false;
+}
+
+function isAcceptableShipping(cls: ReplyClassification, subtotalEur: number): boolean {
+  const eur = cls.shipping_cost_eur;
+  if (typeof eur !== "number" || !Number.isFinite(eur)) return false;
+  const cap = Math.max(AUTO_SHIPPING_EUR_FLOOR, subtotalEur * AUTO_SHIPPING_PERCENT_MAX);
+  return eur <= cap;
+}
+
+export function decideAction(cls: ReplyClassification, state: CounterState): AgentAction {
+  const pending = pendingFromAnswered(state.answered_checklist);
   const issues = cls.issues ?? [];
   const answerable = cls.answerable_questions ?? [];
   const unanswerable = cls.unanswerable_questions ?? [];
+  const wantsHuman = cls.wants_human === true || HUMAN_REQUEST_RE.test(cls.summary || "") || HUMAN_REQUEST_RE.test(cls.summary_en || "");
+
+  // 1. Hard reply cap.
+  if (state.reply_count >= REPLY_CAP && cls.verdict !== "fully_confirmed") {
+    return {
+      kind: "escalate_silent",
+      reason: `Reply limit reached (${REPLY_CAP}) — please take over.`,
+    };
+  }
+
+  // 2. Supplier explicitly wants a human.
+  if (wantsHuman) {
+    return { kind: "escalate_silent", reason: "Supplier asked to speak to a person." };
+  }
+
+  // 3. Supplier asks something we cannot answer.
+  if (unanswerable.length > 0) {
+    return {
+      kind: "escalate_silent",
+      reason: `Supplier asked: ${unanswerable.join(" | ")}`,
+    };
+  }
 
   switch (cls.verdict) {
     case "fully_confirmed": {
-      if (missing.length === 0 && issues.length === 0) {
+      if (pending.length === 0 && issues.length === 0) {
         return { kind: "send_confirmation" };
       }
-      if (missing.length > 0 && state.followup_count < 1) {
-        return { kind: "send_checklist_followup", fields: missing };
+      if (pending.length > 0 && state.reply_count < REPLY_CAP) {
+        return { kind: "send_checklist_followup", fields: pending };
       }
       return {
         kind: "escalate_silent",
-        reason:
-          missing.length > 0
-            ? `Supplier confirmed but still missing after follow-up: ${missing.join(", ")}`
-            : `Supplier confirmed with issues: ${issues.join("; ")}`,
+        reason: pending.length
+          ? `Still missing after follow-ups: ${pending.join(", ")}`
+          : `Confirmed with issues: ${issues.join("; ")}`,
       };
     }
 
-    case "confirmed_with_issue":
-      return { kind: "send_issues_ack" };
+    case "confirmed_with_issue": {
+      // Item unavailability → straight to human, no email.
+      const unavailable = issues.some((i) => UNAVAILABLE_RE.test(i)) ||
+        UNAVAILABLE_RE.test(cls.summary || "") ||
+        UNAVAILABLE_RE.test(cls.summary_en || "");
+      if (unavailable) {
+        return {
+          kind: "escalate_silent",
+          reason: `Supplier flagged item unavailable: ${cls.summary_en || cls.summary}`,
+        };
+      }
 
-    case "declined":
-      return { kind: "send_decline_ack" };
+      const leadOk = isAcceptableLeadTime(cls);
+      const shipOk = isAcceptableShipping(cls, state.order_subtotal_eur);
+
+      // Issues we tolerate automatically: only lead-time / shipping deviations,
+      // and only when both are within thresholds.
+      const benignIssues = issues.every((i) =>
+        /(lead time|delivery|liefer|consegna|livraison|shipping|versand|expédition|spedizione|frais|surcharge)/i.test(i),
+      );
+
+      if (benignIssues && leadOk && shipOk && pending.length === 0) {
+        return { kind: "send_confirmation", reason: "Auto-approved: lead time and shipping within thresholds." };
+      }
+
+      const reasons: string[] = [];
+      if (!leadOk && cls.lead_time)
+        reasons.push(`Lead time: ${cls.lead_time}${cls.lead_time_days ? ` (~${cls.lead_time_days} days)` : ""}`);
+      if (!shipOk && (cls.checklist?.shipping_cost || cls.shipping_cost_eur != null))
+        reasons.push(`Shipping: ${cls.checklist?.shipping_cost ?? `€${cls.shipping_cost_eur}`}`);
+      if (issues.length && reasons.length === 0) reasons.push(issues.join("; "));
+      return {
+        kind: "escalate_silent",
+        reason: `Needs human approval — ${reasons.join(" · ") || "supplier raised issues"}.`,
+      };
+    }
+
+    case "declined": {
+      // No automatic email. Wait for human to authorise replacement purchase,
+      // which will trigger the decline-ack email separately.
+      return { kind: "escalate_silent", reason: `Supplier declined: ${cls.summary_en || cls.summary}` };
+    }
 
     case "needs_clarification": {
       if (answerable.length > 0) {
@@ -63,20 +152,29 @@ export function decideAction(
       }
       return {
         kind: "escalate_silent",
-        reason: unanswerable.length
-          ? `Supplier asked: ${unanswerable.join(" | ")}`
-          : `Supplier asked a question we cannot auto-answer.`,
+        reason: `Supplier asked a question we cannot auto-answer.`,
       };
     }
 
     case "unclear":
     default: {
-      if (state.clarification_count < 1) {
-        return { kind: "send_clarification_request" };
+      if (state.reply_count < REPLY_CAP) {
+        return { kind: "send_clarification_request", pendingChecklist: pending };
       }
-      return { kind: "escalate_silent", reason: `Reply still unclear after one clarification request.` };
+      return { kind: "escalate_silent", reason: `Reply still unclear after ${REPLY_CAP} exchanges.` };
     }
   }
+}
+
+/** Helper used by the webhook to merge classifier results into accumulated state. */
+export function mergeAnsweredChecklist(
+  previous: ChecklistField[],
+  cls: ReplyClassification,
+): ChecklistField[] {
+  const set = new Set(previous);
+  if (cls.checklist?.delivery_date) set.add("delivery_date");
+  if (cls.checklist?.shipping_cost) set.add("shipping_cost");
+  return Array.from(set);
 }
 
 /* ----- Outbound-timeout policy (unchanged behaviour) ----- */
