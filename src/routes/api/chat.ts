@@ -259,8 +259,13 @@ At the very end of EVERY assistant reply, on its own final line, emit exactly th
 - Keep them in the same language as the user (German if they wrote German, English otherwise).
 - Never mention this marker in your prose. The UI parses and hides it.
 
-CATALOG SUMMARY (compact view of what's in stock; use search_products for filtered detail):
+RELEVANT CATALOG ITEMS FOR THIS TURN (USE THE REQUESTED QUANTITIES PROVIDED IF THE USER SPECIFIED THEM):
+
 `;
+
+const SYSTEM_PROMPT_SUFFIX = `
+
+If none of the items above fit the request, call search_products to query the live database for more options.`;
 
 const TOOLS = [
   {
