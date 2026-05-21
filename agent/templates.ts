@@ -33,82 +33,202 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+export type SupplierLanguage = "en" | "de" | "fr" | "it";
+
 export type OrderEmailContext = {
   supplierName: string;
   items: Order["items"];
   subtotal: number;
+  language?: SupplierLanguage;
 };
 
-/**
- * Per-supplier order request. If the cart spans multiple suppliers, the caller
- * builds one of these per supplier — each with the subset of items that goes
- * to that company.
- */
-export function composeOrderEmail(order: Order, ctx: OrderEmailContext): ComposedEmail {
+type Strings = {
+  subjectPrefix: string;
+  greeting: (name: string) => string;
+  intro: (project: string) => string;
+  reference: string;
+  buyer: string;
+  deliverTo: string;
+  items: string;
+  estimatedSubtotal: string;
+  exclVat: string;
+  poAttached: string;
+  pleaseTellUs: string;
+  earliestDelivery: string;
+  shippingCosts: string;
+  flagDiscrepancy: string;
+  needResponse: string;
+  thanks: string;
+  qty: string;
+  item: string;
+  unit: string;
+  unitPrice: string;
+  lineTotal: string;
+  subtotalLabel: string;
+};
+
+const STRINGS: Record<SupplierLanguage, Strings> = {
+  en: {
+    subjectPrefix: "Purchase request",
+    greeting: (n) => `Hello ${n} team,`,
+    intro: (p) => `We would like to place the following order for project "${p}".`,
+    reference: "Reference",
+    buyer: "Buyer",
+    deliverTo: "Deliver to",
+    items: "Items",
+    estimatedSubtotal: "Estimated subtotal",
+    exclVat: "(excl. VAT, excl. shipping)",
+    poAttached: "The full purchase order is attached as a PDF — please confirm it is correct.",
+    pleaseTellUs: "Could you also let us know:",
+    earliestDelivery: "The earliest delivery date you can commit to",
+    shippingCosts: "Any shipping costs that are not already included",
+    flagDiscrepancy:
+      "If anything is unavailable, delayed, or differently priced, please flag it in your reply so we can route it to the right person quickly.",
+    needResponse: "We need a response within 24 hours to keep the project on schedule.",
+    thanks: "Thank you,",
+    qty: "Qty",
+    item: "Item",
+    unit: "Unit",
+    unitPrice: "Unit price",
+    lineTotal: "Line total",
+    subtotalLabel: "Subtotal",
+  },
+  de: {
+    subjectPrefix: "Bestellanfrage",
+    greeting: (n) => `Sehr geehrtes ${n}-Team,`,
+    intro: (p) => `Wir möchten folgende Bestellung für das Projekt „${p}" aufgeben.`,
+    reference: "Referenz",
+    buyer: "Besteller",
+    deliverTo: "Lieferadresse",
+    items: "Positionen",
+    estimatedSubtotal: "Voraussichtliche Zwischensumme",
+    exclVat: "(exkl. MwSt., exkl. Versand)",
+    poAttached: "Die vollständige Bestellung ist als PDF angehängt — bitte bestätigen Sie deren Richtigkeit.",
+    pleaseTellUs: "Könnten Sie uns zusätzlich mitteilen:",
+    earliestDelivery: "Den frühestmöglichen Liefertermin, den Sie zusichern können",
+    shippingCosts: "Allfällige Versandkosten, die noch nicht enthalten sind",
+    flagDiscrepancy:
+      "Falls etwas nicht verfügbar, verzögert oder zu einem abweichenden Preis lieferbar ist, weisen Sie uns bitte in Ihrer Antwort darauf hin, damit wir es schnell an die richtige Person weiterleiten können.",
+    needResponse: "Wir benötigen eine Antwort innerhalb von 24 Stunden, um den Projektplan einzuhalten.",
+    thanks: "Vielen Dank,",
+    qty: "Menge",
+    item: "Artikel",
+    unit: "Einheit",
+    unitPrice: "Einzelpreis",
+    lineTotal: "Gesamtpreis",
+    subtotalLabel: "Zwischensumme",
+  },
+  fr: {
+    subjectPrefix: "Demande d'achat",
+    greeting: (n) => `Bonjour à l'équipe ${n},`,
+    intro: (p) => `Nous souhaitons passer la commande suivante pour le projet « ${p} ».`,
+    reference: "Référence",
+    buyer: "Acheteur",
+    deliverTo: "Livraison à",
+    items: "Articles",
+    estimatedSubtotal: "Sous-total estimé",
+    exclVat: "(hors TVA, hors frais de port)",
+    poAttached: "Le bon de commande complet est joint en PDF — merci de confirmer son exactitude.",
+    pleaseTellUs: "Pourriez-vous également nous indiquer :",
+    earliestDelivery: "La date de livraison la plus proche que vous pouvez garantir",
+    shippingCosts: "Les éventuels frais de port non encore inclus",
+    flagDiscrepancy:
+      "Si un article est indisponible, retardé ou à un prix différent, merci de le signaler dans votre réponse afin que nous puissions le transmettre rapidement à la bonne personne.",
+    needResponse: "Nous avons besoin d'une réponse sous 24 heures pour respecter le planning du projet.",
+    thanks: "Merci,",
+    qty: "Qté",
+    item: "Article",
+    unit: "Unité",
+    unitPrice: "Prix unitaire",
+    lineTotal: "Total ligne",
+    subtotalLabel: "Sous-total",
+  },
+  it: {
+    subjectPrefix: "Richiesta d'acquisto",
+    greeting: (n) => `Salve team ${n},`,
+    intro: (p) => `Vorremmo effettuare il seguente ordine per il progetto "${p}".`,
+    reference: "Riferimento",
+    buyer: "Acquirente",
+    deliverTo: "Consegnare a",
+    items: "Articoli",
+    estimatedSubtotal: "Subtotale stimato",
+    exclVat: "(IVA esclusa, spedizione esclusa)",
+    poAttached: "L'ordine d'acquisto completo è allegato in PDF — vi preghiamo di confermarne la correttezza.",
+    pleaseTellUs: "Potreste inoltre comunicarci:",
+    earliestDelivery: "La data di consegna più rapida che potete garantire",
+    shippingCosts: "Eventuali costi di spedizione non ancora inclusi",
+    flagDiscrepancy:
+      "Se qualcosa non è disponibile, è in ritardo o ha un prezzo diverso, vi preghiamo di segnalarlo nella risposta in modo da poterlo inoltrare rapidamente alla persona giusta.",
+    needResponse: "Abbiamo bisogno di una risposta entro 24 ore per rispettare la pianificazione del progetto.",
+    thanks: "Grazie,",
+    qty: "Qtà",
+    item: "Articolo",
+    unit: "Unità",
+    unitPrice: "Prezzo unitario",
+    lineTotal: "Totale riga",
+    subtotalLabel: "Subtotale",
+  },
+};
+
+function renderTextBlock(s: Strings, order: Order, ctx: OrderEmailContext): string {
   const { supplierName, items, subtotal } = ctx;
   const lines = items.map(
     (i) => `- ${i.qty} × ${i.name} (${i.unit}) @ ${formatEUR(i.price)} → ${formatEUR(i.qty * i.price)}`,
   );
-
-  const subject = `[${order.id}] Purchase request — ${order.project} (${formatEUR(subtotal)})`;
-
-  const text = [
-    `Hello ${supplierName} team,`,
+  return [
+    s.greeting(supplierName),
     ``,
-    `We would like to place the following order for project "${order.project}".`,
-    `Reference: ${order.id}`,
+    s.intro(order.project),
+    `${s.reference}: ${order.id}`,
     ``,
-    `Buyer:`,
+    `${s.buyer}:`,
     `  ${COMPANY.name}`,
     `  ${COMPANY.street}, ${COMPANY.city}`,
-    `Deliver to:`,
+    `${s.deliverTo}:`,
     `  ${COMPANY.site}`,
     ``,
-    `Items:`,
+    `${s.items}:`,
     ...lines,
     ``,
-    `Estimated subtotal: ${formatEUR(subtotal)} (excl. VAT, excl. shipping)`,
+    `${s.estimatedSubtotal}: ${formatEUR(subtotal)} ${s.exclVat}`,
     ``,
-    `The full purchase order is attached as a PDF — please confirm it is correct.`,
-    `Could you also let us know:`,
-    `  - The earliest delivery date you can commit to`,
-    `  - Any shipping costs that are not already included`,
+    s.poAttached,
+    s.pleaseTellUs,
+    `  - ${s.earliestDelivery}`,
+    `  - ${s.shippingCosts}`,
     ``,
-    `If anything is unavailable, delayed, or differently priced, please flag it`,
-    `in your reply so we can route it to the right person quickly.`,
+    s.flagDiscrepancy,
     ``,
-    `We need a response within 24 hours to keep the project on schedule.`,
+    s.needResponse,
     ``,
-    `Thank you,`,
+    s.thanks,
     `${COMPANY.agentName}`,
     `${COMPANY.contact} · ${COMPANY.phone}`,
-    ``,
-    `--`,
-    AGENT_DISCLOSURE_TEXT,
   ].join("\n");
+}
 
+function renderHtmlBlock(s: Strings, order: Order, ctx: OrderEmailContext): string {
+  const { supplierName, items, subtotal } = ctx;
   const itemsHtml = items
     .map(
       (i) =>
         `<tr><td>${i.qty}</td><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.unit)}</td><td style="text-align:right">${formatEUR(i.price)}</td><td style="text-align:right">${formatEUR(i.qty * i.price)}</td></tr>`,
     )
     .join("");
-
-  const html = `
-<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">
-  <p>Hello ${escapeHtml(supplierName)} team,</p>
-  <p>We would like to place the following order for project <strong>${escapeHtml(order.project)}</strong>.<br/>
-  Reference: <strong>${order.id}</strong></p>
+  return `
+  <p>${escapeHtml(s.greeting(supplierName))}</p>
+  <p>${escapeHtml(s.intro(order.project))}<br/>
+  ${escapeHtml(s.reference)}: <strong>${escapeHtml(order.id)}</strong></p>
   <table style="width:100%;margin:8px 0 12px 0;font-size:13px">
     <tr>
       <td style="vertical-align:top;width:50%">
-        <div style="color:#6b7280;font-size:11px;text-transform:uppercase">Buyer</div>
+        <div style="color:#6b7280;font-size:11px;text-transform:uppercase">${escapeHtml(s.buyer)}</div>
         <div><strong>${escapeHtml(COMPANY.name)}</strong></div>
         <div>${escapeHtml(COMPANY.street)}</div>
         <div>${escapeHtml(COMPANY.city)}</div>
       </td>
       <td style="vertical-align:top;width:50%">
-        <div style="color:#6b7280;font-size:11px;text-transform:uppercase">Deliver to</div>
+        <div style="color:#6b7280;font-size:11px;text-transform:uppercase">${escapeHtml(s.deliverTo)}</div>
         <div><strong>Site: ${escapeHtml(order.project)}</strong></div>
         <div>${escapeHtml(COMPANY.site)}</div>
       </td>
@@ -116,26 +236,58 @@ export function composeOrderEmail(order: Order, ctx: OrderEmailContext): Compose
   </table>
   <table style="border-collapse:collapse;width:100%;margin:12px 0">
     <thead><tr style="background:#f3f4f6">
-      <th style="text-align:left;padding:6px">Qty</th>
-      <th style="text-align:left;padding:6px">Item</th>
-      <th style="text-align:left;padding:6px">Unit</th>
-      <th style="text-align:right;padding:6px">Unit price</th>
-      <th style="text-align:right;padding:6px">Line total</th>
+      <th style="text-align:left;padding:6px">${escapeHtml(s.qty)}</th>
+      <th style="text-align:left;padding:6px">${escapeHtml(s.item)}</th>
+      <th style="text-align:left;padding:6px">${escapeHtml(s.unit)}</th>
+      <th style="text-align:right;padding:6px">${escapeHtml(s.unitPrice)}</th>
+      <th style="text-align:right;padding:6px">${escapeHtml(s.lineTotal)}</th>
     </tr></thead>
     <tbody>${itemsHtml}</tbody>
-    <tfoot><tr><td colspan="4" style="text-align:right;padding:6px"><strong>Subtotal</strong></td>
+    <tfoot><tr><td colspan="4" style="text-align:right;padding:6px"><strong>${escapeHtml(s.subtotalLabel)}</strong></td>
       <td style="text-align:right;padding:6px"><strong>${formatEUR(subtotal)}</strong></td></tr></tfoot>
   </table>
-  <p>The full purchase order is attached as a PDF — please confirm it is correct, and let us know:</p>
+  <p>${escapeHtml(s.poAttached)}</p>
+  <p>${escapeHtml(s.pleaseTellUs)}</p>
   <ul>
-    <li>The <strong>earliest delivery date</strong> you can commit to</li>
-    <li>Any <strong>shipping costs</strong> that are not already included</li>
+    <li>${escapeHtml(s.earliestDelivery)}</li>
+    <li>${escapeHtml(s.shippingCosts)}</li>
   </ul>
-  <p>If anything is unavailable, delayed, or differently priced, please flag it in your reply so we can route it to the right person quickly.<br/>
-  We need a response within <strong>24 hours</strong> to keep the project on schedule.</p>
-  <p>Thank you,<br/>
+  <p>${escapeHtml(s.flagDiscrepancy)}<br/>
+  ${escapeHtml(s.needResponse)}</p>
+  <p>${escapeHtml(s.thanks)}<br/>
   ${escapeHtml(COMPANY.agentName)}<br/>
-  ${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>
+  ${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+}
+
+/**
+ * Per-supplier order request. When the supplier's language is not English,
+ * the email is bilingual: native language first, then English below.
+ */
+export function composeOrderEmail(order: Order, ctx: OrderEmailContext): ComposedEmail {
+  const lang: SupplierLanguage = ctx.language ?? "en";
+  const primary = STRINGS[lang];
+  const english = STRINGS.en;
+  const isBilingual = lang !== "en";
+
+  const subjectBase = `${primary.subjectPrefix} — ${order.project} (${formatEUR(ctx.subtotal)})`;
+  const subject = isBilingual
+    ? `[${order.id}] ${subjectBase} / ${english.subjectPrefix} — ${order.project}`
+    : `[${order.id}] ${subjectBase}`;
+
+  const separator = "\n\n-------------------- English --------------------\n\n";
+  const text =
+    renderTextBlock(primary, order, ctx) +
+    (isBilingual ? separator + renderTextBlock(english, order, ctx) : "") +
+    `\n\n--\n${AGENT_DISCLOSURE_TEXT}`;
+
+  const htmlSeparator = isBilingual
+    ? `<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb"/><p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em">English</p>`
+    : "";
+  const html = `
+<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">
+  ${renderHtmlBlock(primary, order, ctx)}
+  ${htmlSeparator}
+  ${isBilingual ? renderHtmlBlock(english, order, ctx) : ""}
   ${AGENT_DISCLOSURE_HTML}
 </div>`;
 
