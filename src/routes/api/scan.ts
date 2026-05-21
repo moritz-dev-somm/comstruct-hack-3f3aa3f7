@@ -90,7 +90,7 @@ export const Route = createFileRoute("/api/scan")({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "openai/gpt-5-mini",
+              model: "openai/gpt-5.4-mini",
               messages: [
                 { role: "system", content: SYSTEM },
                 {

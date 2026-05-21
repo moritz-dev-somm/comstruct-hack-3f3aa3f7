@@ -54,7 +54,7 @@ async function extractFromChat(messages: ChatMsg[]): Promise<Extracted> {
   const url = useOpenAI
     ? "https://api.openai.com/v1/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-4o-mini" : "openai/gpt-5-mini";
+  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
 
   const systemPrompt = `You analyze a construction site procurement chat between a foreman and an assistant. Distill what the foreman ultimately needs to BUY. Be concise and technical — no conversational filler.
 
