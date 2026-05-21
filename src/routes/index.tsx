@@ -668,11 +668,7 @@ function HeroView({
           <ScanButton size="hero" onResult={(prompt) => send(prompt)} />
         </div>
 
-        <div className="my-6 flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          <div className="flex-1 h-px bg-border" />
-          or type
-          <div className="flex-1 h-px bg-border" />
-        </div>
+        <div className="my-6 h-px bg-border" />
 
         <div>
           <ChatInput
@@ -686,18 +682,18 @@ function HeroView({
           />
         </div>
 
-        <div className="mt-6 -mx-4 px-4 overflow-x-auto">
-          <div className="flex gap-2 min-w-min">
-            {SUGGESTED_CHIPS.map((chip) => (
+        <div className="mt-6 flex flex-wrap items-stretch gap-y-2">
+          {SUGGESTED_CHIPS.map((chip, i) => (
+            <Fragment key={chip}>
+              {i > 0 && <div className="self-center mx-2 h-5 w-px bg-border" />}
               <button
-                key={chip}
                 onClick={() => send(chip)}
-                className="shrink-0 rounded-full border bg-card hover:bg-accent px-4 h-10 text-sm font-medium"
+                className="rounded-full border border-brand text-brand hover:bg-brand/10 px-4 h-10 text-sm font-medium"
               >
                 {chip}
               </button>
-            ))}
-          </div>
+            </Fragment>
+          ))}
         </div>
 
         <div className="mt-10">
