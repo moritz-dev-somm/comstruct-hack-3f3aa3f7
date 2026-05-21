@@ -468,6 +468,7 @@ function Home() {
             onClearCategory={() => setSelectedCategory(null)}
             onResetRecommendations={() => setRecommendedIds([])}
             onSuggestion={(s) => send(s)}
+            followups={followups}
             allProducts={products}
             onRunSearch={runHybridSearch}
             searching={searching}
