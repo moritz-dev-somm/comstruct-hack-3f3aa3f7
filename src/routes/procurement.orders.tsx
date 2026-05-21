@@ -176,7 +176,7 @@ function PdfPreviewModal({ order, contacts, onClose }: { order: Order; contacts:
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => downloadPurchaseOrderPdf(order)}
+              onClick={() => downloadPurchaseOrdersBySupplier(order, contacts)}
               className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-md border hover:bg-accent"
             >
               <Download className="size-3.5" /> Download
