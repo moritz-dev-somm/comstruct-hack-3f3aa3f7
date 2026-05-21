@@ -424,6 +424,22 @@ function ProductDialog({
   );
 }
 
+function SortableTh({
+  label, active, dir, onClick, align = "left",
+}: { label: string; active: boolean; dir: SortDir; onClick: () => void; align?: "left" | "right" }) {
+  return (
+    <th className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
+      <button
+        onClick={onClick}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${active ? "text-foreground" : ""}`}
+      >
+        {label}
+        <ArrowUpDown className={`size-3 ${active ? "opacity-100" : "opacity-40"} ${active && dir === "desc" ? "rotate-180" : ""}`} />
+      </button>
+    </th>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
