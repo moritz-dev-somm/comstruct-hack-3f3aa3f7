@@ -29,6 +29,7 @@ import { useCart } from "@/lib/cart";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
+import { ScanButton } from "@/components/ScanButton";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
 
 const CHOCOLATE_THRESHOLD = 500;
@@ -374,6 +375,7 @@ function Home() {
                 placeholder="Ask a follow-up…"
               />
             </div>
+            <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
             <VoiceButton size="compact" onTranscript={(t) => send(t)} />
           </div>
         </div>
@@ -441,9 +443,10 @@ function HeroView({
           Describe the job in your own words — speak it or type it.
         </p>
 
-        {/* Primary voice CTA — visually distinct, separated from the chat bar */}
-        <div className="mt-8 flex justify-center">
+        {/* Primary action CTAs — voice (brand) + scan (grey), visually distinct */}
+        <div className="mt-8 flex justify-center items-start gap-8">
           <VoiceButton size="hero" onTranscript={(t) => send(t)} />
+          <ScanButton size="hero" onResult={(prompt) => send(prompt)} />
         </div>
 
         <div className="my-6 flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
