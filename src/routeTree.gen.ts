@@ -18,6 +18,7 @@ import { Route as ProcurementIndexRouteImport } from './routes/procurement.index
 import { Route as ProcurementOrdersRouteImport } from './routes/procurement.orders'
 import { Route as ProcurementCatalogRouteImport } from './routes/procurement.catalog'
 import { Route as ProcurementAnalyticsRouteImport } from './routes/procurement.analytics'
+import { Route as ProcurementAgentRouteImport } from './routes/procurement.agent'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as ProcurementOrdersOrderIdRouteImport } from './routes/procurement.orders.$orderId'
@@ -67,6 +68,11 @@ const ProcurementAnalyticsRoute = ProcurementAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => ProcurementRoute,
 } as any)
+const ProcurementAgentRoute = ProcurementAgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
+  getParentRoute: () => ProcurementRoute,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
+  '/procurement/agent': typeof ProcurementAgentRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
+  '/procurement/agent': typeof ProcurementAgentRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
+  '/procurement/agent': typeof ProcurementAgentRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/products'
     | '/api/chat'
+    | '/procurement/agent'
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/products'
     | '/api/chat'
+    | '/procurement/agent'
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/products'
     | '/api/chat'
+    | '/procurement/agent'
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
@@ -245,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProcurementAnalyticsRouteImport
       parentRoute: typeof ProcurementRoute
     }
+    '/procurement/agent': {
+      id: '/procurement/agent'
+      path: '/agent'
+      fullPath: '/procurement/agent'
+      preLoaderRoute: typeof ProcurementAgentRouteImport
+      parentRoute: typeof ProcurementRoute
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -281,6 +300,7 @@ const ProcurementOrdersRouteWithChildren =
   ProcurementOrdersRoute._addFileChildren(ProcurementOrdersRouteChildren)
 
 interface ProcurementRouteChildren {
+  ProcurementAgentRoute: typeof ProcurementAgentRoute
   ProcurementAnalyticsRoute: typeof ProcurementAnalyticsRoute
   ProcurementCatalogRoute: typeof ProcurementCatalogRoute
   ProcurementOrdersRoute: typeof ProcurementOrdersRouteWithChildren
@@ -288,6 +308,7 @@ interface ProcurementRouteChildren {
 }
 
 const ProcurementRouteChildren: ProcurementRouteChildren = {
+  ProcurementAgentRoute: ProcurementAgentRoute,
   ProcurementAnalyticsRoute: ProcurementAnalyticsRoute,
   ProcurementCatalogRoute: ProcurementCatalogRoute,
   ProcurementOrdersRoute: ProcurementOrdersRouteWithChildren,
