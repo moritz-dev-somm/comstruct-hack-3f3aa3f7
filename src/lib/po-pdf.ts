@@ -25,11 +25,20 @@ const BUYER = {
   phone: "+41 61 555 01 23",
 };
 
-const SUPPLIER = {
+const DEFAULT_SUPPLIER = {
   name: "OBI Bau- und Heimwerkermärkte GmbH",
   street: "Albert-Einstein-Straße 7-9",
   city: "42929 Wermelskirchen, Germany",
   vat: "DE 121 758 727",
+};
+
+export type SupplierBlock = {
+  name: string;
+  street?: string;
+  city?: string;
+  vat?: string;
+  email?: string;
+  phone?: string;
 };
 
 const VAT_RATE = 0.19;
