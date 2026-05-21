@@ -242,7 +242,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
           </div>
 
           <div className={`${CARD} p-5`}>
-            <SectionHeader title="Ausgaben nach Kategorie" subtitle="Anteile am Gesamtbudget" />
+            <SectionHeader title="Spend by category" subtitle="Share of total budget" />
             <div className="h-[280px] mt-4 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
