@@ -125,7 +125,7 @@ export function generatePurchaseOrderPdf(
 
   /* ----- Line items ----- */
   const tableStartY = addrY + 38;
-  const rows = order.items.map((it, idx) => {
+  const rows = items.map((it, idx) => {
     const lineNet = it.qty * it.price;
     return [
       String(idx + 1),
