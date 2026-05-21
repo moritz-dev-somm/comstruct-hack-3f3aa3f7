@@ -1,10 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -12,151 +15,610 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatEUR } from "@/lib/catalog";
-import { useOrders } from "@/lib/orders";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, X } from "lucide-react";
+import {
+  APPROVAL_TIERS,
+  APPROVAL_TIMES,
+  PERIODS,
+  type Period,
+  REJECTIONS,
+  TIMEOFDAY,
+  WEEKDAY,
+  buildDailySeries,
+  formatCHF,
+  formatCHFShort,
+  scaleCategories,
+  scaleForemen,
+  scaleKPIs,
+  scaleProjects,
+  scaleSuppliers,
+} from "@/lib/analytics-mock";
 
 export const Route = createFileRoute("/procurement/analytics")({
   component: Analytics,
 });
 
-const COLORS = ["#C8281E", "#1D4F9E", "#3F8A56", "#D9883A", "#7A5A8F"];
+const PAGE_BG = "#F9FAFB";
+const CARD = "rounded-xl border border-[#E5E7EB] shadow-sm bg-white";
+const GREEN = "#16A34A";
+const BLUE = "#2563EB";
+const GRAY = "#6B7280";
+const RED = "#DC2626";
 
 function Analytics() {
-  const { orders } = useOrders();
+  const [period, setPeriod] = useState<Period>("monat");
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [foremanDrawer, setForemanDrawer] = useState<string | null>(null);
 
-  const totals = useMemo(() => {
-    const now = Date.now();
-    const inMonth = orders.filter(
-      (o) => now - new Date(o.createdAt).getTime() < 30 * 24 * 60 * 60_000,
-    );
-    const spend = inMonth.reduce((s, o) => s + o.subtotal, 0);
-    const avg = inMonth.length ? spend / inMonth.length : 0;
-    return {
-      spend,
-      count: inMonth.length,
-      avg,
-      suppliers: new Set(inMonth.flatMap((o) => o.items.map((i) => i.category))).size,
-    };
-  }, [orders]);
+  const spendRef = useRef<HTMLDivElement>(null);
+  const supplierRef = useRef<HTMLDivElement>(null);
+  const approvalRef = useRef<HTMLDivElement>(null);
 
-  const byProject = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const o of orders) map.set(o.project, (map.get(o.project) ?? 0) + o.subtotal);
-    return Array.from(map, ([project, total]) => ({ project, total }));
-  }, [orders]);
+  const kpis = useMemo(() => scaleKPIs(period), [period]);
+  const series = useMemo(() => buildDailySeries(period), [period]);
+  const projects = useMemo(() => scaleProjects(period, null), [period]);
+  const categories = useMemo(() => scaleCategories(period, projectFilter), [period, projectFilter]);
+  const suppliers = useMemo(() => scaleSuppliers(period, projectFilter), [period, projectFilter]);
+  const foremen = useMemo(() => scaleForemen(period, projectFilter), [period, projectFilter]);
 
-  const byCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const o of orders) {
-      for (const i of o.items) {
-        map.set(i.category, (map.get(i.category) ?? 0) + i.qty * i.price);
-      }
-    }
-    return Array.from(map, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [orders]);
+  const categoryTotal = categories.reduce((s, c) => s + c.value, 0);
+  const topDay = useMemo(() => series.reduce((m, d) => (d.spend > m.spend ? d : m), series[0]), [series]);
+  const quietDay = useMemo(() => series.find((d) => d.spend === 0) ?? series[0], [series]);
 
-  const topForemen = useMemo(() => {
-    const map = new Map<string, { foreman: string; project: string; spend: number; count: number }>();
-    for (const o of orders) {
-      const key = o.foreman;
-      const cur = map.get(key) ?? { foreman: o.foreman, project: o.project, spend: 0, count: 0 };
-      cur.spend += o.subtotal;
-      cur.count += 1;
-      map.set(key, cur);
-    }
-    return Array.from(map.values()).sort((a, b) => b.spend - a.spend).slice(0, 5);
-  }, [orders]);
+  const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const exportCSV = () => {
+    const csvContent = `Projekt,Polier,Bestellungen,Ausgaben CHF,Lieferant,Kategorie,Datum
+Schulhaus Zürich-Nord,Marco Bianchi,18,1640,ACME Construction,PSA,Mai 2026
+Renovation Hardturm,Anna Kessler,14,1280,Würth AG,Befestigung,Mai 2026
+Neubau Lagerhaus,Peter Hofer,9,760,Bosch Professional,Werkzeug,Mai 2026
+Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "comstruct_analytics_Mai_2026.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Spend analytics</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Last 30 days of C-material activity.</p>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi label="C-spend this month" value={formatEUR(totals.spend)} />
-        <Kpi label="Orders" value={totals.count.toString()} />
-        <Kpi label="Categories" value={totals.suppliers.toString()} />
-        <Kpi label="Avg order value" value={formatEUR(totals.avg)} />
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        <ChartCard title="Spend per project">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={byProject}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="project" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => `€${v}`} tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(v: number) => formatEUR(v)} />
-              <Bar dataKey="total" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Spend by category">
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
-                {byCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Tooltip formatter={(v: number) => formatEUR(v)} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            {byCategory.map((c, i) => (
-              <span key={c.name} className="inline-flex items-center gap-1.5">
-                <span className="size-2.5 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} />
-                {c.name}
-              </span>
-            ))}
-          </div>
-        </ChartCard>
-      </div>
-
-      <ChartCard title="Top foremen this month">
-        <table className="w-full text-sm">
-          <thead className="text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="text-left font-medium py-2">Foreman</th>
-              <th className="text-left font-medium py-2">Project</th>
-              <th className="text-right font-medium py-2">Orders</th>
-              <th className="text-right font-medium py-2">Spend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topForemen.length === 0 && (
-              <tr><td colSpan={4} className="text-center text-muted-foreground py-6">No orders yet.</td></tr>
+    <div style={{ background: PAGE_BG }} className="min-h-screen">
+      <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
+        {/* Header */}
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[24px] font-bold text-[#111827] leading-tight">Spend Analytics</h1>
+            <p className="text-[13px] text-[#6B7280]">C-Material Beschaffung</p>
+            {projectFilter && (
+              <div className="mt-2 inline-flex items-center gap-2 bg-[#ECFDF5] text-[#065F46] text-xs px-2.5 py-1 rounded-full border border-[#A7F3D0]">
+                Filter aktiv: {projectFilter}
+                <button onClick={() => setProjectFilter(null)} aria-label="Filter entfernen">
+                  <X className="size-3.5" />
+                </button>
+              </div>
             )}
-            {topForemen.map((r) => (
-              <tr key={r.foreman} className="border-t">
-                <td className="py-2 font-medium">{r.foreman}</td>
-                <td className="py-2 text-muted-foreground">{r.project}</td>
-                <td className="py-2 text-right tabular-nums">{r.count}</td>
-                <td className="py-2 text-right tabular-nums font-semibold">{formatEUR(r.spend)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </ChartCard>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="inline-flex bg-white border border-[#E5E7EB] rounded-full p-1">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPeriod(p.id)}
+                  className={`px-3.5 py-1.5 text-xs rounded-full transition-colors ${
+                    period === p.id ? "text-white" : "text-[#374151] hover:bg-[#F3F4F6]"
+                  }`}
+                  style={period === p.id ? { background: GREEN } : undefined}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={exportCSV}
+              className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] text-[#111827]"
+            >
+              <Download className="size-4" /> Export
+            </button>
+          </div>
+        </header>
+
+        {/* §1 KPI row */}
+        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <KpiCard
+            label="Gesamtausgaben C-Material"
+            value={formatCHF(kpis.spend)}
+            trend={12}
+            trendLabel="vs Vormonat"
+            onClick={() => scrollTo(spendRef)}
+          />
+          <KpiCard
+            label="Anzahl Bestellungen"
+            value={String(kpis.count)}
+            trend={8}
+            onClick={() => scrollTo(spendRef)}
+          />
+          <KpiCard
+            label="Ø Bestellwert"
+            value={formatCHF(kpis.avg)}
+            trend={-3}
+            onClick={() => scrollTo(spendRef)}
+          />
+          <KpiCard
+            label="Aktive Lieferanten"
+            value={String(kpis.suppliers)}
+            trend={0}
+            onClick={() => scrollTo(supplierRef)}
+          />
+          <KpiCard
+            label="Genehmigungsquote"
+            value={`${kpis.approvalRate}%`}
+            trend={2}
+            onClick={() => scrollTo(approvalRef)}
+          />
+          <KpiCard
+            label="Ø Genehmigungszeit"
+            value={`${kpis.approvalMinutes} Min.`}
+            trend={-22}
+            invertTrend
+            onClick={() => scrollTo(approvalRef)}
+          />
+        </section>
+
+        {/* §2 Ausgabenverlauf */}
+        <section ref={spendRef} className={`${CARD} p-5`}>
+          <SectionHeader title="Ausgabenverlauf" subtitle="Tägliche C-Material-Ausgaben im ausgewählten Zeitraum" />
+          <div className="h-[320px] mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={series} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="#F3F4F6" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: GRAY }} axisLine={{ stroke: "#E5E7EB" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: GRAY }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCHFShort(v)} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
+                  formatter={(v: number, name: string) => [formatCHF(v), name]}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="spend" name="Tagesausgaben" fill={GREEN} fillOpacity={0.75} radius={[3, 3, 0, 0]} />
+                <Line dataKey="rolling7" name="7-Tage-Durchschnitt" stroke={BLUE} strokeWidth={2} dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Chip>📈 Höchster Tag: {topDay.label} — {formatCHF(topDay.spend)} (Elektro Grundausstattung ×3)</Chip>
+            <Chip>📉 Ruhigster Tag: {quietDay.label} (Sonntag) — CHF 0</Chip>
+            <Chip>⚡ Ø Montag 34% höher als andere Wochentage</Chip>
+          </div>
+        </section>
+
+        {/* §3 Spend Breakdown */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className={`${CARD} p-5`}>
+            <SectionHeader title="Ausgaben nach Projekt" subtitle="Klick auf Balken filtert das gesamte Dashboard" />
+            <div className="h-[280px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={projects} layout="vertical" margin={{ top: 10, right: 50, left: 10, bottom: 0 }}>
+                  <CartesianGrid stroke="#F3F4F6" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: GRAY }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCHFShort(v)} />
+                  <YAxis dataKey="project" type="category" width={150} tick={{ fontSize: 11, fill: "#111827" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
+                    formatter={(v: number) => [formatCHF(v), "Ausgaben"]}
+                  />
+                  <Bar
+                    dataKey="total"
+                    fill={GREEN}
+                    radius={[0, 4, 4, 0]}
+                    onClick={(d: { project: string }) => setProjectFilter(d.project)}
+                    style={{ cursor: "pointer" }}
+                    label={{ position: "right", formatter: (v: number) => formatCHF(v), fontSize: 11, fill: "#111827" }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={`${CARD} p-5`}>
+            <SectionHeader title="Ausgaben nach Kategorie" subtitle="Anteile am Gesamtbudget" />
+            <div className="h-[280px] mt-4 relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categories}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="55%"
+                    outerRadius="80%"
+                    paddingAngle={1}
+                    label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
+                    labelLine={{ stroke: "#9CA3AF" }}
+                  >
+                    {categories.map((c) => (
+                      <Cell key={c.name} fill={c.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
+                    formatter={(v: number, _n: string, p: { payload: { name: string; pct: number; top: string } }) => [
+                      `${formatCHF(v)} (${p.payload.pct}%) — Top: ${p.payload.top}`,
+                      p.payload.name,
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <div className="text-[11px] text-[#6B7280]">Gesamt</div>
+                <div className="text-[18px] font-bold text-[#111827]">{formatCHF(categoryTotal)}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* §4 Supplier Analysis */}
+        <section ref={supplierRef} className={`${CARD} p-5`}>
+          <SectionHeader title="Lieferantenanalyse" subtitle="Ausgaben, Vertragskonformität und Lieferperformance" />
+          <SupplierTable rows={suppliers} />
+          <div className="mt-4 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-[13px] text-[#92400E]">
+              ⚠ CHF 224 wurden bei Lieferanten ohne Rahmenvertrag ausgegeben. Empfehlung: Bestellungen auf ACME und Würth AG konsolidieren.
+            </div>
+            <Link
+              to="/settings"
+              className="text-xs px-3 py-1.5 rounded-md bg-white border border-[#FDE68A] text-[#92400E] hover:bg-[#FFFBEB]"
+            >
+              Bestellregeln anpassen →
+            </Link>
+          </div>
+        </section>
+
+        {/* §5 Ordering Behaviour */}
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className={`${CARD} p-5 lg:col-span-3`}>
+            <SectionHeader title="Top Besteller" subtitle="Bestellverhalten je Polier" />
+            <ForemanTable rows={foremen} onSelect={setForemanDrawer} />
+          </div>
+          <div className={`${CARD} p-5 lg:col-span-2`}>
+            <SectionHeader title="Bestellmuster" subtitle="Wann ordern Poliere?" />
+            <div className="text-[12px] text-[#6B7280] mt-3 mb-1">Bestellungen nach Wochentag</div>
+            <div className="h-[170px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={WEEKDAY} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke="#F3F4F6" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: GRAY }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: GRAY }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }} />
+                  <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                    {WEEKDAY.map((d) => (
+                      <Cell key={d.day} fill={d.weekend ? "#D1D5DB" : GREEN} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-[12px] text-[#6B7280] mt-4 mb-2">Bestellungen nach Tageszeit</div>
+            <div className="space-y-2">
+              {TIMEOFDAY.map((t) => (
+                <div key={t.slot} className="flex items-center gap-2 text-[12px]">
+                  <span className="w-16 text-[#374151]">{t.slot}</span>
+                  <div className="flex-1 h-2.5 bg-[#F3F4F6] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${t.pct}%`, background: GREEN }} />
+                  </div>
+                  <span className="w-10 text-right text-[#6B7280]">{t.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* §6 Approval Performance */}
+        <section ref={approvalRef} className={`${CARD} p-5`}>
+          <SectionHeader title="Genehmigungsperformance" subtitle="Durchlaufzeiten und Entscheidungsverhalten" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+            {/* Chart A */}
+            <div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Genehmigungszeiten</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Wie schnell werden Bestellungen genehmigt?</div>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={APPROVAL_TIMES} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <CartesianGrid stroke="#F3F4F6" vertical={false} />
+                    <XAxis dataKey="bucket" tick={{ fontSize: 10, fill: GRAY }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: GRAY }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }} />
+                    <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                      {APPROVAL_TIMES.map((b) => (
+                        <Cell key={b.bucket} fill={b.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[12px] text-[#16A34A] font-medium mt-1">Ø 18 Minuten — Ziel: unter 30 Minuten ✓</div>
+            </div>
+
+            {/* Chart B */}
+            <div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Genehmigungen nach Schwellwert</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Aufschlüsselung nach Genehmigungsstufe</div>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={APPROVAL_TIERS} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="80%" paddingAngle={1}>
+                      {APPROVAL_TIERS.map((t) => (
+                        <Cell key={t.name} fill={t.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
+                      formatter={(v: number, _n: string, p: { payload: { pct: number; name: string } }) => [
+                        `${v} Bestellungen (${p.payload.pct}%)`,
+                        p.payload.name,
+                      ]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-1 mt-1">
+                {APPROVAL_TIERS.map((t) => (
+                  <div key={t.name} className="flex items-center gap-2 text-[11px] text-[#374151]">
+                    <span className="size-2 rounded-sm" style={{ background: t.color }} />
+                    <span className="flex-1 truncate">{t.name}</span>
+                    <span className="text-[#6B7280]">{t.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Chart C */}
+            <div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Ablehnungsrate</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Übersicht abgelehnter Bestellungen</div>
+              <div className="text-[44px] font-bold text-[#DC2626] leading-none mt-2">6%</div>
+              <div className="text-[12px] text-[#6B7280] mt-1 mb-3">3 von 47 Bestellungen abgelehnt</div>
+              <div className="space-y-1.5">
+                {REJECTIONS.map((r) => (
+                  <div key={r.reason} className="flex items-center justify-between text-[12px] border-t border-[#F3F4F6] pt-1.5">
+                    <span className="text-[#374151]">{r.reason}</span>
+                    <span className="text-[#6B7280]">{r.count}×</span>
+                  </div>
+                ))}
+              </div>
+              <Link
+                to="/procurement/orders"
+                className="inline-block mt-3 text-xs px-3 py-1.5 rounded-md border border-[#E5E7EB] text-[#111827] hover:bg-[#F9FAFB]"
+              >
+                Ablehnungen ansehen →
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Foreman drawer */}
+      {foremanDrawer && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setForemanDrawer(null)} />
+          <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-white border-l border-[#E5E7EB] p-5 overflow-y-auto">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-[#6B7280]">Polier</div>
+                <div className="text-[18px] font-bold text-[#111827]">{foremanDrawer}</div>
+              </div>
+              <button onClick={() => setForemanDrawer(null)} className="p-1 rounded-md hover:bg-[#F3F4F6]">
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="text-[13px] text-[#6B7280] mt-4">
+              Bestellhistorie wird hier angezeigt (Demo). Verknüpfung mit echten Bestelldaten folgt.
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-2xl font-bold mt-1 tabular-nums">{value}</div>
+    <div>
+      <h2 className="text-[16px] font-semibold text-[#111827]">{title}</h2>
+      <p className="text-[13px] text-[#6B7280]">{subtitle}</p>
     </div>
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card p-5">
-      <h3 className="font-semibold text-sm mb-3">{title}</h3>
-      {children}
+    <span className="text-[13px] bg-[#F3F4F6] text-[#374151] rounded-full px-3 py-1">{children}</span>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  trend,
+  trendLabel,
+  invertTrend,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  trend: number;
+  trendLabel?: string;
+  invertTrend?: boolean;
+  onClick?: () => void;
+}) {
+  const positiveIsGood = !invertTrend;
+  const up = trend > 0;
+  const flat = trend === 0;
+  const good = flat ? null : positiveIsGood ? up : !up;
+  const color = flat ? "#6B7280" : good ? "#16A34A" : "#DC2626";
+  const Arrow = flat ? null : up ? ArrowUp : ArrowDown;
+  return (
+    <button
+      onClick={onClick}
+      className={`${CARD} p-4 text-left hover:border-[#D1D5DB] transition-colors`}
+    >
+      <div className="text-[12px] text-[#6B7280]">{label}</div>
+      <div className="text-[28px] font-bold text-[#111827] leading-tight mt-1">{value}</div>
+      <div className="flex items-center gap-1 mt-1 text-[12px]" style={{ color }}>
+        {Arrow && <Arrow className="size-3.5" />}
+        <span>{flat ? "→ 0%" : `${Math.abs(trend)}%`}</span>
+        <span className="text-[#6B7280]">{trendLabel ?? "vs Vorperiode"}</span>
+      </div>
+    </button>
+  );
+}
+
+function SupplierTable({ rows }: { rows: ReturnType<typeof scaleSuppliers> }) {
+  const [sort, setSort] = useState<{ key: keyof typeof rows[number]; dir: "asc" | "desc" }>({
+    key: "spend",
+    dir: "desc",
+  });
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const av = a[sort.key];
+      const bv = b[sort.key];
+      if (typeof av === "number" && typeof bv === "number") return sort.dir === "asc" ? av - bv : bv - av;
+      return sort.dir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+    return copy;
+  }, [rows, sort]);
+
+  const toggle = (key: typeof sort.key) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="text-left text-[#6B7280] border-b border-[#E5E7EB]">
+            <Th label="Lieferant" onClick={() => toggle("name")} />
+            <Th label="Bestellungen" onClick={() => toggle("orders")} align="right" />
+            <Th label="Ausgaben CHF" onClick={() => toggle("spend")} align="right" />
+            <Th label="Vertragskonform" onClick={() => toggle("compliance")} align="center" />
+            <Th label="Ø Lieferzeit" align="right" />
+            <Th label="Status" />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => (
+            <tr
+              key={r.name}
+              className={`border-b border-[#F3F4F6] ${r.status === "none" ? "border-l-4 border-l-[#DC2626] bg-[#FEF2F2]/40" : ""}`}
+            >
+              <td className="py-2.5 px-2 text-[#111827] font-medium">{r.name}</td>
+              <td className="py-2.5 px-2 text-right text-[#374151]">{r.orders}</td>
+              <td className="py-2.5 px-2 text-right text-[#374151]">{formatCHF(r.spend)}</td>
+              <td className="py-2.5 px-2 text-center">
+                <CompliancePill value={r.compliance} />
+              </td>
+              <td className="py-2.5 px-2 text-right text-[#374151]">{r.leadTime}</td>
+              <td className="py-2.5 px-2 text-[#374151]">{r.statusLabel}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  );
+}
+
+function CompliancePill({ value }: { value: number }) {
+  let bg = "#ECFDF5", fg = "#065F46";
+  if (value === 0 || value < 80) { bg = "#FEE2E2"; fg = "#991B1B"; }
+  else if (value < 100) { bg = "#FEF3C7"; fg = "#92400E"; }
+  return (
+    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ background: bg, color: fg }}>
+      {value}%
+    </span>
+  );
+}
+
+function ForemanTable({
+  rows,
+  onSelect,
+}: {
+  rows: ReturnType<typeof scaleForemen>;
+  onSelect: (name: string) => void;
+}) {
+  const [sort, setSort] = useState<{ key: keyof typeof rows[number]; dir: "asc" | "desc" }>({
+    key: "spend",
+    dir: "desc",
+  });
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const av = a[sort.key];
+      const bv = b[sort.key];
+      if (typeof av === "number" && typeof bv === "number") return sort.dir === "asc" ? av - bv : bv - av;
+      return sort.dir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+    return copy;
+  }, [rows, sort]);
+  const toggle = (key: typeof sort.key) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="text-left text-[#6B7280] border-b border-[#E5E7EB]">
+            <Th label="Polier" onClick={() => toggle("foreman")} />
+            <Th label="Projekt" onClick={() => toggle("project")} />
+            <Th label="Bestellungen" onClick={() => toggle("orders")} align="right" />
+            <Th label="Ausgaben CHF" onClick={() => toggle("spend")} align="right" />
+            <Th label="Ø Wert" onClick={() => toggle("avg")} align="right" />
+            <Th label="Trend" onClick={() => toggle("trend")} align="right" />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => (
+            <tr
+              key={r.foreman}
+              onClick={() => onSelect(r.foreman)}
+              className="border-b border-[#F3F4F6] hover:bg-[#F9FAFB] cursor-pointer"
+            >
+              <td className="py-2.5 px-2 text-[#111827] font-medium">{r.foreman}</td>
+              <td className="py-2.5 px-2 text-[#374151]">{r.project}</td>
+              <td className="py-2.5 px-2 text-right text-[#374151]">{r.orders}</td>
+              <td className="py-2.5 px-2 text-right text-[#374151]">{formatCHF(r.spend)}</td>
+              <td className="py-2.5 px-2 text-right text-[#374151]">{formatCHF(r.avg)}</td>
+              <td
+                className="py-2.5 px-2 text-right font-medium"
+                style={{ color: r.trend > 0 ? GREEN : r.trend < 0 ? RED : GRAY }}
+              >
+                {r.trend > 0 ? "↑" : r.trend < 0 ? "↓" : "→"} {Math.abs(r.trend)}%
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Th({
+  label,
+  onClick,
+  align,
+}: {
+  label: string;
+  onClick?: () => void;
+  align?: "left" | "right" | "center";
+}) {
+  const alignment = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return (
+    <th className={`py-2 px-2 font-medium text-[11px] uppercase tracking-wide ${alignment}`}>
+      {onClick ? (
+        <button onClick={onClick} className="inline-flex items-center gap-1 group hover:text-[#111827]">
+          {label}
+          <ArrowUpDown className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      ) : (
+        label
+      )}
+    </th>
   );
 }
