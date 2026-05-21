@@ -108,7 +108,15 @@ async function extractIntents(userMessage: string, apiKey: string): Promise<Sear
   const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
 Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
 Valid category_filter values (else null): ${VALID_CATEGORIES.map((c) => `'${c}'`).join(", ")}.
-Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null. Keep q short (1-4 keywords, same language as the user).
+Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null.
+
+KEYWORD (q) RULES — BE AS MINIMAL AS POSSIBLE:
+- Pick the SINGLE most distinctive token. Prefer model/size/standard codes over generic nouns.
+- Examples: "TX50 drill bits" → q="TX50"; "3.5x35 drywall screws" → q="3.5x35"; "EN388 cut-resistant gloves size L" → q="EN388"; "M8x80 anchors" → q="M8x80"; "P800 sanding discs" → q="P800".
+- ONLY when no code/size exists, use one short generic noun: "nails" → q="nail" (singular), "gloves" → q="glove", "helmet" → q="helmet".
+- NEVER combine code + noun (no "TX50 bit", no "3.5x35 screw"). The semantic search handles the noun automatically.
+- Same language as the user is fine but codes/sizes are language-neutral.
+
 Set category_filter ONLY when the user explicitly names a category or the item is unambiguous (e.g. "safety helmet" → Safety, "drill bit" → Power & Light). When in doubt, leave category_filter null — a wrong category hard-excludes good matches.`;
 
   try {
@@ -229,6 +237,7 @@ async function retrieveRelevant(
       try {
         const embedding = await embedQuery(intent.q, apiKey);
         if (embedding) {
+          // Attempt 1: hybrid (embedding + keyword)
           const { data, error } = await sb.rpc("hybrid_search_materials", {
             user_embedding: embedding as unknown as string,
             category_filter: intent.category_filter,
@@ -237,6 +246,20 @@ async function retrieveRelevant(
           });
           if (!error && Array.isArray(data) && data.length) {
             const skus = (data as Array<{ sku: string }>).map((r) => r.sku);
+            const full = await fetchProductsBySkus(skus);
+            const order = new Map(skus.map((s, i) => [s, i]));
+            full.sort((a, b) => (order.get(a.sku) ?? 0) - (order.get(b.sku) ?? 0));
+            return full.map((r) => ({ ...r, requested_quantity: intent.requested_quantity }));
+          }
+          // Attempt 2: pure semantic — drop keyword filter so embedding alone ranks
+          const sem = await sb.rpc("hybrid_search_materials", {
+            user_embedding: embedding as unknown as string,
+            category_filter: intent.category_filter,
+            keyword_filters: null,
+            match_count: 5,
+          });
+          if (!sem.error && Array.isArray(sem.data) && sem.data.length) {
+            const skus = (sem.data as Array<{ sku: string }>).map((r) => r.sku);
             const full = await fetchProductsBySkus(skus);
             const order = new Map(skus.map((s, i) => [s, i]));
             full.sort((a, b) => (order.get(a.sku) ?? 0) - (order.get(b.sku) ?? 0));
