@@ -1221,6 +1221,7 @@ function ProductCard({
       qty: 1,
       category: product.category,
       unit: product.unit,
+      supplier: product.supplier,
     });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
