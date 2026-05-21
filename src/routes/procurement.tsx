@@ -120,7 +120,7 @@ function SwitchRoleButton() {
       }}
       className="w-full flex items-center gap-2 px-3 h-9 rounded-md text-xs text-muted-foreground hover:bg-accent"
     >
-      <LogOut className="size-4" /> Switch role
+      <LogOut className="size-4" /> Switch user
     </button>
   );
 }
