@@ -12,7 +12,12 @@ export type DerivedStatus =
   | "pending_central"
   | "rejected"
   | "sending"
-  | "awaiting_supplier"
+  | "awaiting_first_reply"
+  | "clarifying"
+  | "following_up"
+  | "answering_questions"
+  | "issues_raised"
+  | "declined"
   | "action_required"
   | "partially_confirmed"
   | "confirmed"
@@ -26,7 +31,12 @@ export const DERIVED_STATUS_META: Record<DerivedStatus, { label: string; tone: S
   pending_central: { label: "Pending Central Approval", tone: "amber" },
   rejected: { label: "Rejected", tone: "red" },
   sending: { label: "Sending to Supplier", tone: "blue" },
-  awaiting_supplier: { label: "Awaiting Supplier Response", tone: "blue" },
+  awaiting_first_reply: { label: "Awaiting Supplier Reply", tone: "blue" },
+  clarifying: { label: "Clarifying with Supplier", tone: "amber" },
+  following_up: { label: "Following Up on Details", tone: "amber" },
+  answering_questions: { label: "Answered Supplier Questions", tone: "blue" },
+  issues_raised: { label: "Issues Raised", tone: "red" },
+  declined: { label: "Supplier Declined", tone: "red" },
   action_required: { label: "Action Required", tone: "amber" },
   partially_confirmed: { label: "Partially Confirmed", tone: "teal" },
   confirmed: { label: "Confirmed by Supplier", tone: "green" },
@@ -34,10 +44,44 @@ export const DERIVED_STATUS_META: Record<DerivedStatus, { label: string; tone: S
 };
 
 /**
- * Derives the user-facing status from the order's approval state and any
- * supplier negotiations attached to it. Once an order is `ordered`, the
- * supplier conversation drives the label.
+ * Priority for collapsing multiple per-supplier negotiations into one pill:
+ * lower number wins (more urgent / more specific).
  */
+const PRIORITY: Record<DerivedStatus, number> = {
+  declined: 0,
+  issues_raised: 1,
+  action_required: 2,
+  clarifying: 3,
+  following_up: 4,
+  answering_questions: 5,
+  awaiting_first_reply: 6,
+  partially_confirmed: 7,
+  confirmed: 8,
+  sending: 9,
+  delivered: 10,
+  draft: 11,
+  pending_pm: 11,
+  pending_central: 11,
+  rejected: 11,
+};
+
+function negToDerived(n: { status: string | null; last_reply_at: string | null }): DerivedStatus {
+  const s = (n.status || "").toLowerCase();
+  switch (s) {
+    case "confirmed": return "confirmed";
+    case "declined": return "declined";
+    case "issues_raised": return "issues_raised";
+    case "needs_user": return "action_required";
+    case "clarifying": return "clarifying";
+    case "following_up": return "following_up";
+    case "answering_questions": return "answering_questions";
+    case "sent":
+    case "awaiting_reply":
+    default:
+      return n.last_reply_at ? "clarifying" : "awaiting_first_reply";
+  }
+}
+
 export function deriveOrderStatus(
   order: Pick<Order, "status">,
   negotiations: NegotiationRow[] | undefined,
@@ -49,25 +93,22 @@ export function deriveOrderStatus(
   if (s === "rejected") return "rejected";
   if (s === "delivered") return "delivered";
 
-  // s === "ordered" or "approved" — look at supplier negotiations.
   const list = negotiations ?? [];
   if (list.length === 0) return "sending";
 
-  const counts = list.reduce(
-    (acc, n) => {
-      const k = (n.status || "").toLowerCase();
-      if (k === "confirmed") acc.confirmed++;
-      else if (k === "needs_user" || k === "declined") acc.action++;
-      else acc.awaiting++;
-      return acc;
-    },
-    { confirmed: 0, action: 0, awaiting: 0 },
-  );
-
-  if (counts.action > 0) return "action_required";
-  if (counts.confirmed === list.length) return "confirmed";
-  if (counts.confirmed > 0) return "partially_confirmed";
-  return "awaiting_supplier";
+  const derivedList = list.map(negToDerived);
+  const confirmedCount = derivedList.filter((d) => d === "confirmed").length;
+  if (confirmedCount > 0 && confirmedCount < derivedList.length) {
+    // Mix of confirmed + still-open — surface the worst open one, but if
+    // everything else is just confirmed return partially_confirmed.
+    const nonConfirmed = derivedList.filter((d) => d !== "confirmed");
+    const worst = nonConfirmed.sort((a, b) => PRIORITY[a] - PRIORITY[b])[0];
+    if (worst === "awaiting_first_reply" || worst === "answering_questions") {
+      return "partially_confirmed";
+    }
+    return worst;
+  }
+  return derivedList.sort((a, b) => PRIORITY[a] - PRIORITY[b])[0];
 }
 
 export const STATUS_TONE_CLASS: Record<StatusTone, string> = {

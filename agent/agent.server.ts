@@ -151,6 +151,8 @@ export type ReplyClassification = {
   answerable_questions?: string[];
   /** Questions that require a human to answer. */
   unanswerable_questions?: string[];
+  /** Specific vague points / unanswered items we should re-ask the supplier about. */
+  unclear_points?: string[];
   /** Hint from the classifier as to which outbound action fits. Policy may override. */
   suggested_outbound?: SuggestedOutbound;
   /** Number of automated targeted follow-ups already sent for the missing fields. */
@@ -184,6 +186,8 @@ Always provide:
 If the supplier asks us questions, split them:
 - answerable_questions: questions we can answer from purchase-order data (delivery address, VAT ID, payment terms, line items, contact, project reference). Use the supplier's own wording, translated to English.
 - unanswerable_questions: questions that need a human (custom discounts, off-PO terms, anything we don't know).
+
+If the verdict is "unclear" OR the supplier replied but left specific points vague or unanswered, populate unclear_points with a SHORT bullet list (max 6) of the EXACT concrete items we still need from the supplier. Phrase each bullet in the SUPPLIER'S language as a direct, specific question — e.g. "Confirm whether item X is in stock now or backordered", "Confirm unit price for SKU Y after the discount you mentioned", "Confirm earliest delivery date for the steel beams (you mentioned 'soon')". Never write generic prose. If nothing is unclear, return [].
 
 Finally pick suggested_outbound (the policy layer may still override):
 - "confirm" when fully_confirmed AND missing_checklist is empty AND no issues
@@ -253,7 +257,7 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, suggested_outbound.`,
+          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, suggested_outbound.`,
       },
     ],
     response_format: { type: "json_object" },
@@ -300,6 +304,9 @@ export async function classifyReply(args: {
         : [],
       unanswerable_questions: Array.isArray(parsed.unanswerable_questions)
         ? parsed.unanswerable_questions.map(String).filter(Boolean)
+        : [],
+      unclear_points: Array.isArray(parsed.unclear_points)
+        ? parsed.unclear_points.map(String).filter(Boolean).slice(0, 6)
         : [],
       suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
     };

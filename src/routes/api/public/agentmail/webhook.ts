@@ -253,31 +253,32 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           }
           case "send_checklist_followup": {
             await reply(composeFollowupEmail(order, action.fields, lang));
-            nextStatus = "awaiting_reply";
+            nextStatus = "following_up";
             nextFollowup = followupCount + 1;
             break;
           }
           case "send_answer_questions": {
             const qa = buildAnswersFromOrder(order, action.questions);
             await reply(composeAnswerQuestionsEmail(order, qa, lang));
-            nextStatus = "awaiting_reply";
+            nextStatus = "answering_questions";
             break;
           }
           case "send_clarification_request": {
-            await reply(composeClarificationRequestEmail(order, lang));
-            nextStatus = "awaiting_reply";
+            const points = (cls.unclear_points ?? []).filter(Boolean);
+            await reply(composeClarificationRequestEmail(order, lang, points));
+            nextStatus = "clarifying";
             nextClarification = clarificationCount + 1;
             break;
           }
           case "send_decline_ack": {
             await reply(composeDeclineAckEmail(order, lang));
-            nextStatus = "needs_user";
+            nextStatus = "declined";
             needsUserReason = `Supplier declined: ${cls.summary_en || cls.summary}`;
             break;
           }
           case "send_issues_ack": {
             await reply(composeIssuesAckEmail(order, lang));
-            nextStatus = "needs_user";
+            nextStatus = "issues_raised";
             needsUserReason = `Issues: ${(cls.issues ?? []).join("; ") || cls.summary_en || cls.summary}`;
             break;
           }
