@@ -4,10 +4,11 @@ import { FileText, Download, ChevronRight, X, Eye } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type OrderStatus, type Order } from "@/lib/orders";
 import {
-  downloadPurchaseOrderPdf,
-  generatePurchaseOrderPdf,
+  downloadPurchaseOrdersBySupplier,
+  generatePurchaseOrdersBySupplier,
   purchaseOrderFilename,
 } from "@/lib/po-pdf";
+import { useSuppliers, supplierContactMap } from "@/lib/suppliers";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/orders")({
