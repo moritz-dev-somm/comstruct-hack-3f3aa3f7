@@ -1,54 +1,62 @@
-# Why "I need nails" misses the catalog
+# Fix: Quick Reorder can't add items to cart
 
-The catalog has two perfectly fine rows (`C011 60 mm Nail`, `C012 Nail 80 mm`), embeddings are populated on every product, and our per-keyword hybrid search runs for each intent. So why does the model say "tell me more about the job"?
+## Why it's broken
 
-Three independent gates are dropping nails:
+The three "past orders" at the bottom of the landing page are defined as English display strings:
 
-1. **Plural / language mismatch in `hybrid_search_materials` keyword check.** The SQL only matches the keyword filter against `name`, `description`, and `keywords` (the German-leaning columns). `ILIKE '%nails%'` against the German `name='Nagel 80mm'` and English-but-singular `keywords={nail,80mm}` returns 0. The English columns (`name_en`, `description_en`, `keywords_en`) are never consulted.
-2. **Hard 0.3 cosine-similarity gate.** When the keyword score is 0 (see #1), a row only survives if `similarity > 0.3`. A 1-word query like "nails" produces a low-information embedding, so borderline matches get culled and the RPC returns `[]`.
-3. **Wrong `category_filter` from intent extraction.** `extractIntents` is encouraged to pick a category, and the small Gemini Flash Lite model sometimes picks the wrong one (or "Other"). Category filter is a hard `WHERE`, so a misclassification removes nails entirely. When that happens, the ILIKE fallback in `searchProducts` also misses ("Nagel" doesn't contain "nails").
+```ts
+items: ["Drywall screws TX25", "Gypsum board 12.5mm", "Joint tape 50m", "Corner bead"]
+```
 
-When all three combine, the system prompt gets `(no catalog items matched this turn)`, and the model falls back to asking the user to clarify — exactly what you're seeing.
+When you click **Add all to cart**, the handler tries to match each string against `products` by substring (in either direction). The live catalog has different names (often German, e.g. `Nagel 80mm`) and uses SKUs like `C001`, so no match is ever found and the toast says *"No matching products found in catalog"*. Nothing gets added.
 
 ## Fix
 
-Four small, surgical changes. Nothing about the chat UX, recommendation rendering, or hybrid search at the bottom of the chat changes.
+Switch the Quick Reorder data model from display strings to **real catalog SKUs**, and derive the visible item names from the live products list at render time. That guarantees every "Add all" click resolves cleanly.
 
-### 1. Make `hybrid_search_materials` bilingual + plural-tolerant (SQL migration)
+### Changes (all in `src/routes/index.tsx`)
 
-Update the RPC so `keyword_score` is computed over both language sets and tolerates a singular/plural mismatch:
+1. **Change the `QuickOrder` type** to carry SKUs, not display strings:
+   ```ts
+   type QuickOrder = {
+     id: string;
+     date: string;
+     skus: string[];   // real catalog SKUs (C001, C014, ...)
+     total: string;
+   };
+   ```
 
-- Match each keyword against `name`, `name_en`, `description`, `description_en`, `keywords`, `keywords_en`.
-- Normalize: lowercase both sides; if a keyword ends in `s` and is >3 chars, also try the singular form (cheap, no extensions needed).
-- Drop the `similarity > 0.3` gate. Replace with `similarity > 0.05` so the RPC always returns up to `match_count` rows ranked by `hybrid_score`. The application layer (and the LLM) decide relevance, not the database.
+2. **Rewrite the three dummy orders** to use SKUs that actually exist in the catalog. Each order picks 3–4 SKUs that fit its theme:
+   - `#E-4821` (drywall/finishing job) — fastener + driver + consumable SKUs
+   - `#E-4789` (PPE refresh) — helmet, gloves, mask, glasses SKUs
+   - `#E-4755` (anchoring/sealing) — anchor, sealant, gun SKUs
 
-### 2. Bias `extractIntents` toward leaving `category_filter` null
+   To stay catalog-agnostic and avoid hardcoding SKUs that may not exist, build the three orders **dynamically from the live `products` list** inside `Home()`:
+   - Pick the first N products from a few relevant categories (`Fasteners`, `Safety`, `Sealing` / `Anchors`).
+   - Compute the real total from `product.price`.
+   - Skip the Quick Reorder block entirely while `products` is still empty (loading).
 
-In `src/routes/api/chat.ts`, tweak the system prompt for `extractIntents` to: "Set `category_filter` only when the user explicitly names a category or the item is unambiguous (e.g. 'safety helmet' → Safety). When in doubt, leave it null." This removes the most common false-exclusion without touching anything else.
+3. **Render order items from the resolved products**:
+   ```ts
+   {order.skus
+     .map((sku) => products.find((p) => p.sku === sku)?.name)
+     .filter(Boolean)
+     .slice(0, 3)
+     .join(" · ")}
+   ```
+   No more "Drywall screws TX25" placeholder text — the user sees actual catalog names.
 
-### 3. Stop the LLM from asking when items exist
+4. **Rewrite `onAddQuickOrder`** to take SKUs and resolve via `products.find(p => p.sku === sku)` — a direct, reliable lookup. Drop the substring matching entirely.
 
-In the main chat system prompt (`SYSTEM_PROMPT_BASE` in `src/routes/api/chat.ts`), add one sentence near the "Pick 1-20 specific catalog items" rule:
+5. **Remove the now-unused module-level `QUICK_REORDER_ORDERS` constant** (the in-component block is the source of truth).
 
-> If the relevant catalog items below contain anything plausibly matching the user's request, recommend them with sensible defaults — do NOT ask clarifying questions. Only ask for clarification when the catalog list is empty AND `search_products` also returns nothing.
+### Result
 
-This makes "I need nails" reliably resolve to "Here are [[product:C011:100]] and [[product:C012:50]] — 60 mm for studwork, 80 mm for formwork. Which length?" instead of an open question.
+- Clicking **Add all to cart** on any Quick Reorder card adds every item to the cart and opens the cart drawer.
+- The displayed product names and total match what's actually in the catalog.
+- If the catalog is empty / still loading, the Quick Reorder block doesn't render (no broken cards).
 
-### 4. Belt-and-braces: lowercase the keyword filter in the chat retrieval call
+## Out of scope
 
-In `retrieveRelevant` (chat.ts), pass `intent.q.toLowerCase()` as the keyword filter, since the SQL `ILIKE` is already case-insensitive but we'll be doing the singular-trim in SQL on the lowered form.
-
-## Files touched
-
-- `supabase/migrations/<new>.sql` — replace `hybrid_search_materials` with the bilingual / plural-tolerant version, threshold lowered to 0.05.
-- `src/routes/api/chat.ts` — two prompt edits (extractIntents + SYSTEM_PROMPT_BASE) and the `.toLowerCase()` on the keyword filter.
-
-## What this does NOT change
-
-- The end-of-chat hybrid catalog search (`/api/hybrid-search`) keeps its current behavior and now benefits from the same RPC improvements automatically.
-- Embeddings, the embeddings model, and the `search_document` trigger stay as-is.
-- No UI changes.
-
-## Expected outcome
-
-"I need nails", "Nägel", "brauche Nägel", "screws", "Schrauben" — single-word foreman queries — will return catalog rows on the first turn, and the assistant will recommend defaults instead of interrogating the user.
+- Persisting real past orders to the DB — these remain demo orders, just wired to real catalog SKUs.
+- Any styling / layout changes.
