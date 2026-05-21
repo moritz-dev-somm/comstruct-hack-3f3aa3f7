@@ -183,7 +183,67 @@ async function searchProducts(args: {
   return (data ?? []) as ProductRow[];
 }
 
+/**
+ * Curated SKU + quantity answers for the hard-coded suggestion chips shown
+ * on the homepage (see SUGGESTED_CHIPS in src/routes/index.tsx). When the
+ * user's message matches one of these chip strings exactly (case-insensitive,
+ * trimmed), we skip intent extraction + hybrid search and feed the LLM the
+ * curated list directly. This makes chip answers instant and deterministic.
+ *
+ * Keys MUST be lowercased + trimmed.
+ */
+const PRESET_CHIPS: Record<string, Array<{ sku: string; qty: number }>> = {
+  "ppe pack for a new worker": [
+    { sku: "C073", qty: 1 },  // Bauhelm weiß
+    { sku: "C021", qty: 1 },  // Schutzbrille klar
+    { sku: "C019", qty: 2 },  // Arbeitshandschuhe Gr.9
+    { sku: "C023", qty: 5 },  // Atemschutzmaske FFP2
+    { sku: "C022", qty: 5 },  // Gehörschutzstöpsel
+    { sku: "C024", qty: 1 },  // Warnweste orange
+    { sku: "C075", qty: 1 },  // Kniepolster
+  ],
+  "drywall screws for metal studs": [
+    { sku: "C001", qty: 200 }, // Schraube TX20 4x40
+    { sku: "C002", qty: 100 }, // Schraube TX20 5x60
+    { sku: "C032", qty: 1 },   // Bit TX20
+  ],
+  "window sealing kit": [
+    { sku: "C042", qty: 2 },  // PU-Schaum
+    { sku: "C076", qty: 1 },  // Montageschaum Reiniger
+    { sku: "C039", qty: 2 },  // Silikon transparent
+    { sku: "C040", qty: 2 },  // Silikon weiß
+    { sku: "C041", qty: 2 },  // Acryl weiß
+    { sku: "C026", qty: 2 },  // Abdeckfolie 4x5m
+    { sku: "C027", qty: 1 },  // Panzertape silber
+    { sku: "C025", qty: 1 },  // Malervlies
+  ],
+  "concrete drilling set": [
+    { sku: "C035", qty: 2 },  // Bohrer 10mm
+    { sku: "C034", qty: 2 },  // Bohrer 8mm
+    { sku: "C006", qty: 50 }, // Dübel 10mm
+    { sku: "C005", qty: 50 }, // Dübel 8mm
+    { sku: "C071", qty: 1 },  // Betontrennscheibe
+  ],
+  "refill: gloves, masks, blades": [
+    { sku: "C019", qty: 10 }, // Arbeitshandschuhe Gr.9
+    { sku: "C020", qty: 10 }, // Arbeitshandschuhe Gr.10
+    { sku: "C098", qty: 20 }, // Handschuh Latex
+    { sku: "C023", qty: 20 }, // Atemschutzmaske FFP2
+    { sku: "C097", qty: 30 }, // Staubmaske einfach
+    { sku: "C072", qty: 5 },  // Flexscheibe Metall
+    { sku: "C071", qty: 2 },  // Betontrennscheibe
+  ],
+  "sds bits + plugs for anchors": [
+    { sku: "C034", qty: 1 },  // Bohrer 8mm
+    { sku: "C035", qty: 1 },  // Bohrer 10mm
+    { sku: "C004", qty: 50 }, // Dübel 6mm
+    { sku: "C005", qty: 50 }, // Dübel 8mm
+    { sku: "C006", qty: 50 }, // Dübel 10mm
+  ],
+};
+
 async function fetchProductsBySkus(skus: string[]): Promise<ProductRow[]> {
+
   if (!skus.length) return [];
   const sb = sbClient();
   const { data, error } = await sb.from("products").select(SELECT_COLS).in("sku", skus);
