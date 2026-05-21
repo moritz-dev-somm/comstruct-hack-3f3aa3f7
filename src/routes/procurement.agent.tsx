@@ -118,11 +118,19 @@ function AgentPage() {
 
   const listFn = useServerFn(listInboxMessages);
   const getFn = useServerFn(getInboxMessage);
+  const negFn = useServerFn(listNegotiationsForInbox);
 
   const messagesQ = useQuery({
     queryKey: ["agent-inbox", inbox?.inboxId],
     enabled: !!inbox,
     queryFn: () => listFn({ data: { inboxId: inbox!.inboxId, limit: 50 } }),
+    refetchInterval: 15_000,
+  });
+
+  const negotiationsQ = useQuery({
+    queryKey: ["agent-negotiations", inbox?.inboxId],
+    enabled: !!inbox,
+    queryFn: () => negFn({ data: { inboxId: inbox!.inboxId } }),
     refetchInterval: 15_000,
   });
 
@@ -140,6 +148,33 @@ function AgentPage() {
     if (!inbox || messagesQ.data?.ok !== true) return [];
     return buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address);
   }, [messagesQ.data, inbox]);
+
+  // Map: latest classification per AgentMail thread_id, and per reply_message_id.
+  const verdictByThread = useMemo(() => {
+    const m = new Map<string, VerdictInfo>();
+    if (negotiationsQ.data?.ok !== true) return m;
+    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
+      const v = (n.classification?.verdict ?? null) as Verdict | null;
+      if (!v) continue;
+      const info: VerdictInfo = {
+        verdict: v,
+        replyMessageId: n.reply_message_id ?? null,
+        lastReplyAt: n.last_reply_at ?? null,
+      };
+      if (n.thread_id) m.set(n.thread_id, info);
+    }
+    return m;
+  }, [negotiationsQ.data]);
+
+  const verdictByMessageId = useMemo(() => {
+    const m = new Map<string, Verdict>();
+    if (negotiationsQ.data?.ok !== true) return m;
+    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
+      const v = (n.classification?.verdict ?? null) as Verdict | null;
+      if (v && n.reply_message_id) m.set(n.reply_message_id, v);
+    }
+    return m;
+  }, [negotiationsQ.data]);
 
   // Default: most recent thread expanded.
   const effectiveExpanded = (key: string, idx: number) =>
