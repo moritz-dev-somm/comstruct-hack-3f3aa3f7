@@ -108,7 +108,8 @@ async function extractIntents(userMessage: string, apiKey: string): Promise<Sear
   const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
 Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
 Valid category_filter values (else null): ${VALID_CATEGORIES.map((c) => `'${c}'`).join(", ")}.
-Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null. Keep q short (1-4 keywords, same language as the user).`;
+Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null. Keep q short (1-4 keywords, same language as the user).
+Set category_filter ONLY when the user explicitly names a category or the item is unambiguous (e.g. "safety helmet" → Safety, "drill bit" → Power & Light). When in doubt, leave category_filter null — a wrong category hard-excludes good matches.`;
 
   try {
     const res = await fetch(url, {
