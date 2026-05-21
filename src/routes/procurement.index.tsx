@@ -164,27 +164,23 @@ function ApprovalsInbox() {
                         approve(orderToSend.id, approver);
                         const t = toast.loading(`${orderToSend.id}: contacting supplier…`);
                         try {
-                          const { purchaseOrderFilename, purchaseOrderPdfBase64 } = await import(
-                            "@/lib/po-pdf"
+                          const [{ generatePurchaseOrdersBySupplier }, { fetchSuppliers, supplierContactMap }] =
+                            await Promise.all([
+                              import("@/lib/po-pdf"),
+                              import("@/lib/suppliers"),
+                            ]);
+                          const contacts = supplierContactMap(
+                            await fetchSuppliers().catch(() => []),
                           );
-                          const FALLBACK = "Generisch";
-                          const groups = new Map<string, typeof orderToSend.items>();
-                          for (const it of orderToSend.items) {
-                            const key = (it.supplier && it.supplier.trim()) || FALLBACK;
-                            const arr = groups.get(key) ?? [];
-                            arr.push(it);
-                            groups.set(key, arr);
-                          }
-                          const attachments = Array.from(groups.entries()).map(([supplierName, items]) => {
-                            const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
+                          const perSupplier = generatePurchaseOrdersBySupplier(orderToSend, contacts);
+                          const attachments = perSupplier.map((p) => {
+                            const dataUri = p.doc.output("datauristring");
+                            const comma = dataUri.indexOf(",");
+                            const pdfBase64 = comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
                             return {
-                              supplierName,
-                              filename: purchaseOrderFilename(orderToSend, supplierName),
-                              pdfBase64: purchaseOrderPdfBase64(orderToSend, {
-                                supplier: { name: supplierName },
-                                itemsOverride: items,
-                                subtotalOverride: subtotal,
-                              }),
+                              supplierName: p.supplierName,
+                              filename: p.filename,
+                              pdfBase64,
                             };
                           });
                           const res = (await startNegotiation({
