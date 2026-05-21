@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { formatEUR } from "@/lib/catalog";
-import { useOrders, PM, CENTRAL, type Order } from "@/lib/orders";
+import { useOrders, PM, CENTRAL } from "@/lib/orders";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import { StatusPill } from "./orders";
 
