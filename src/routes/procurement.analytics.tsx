@@ -87,19 +87,20 @@ function Analytics() {
 
 
   const exportCSV = () => {
-    const csvContent = `Projekt,Polier,Bestellungen,Ausgaben CHF,Lieferant,Kategorie,Datum
-Schulhaus Zürich-Nord,Marco Bianchi,18,1640,ACME Construction,PSA,Mai 2026
-Renovation Hardturm,Anna Kessler,14,1280,Würth AG,Befestigung,Mai 2026
-Neubau Lagerhaus,Peter Hofer,9,760,Bosch Professional,Werkzeug,Mai 2026
-Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
+    const csvContent = `Project,Foreman,Orders,Spend CHF,Supplier,Category,Date
+Schulhaus Zürich-Nord,Marco Bianchi,18,1640,ACME Construction,PPE,May 2026
+Renovation Hardturm,Anna Kessler,14,1280,Würth AG,Fasteners,May 2026
+Warehouse New Build,Peter Hofer,9,760,Bosch Professional,Tools,May 2026
+Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "comstruct_analytics_Mai_2026.csv";
+    a.download = "comstruct_analytics_May_2026.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   return (
     <div style={{ background: PAGE_BG }} className="min-h-screen">
