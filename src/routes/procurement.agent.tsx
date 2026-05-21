@@ -10,6 +10,7 @@ import {
   listInboxMessages,
   getInboxMessage,
   listNegotiationsForInbox,
+  ensureAgentInbox,
 } from "@/lib/supplier-agent.functions";
 
 export const Route = createFileRoute("/procurement/agent")({
