@@ -34,6 +34,8 @@ import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } f
 import { VoiceButton } from "@/components/VoiceButton";
 import { ScanButton } from "@/components/ScanButton";
 import { ProductImage } from "@/components/ProductImage";
+import { HoldButton } from "@/components/HoldButton";
+
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
@@ -1247,27 +1249,24 @@ function InlineProductBubble({
             onClick={stop}
             className="ml-1 inline-flex items-center rounded-full bg-background border h-7 overflow-hidden shrink-0"
           >
-            <button
-              onClick={(e) => {
-                stop(e);
-                cart.setQty(product.sku, inCart.qty - 1);
-              }}
+            <HoldButton
+              onTick={() => cart.adjust(product.sku, -1)}
+              stopPropagation
               className="w-7 h-full grid place-items-center hover:bg-accent text-base font-semibold"
               aria-label="Decrease"
             >
               −
-            </button>
+            </HoldButton>
             <span className="px-1.5 text-xs font-bold tabular-nums">{inCart.qty}</span>
-            <button
-              onClick={(e) => {
-                stop(e);
-                cart.setQty(product.sku, inCart.qty + 1);
-              }}
+            <HoldButton
+              onTick={() => cart.adjust(product.sku, +1)}
+              stopPropagation
               className="w-7 h-full grid place-items-center hover:bg-accent text-base font-semibold"
               aria-label="Increase"
             >
               +
-            </button>
+            </HoldButton>
+
           </span>
         ) : (
           <button
@@ -1431,21 +1430,24 @@ function ProductCard({
             </div>
             {inCart ? (
               <div onClick={stop} className="flex items-center rounded-md border h-11 overflow-hidden shrink-0">
-                <button
-                  onClick={(e) => { stop(e); cart.setQty(product.sku, inCart.qty - 1); }}
+                <HoldButton
+                  onTick={() => cart.adjust(product.sku, -1)}
+                  stopPropagation
                   className="w-11 h-full grid place-items-center hover:bg-accent text-xl font-semibold"
                   aria-label="Decrease"
                 >
                   −
-                </button>
+                </HoldButton>
                 <span className="px-3 text-base font-bold tabular-nums">{inCart.qty}</span>
-                <button
-                  onClick={(e) => { stop(e); cart.setQty(product.sku, inCart.qty + 1); }}
+                <HoldButton
+                  onTick={() => cart.adjust(product.sku, +1)}
+                  stopPropagation
                   className="w-11 h-full grid place-items-center hover:bg-accent text-xl font-semibold"
                   aria-label="Increase"
                 >
                   +
-                </button>
+                </HoldButton>
+
               </div>
             ) : (
               <button
@@ -1536,17 +1538,18 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
               </div>
               {inCart ? (
                 <div className="flex items-center rounded-md border h-12 overflow-hidden w-fit">
-                  <button
-                    onClick={() => cart.setQty(product.sku, inCart.qty - 1)}
+                  <HoldButton
+                    onTick={() => cart.adjust(product.sku, -1)}
                     className="w-12 h-full grid place-items-center hover:bg-accent text-2xl font-semibold"
                     aria-label="Decrease"
-                  >−</button>
+                  >−</HoldButton>
                   <span className="px-4 text-lg font-bold tabular-nums">{inCart.qty}</span>
-                  <button
-                    onClick={() => cart.setQty(product.sku, inCart.qty + 1)}
+                  <HoldButton
+                    onTick={() => cart.adjust(product.sku, +1)}
                     className="w-12 h-full grid place-items-center hover:bg-accent text-2xl font-semibold"
                     aria-label="Increase"
-                  >+</button>
+                  >+</HoldButton>
+
                 </div>
               ) : (
                 <button
@@ -1786,17 +1789,18 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center rounded-md border h-10 overflow-hidden">
-                  <button
-                    onClick={() => cart.setQty(i.productId, i.qty - 1)}
+                  <HoldButton
+                    onTick={() => cart.adjust(i.productId, -1)}
                     className="w-10 h-full grid place-items-center hover:bg-accent text-lg font-semibold"
                     aria-label="Decrease"
-                  >−</button>
+                  >−</HoldButton>
                   <span className="px-3 text-base font-bold tabular-nums min-w-[2.5rem] text-center">{i.qty}</span>
-                  <button
-                    onClick={() => cart.setQty(i.productId, i.qty + 1)}
+                  <HoldButton
+                    onTick={() => cart.adjust(i.productId, +1)}
                     className="w-10 h-full grid place-items-center hover:bg-accent text-lg font-semibold"
                     aria-label="Increase"
-                  >+</button>
+                  >+</HoldButton>
+
                 </div>
                 <div className="font-bold text-base tabular-nums">{formatEUR(i.qty * i.price)}</div>
               </div>
