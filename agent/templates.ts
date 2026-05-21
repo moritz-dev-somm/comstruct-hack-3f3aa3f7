@@ -735,9 +735,35 @@ export function buildAnswersFromOrder(order: Order, questions: string[]): Questi
    9. Free-text human reply (used by the "needs you" UI)
    ============================================================ */
 
-export function composeHumanReplyEmail(order: Order, message: string): ComposedEmail {
-  const subject = `Re: [${order.id}] Procurement follow-up`;
-  const text = `${message}\n\n${SIGN.en}\n${COMPANY.agentName}\n${COMPANY.contact} · ${COMPANY.phone}`;
-  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55"><p>${escapeHtml(message).replace(/\n/g, "<br/>")}</p><p>${escapeHtml(SIGN.en)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p></div>`;
-  return { subject, text, html };
+const HUMAN_SUBJECT: Record<SupplierLanguage, string> = {
+  en: "Procurement follow-up",
+  de: "Beschaffung — Rückfrage",
+  fr: "Achats — suivi",
+  it: "Acquisti — seguito",
+};
+
+/**
+ * Free-text human reply. The caller must pass the message in BOTH English
+ * and the supplier's native language (see `translateForSupplier` in
+ * `agent.server.ts`) so the email is always bilingual, like every other
+ * agent-sent template.
+ */
+export function composeHumanReplyEmail(
+  order: Order,
+  parts: { messageEn: string; messageNative: string },
+  language: SupplierLanguage = "en",
+): ComposedEmail {
+  const block = (msg: string, sign: string) =>
+    `${msg}\n\n${sign}\n${COMPANY.agentName}\n${COMPANY.contact} · ${COMPANY.phone}`;
+  const blockHtml = (msg: string, sign: string) =>
+    `<p>${escapeHtml(msg).replace(/\n/g, "<br/>")}</p><p>${escapeHtml(sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+  return assembleBilingual({
+    language,
+    subjectEn: `Re: [${order.id}] ${HUMAN_SUBJECT.en}`,
+    subjectNative: HUMAN_SUBJECT[language],
+    textEn: block(parts.messageEn, SIGN.en),
+    textNative: block(parts.messageNative, SIGN[language]),
+    htmlEn: blockHtml(parts.messageEn, SIGN.en),
+    htmlNative: blockHtml(parts.messageNative, SIGN[language]),
+  });
 }
