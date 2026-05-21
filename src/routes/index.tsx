@@ -865,6 +865,7 @@ function ConversationView({
   onSelectCategory: (c: string) => void;
   onClearCategory: () => void;
   onResetRecommendations: () => void;
+  onAddBundle: () => void;
   onSuggestion: (s: string) => void;
   followups: string[];
   allProducts: Product[];
