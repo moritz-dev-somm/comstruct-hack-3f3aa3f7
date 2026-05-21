@@ -87,19 +87,20 @@ function Analytics() {
 
 
   const exportCSV = () => {
-    const csvContent = `Projekt,Polier,Bestellungen,Ausgaben CHF,Lieferant,Kategorie,Datum
-Schulhaus Zürich-Nord,Marco Bianchi,18,1640,ACME Construction,PSA,Mai 2026
-Renovation Hardturm,Anna Kessler,14,1280,Würth AG,Befestigung,Mai 2026
-Neubau Lagerhaus,Peter Hofer,9,760,Bosch Professional,Werkzeug,Mai 2026
-Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
+    const csvContent = `Project,Foreman,Orders,Spend CHF,Supplier,Category,Date
+Schulhaus Zürich-Nord,Marco Bianchi,18,1640,ACME Construction,PPE,May 2026
+Renovation Hardturm,Anna Kessler,14,1280,Würth AG,Fasteners,May 2026
+Warehouse New Build,Peter Hofer,9,760,Bosch Professional,Tools,May 2026
+Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "comstruct_analytics_Mai_2026.csv";
+    a.download = "comstruct_analytics_May_2026.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   return (
     <div style={{ background: PAGE_BG }} className="min-h-screen">
@@ -108,15 +109,16 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-[24px] font-bold text-[#111827] leading-tight">Spend Analytics</h1>
-            <p className="text-[13px] text-[#6B7280]">C-Material Beschaffung</p>
+            <p className="text-[13px] text-[#6B7280]">C-material procurement</p>
             {projectFilter && (
               <div className="mt-2 inline-flex items-center gap-2 bg-[#ECFDF5] text-[#065F46] text-xs px-2.5 py-1 rounded-full border border-[#A7F3D0]">
-                Filter aktiv: {projectFilter}
-                <button onClick={() => setProjectFilter(null)} aria-label="Filter entfernen">
+                Active filter: {projectFilter}
+                <button onClick={() => setProjectFilter(null)} aria-label="Remove filter">
                   <X className="size-3.5" />
                 </button>
               </div>
             )}
+
           </div>
           <div className="flex items-center gap-3">
             <div className="inline-flex bg-white border border-[#E5E7EB] rounded-full p-1">
@@ -145,48 +147,49 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
         {/* §1 KPI row */}
         <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           <KpiCard
-            label="Gesamtausgaben C-Material"
+            label="Total C-material spend"
             value={formatCHF(kpis.spend)}
             trend={12}
-            trendLabel="vs Vormonat"
+            trendLabel="vs last month"
             onClick={() => scrollTo(spendRef)}
           />
           <KpiCard
-            label="Anzahl Bestellungen"
+            label="Number of orders"
             value={String(kpis.count)}
             trend={8}
             onClick={() => scrollTo(spendRef)}
           />
           <KpiCard
-            label="Ø Bestellwert"
+            label="Avg. order value"
             value={formatCHF(kpis.avg)}
             trend={-3}
             onClick={() => scrollTo(spendRef)}
           />
           <KpiCard
-            label="Aktive Lieferanten"
+            label="Active suppliers"
             value={String(kpis.suppliers)}
             trend={0}
             onClick={() => scrollTo(supplierRef)}
           />
           <KpiCard
-            label="Genehmigungsquote"
+            label="Approval rate"
             value={`${kpis.approvalRate}%`}
             trend={2}
             onClick={() => scrollTo(approvalRef)}
           />
           <KpiCard
-            label="Ø Genehmigungszeit"
-            value={`${kpis.approvalMinutes} Min.`}
+            label="Avg. approval time"
+            value={`${kpis.approvalMinutes} min`}
             trend={-22}
             invertTrend
             onClick={() => scrollTo(approvalRef)}
           />
+
         </section>
 
-        {/* §2 Ausgabenverlauf */}
+        {/* §2 Spend over time */}
         <section ref={spendRef} className={`${CARD} p-5`}>
-          <SectionHeader title="Ausgabenverlauf" subtitle="Tägliche C-Material-Ausgaben im ausgewählten Zeitraum" />
+          <SectionHeader title="Spend over time" subtitle="Daily C-material spend over the selected period" />
           <div className="h-[320px] mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={series} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
@@ -198,22 +201,23 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                   formatter={(v: number, name: string) => [formatCHF(v), name]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="spend" name="Tagesausgaben" fill={GREEN} fillOpacity={0.75} radius={[3, 3, 0, 0]} />
-                <Line dataKey="rolling7" name="7-Tage-Durchschnitt" stroke={BLUE} strokeWidth={2} dot={false} />
+                <Bar dataKey="spend" name="Daily spend" fill={GREEN} fillOpacity={0.75} radius={[3, 3, 0, 0]} />
+                <Line dataKey="rolling7" name="7-day average" stroke={BLUE} strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
           <div className="flex flex-wrap gap-2 mt-4">
-            <Chip>📈 Höchster Tag: {topDay.label} — {formatCHF(topDay.spend)} (Elektro Grundausstattung ×3)</Chip>
-            <Chip>📉 Ruhigster Tag: {quietDay.label} (Sonntag) — CHF 0</Chip>
-            <Chip>⚡ Ø Montag 34% höher als andere Wochentage</Chip>
+            <Chip>📈 Peak day: {topDay.label} — {formatCHF(topDay.spend)} (Electrical starter kit ×3)</Chip>
+            <Chip>📉 Quietest day: {quietDay.label} (Sunday) — CHF 0</Chip>
+            <Chip>⚡ Avg. Monday 34% higher than other weekdays</Chip>
           </div>
         </section>
+
 
         {/* §3 Spend Breakdown */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className={`${CARD} p-5`}>
-            <SectionHeader title="Ausgaben nach Projekt" subtitle="Klick auf Balken filtert das gesamte Dashboard" />
+            <SectionHeader title="Spend by project" subtitle="Click a bar to filter the whole dashboard" />
             <div className="h-[280px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={projects} layout="vertical" margin={{ top: 10, right: 50, left: 10, bottom: 0 }}>
@@ -222,7 +226,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                   <YAxis dataKey="project" type="category" width={150} tick={{ fontSize: 11, fill: "#111827" }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
-                    formatter={(v: number) => [formatCHF(v), "Ausgaben"]}
+                    formatter={(v: number) => [formatCHF(v), "Spend"]}
                   />
                   <Bar
                     dataKey="total"
@@ -238,7 +242,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
           </div>
 
           <div className={`${CARD} p-5`}>
-            <SectionHeader title="Ausgaben nach Kategorie" subtitle="Anteile am Gesamtbudget" />
+            <SectionHeader title="Spend by category" subtitle="Share of total budget" />
             <div className="h-[280px] mt-4 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -267,7 +271,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="text-[11px] text-[#6B7280]">Gesamt</div>
+                <div className="text-[11px] text-[#6B7280]">Total</div>
                 <div className="text-[18px] font-bold text-[#111827]">{formatCHF(categoryTotal)}</div>
               </div>
             </div>
@@ -276,30 +280,31 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
 
         {/* §4 Supplier Analysis */}
         <section ref={supplierRef} className={`${CARD} p-5`}>
-          <SectionHeader title="Lieferantenanalyse" subtitle="Ausgaben, Vertragskonformität und Lieferperformance" />
+          <SectionHeader title="Supplier analysis" subtitle="Spend, contract compliance and delivery performance" />
           <SupplierTable rows={suppliers} />
           <div className="mt-4 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-[13px] text-[#92400E]">
-              ⚠ CHF 224 wurden bei Lieferanten ohne Rahmenvertrag ausgegeben. Empfehlung: Bestellungen auf ACME und Würth AG konsolidieren.
+              ⚠ CHF 224 spent with suppliers without a framework agreement. Recommendation: consolidate orders with ACME and Würth AG.
             </div>
             <Link
               to="/settings"
               className="text-xs px-3 py-1.5 rounded-md bg-white border border-[#FDE68A] text-[#92400E] hover:bg-[#FFFBEB]"
             >
-              Bestellregeln anpassen →
+              Adjust ordering rules →
             </Link>
           </div>
+
         </section>
 
         {/* §5 Ordering Behaviour */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           <div className={`${CARD} p-5 lg:col-span-3`}>
-            <SectionHeader title="Top Besteller" subtitle="Bestellverhalten je Polier" />
+            <SectionHeader title="Top orderers" subtitle="Ordering behaviour by foreman" />
             <ForemanTable rows={foremen} onSelect={setForemanDrawer} />
           </div>
           <div className={`${CARD} p-5 lg:col-span-2`}>
-            <SectionHeader title="Bestellmuster" subtitle="Wann ordern Poliere?" />
-            <div className="text-[12px] text-[#6B7280] mt-3 mb-1">Bestellungen nach Wochentag</div>
+            <SectionHeader title="Ordering patterns" subtitle="When do foremen order?" />
+            <div className="text-[12px] text-[#6B7280] mt-3 mb-1">Orders by weekday</div>
             <div className="h-[170px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={WEEKDAY} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -315,7 +320,8 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="text-[12px] text-[#6B7280] mt-4 mb-2">Bestellungen nach Tageszeit</div>
+            <div className="text-[12px] text-[#6B7280] mt-4 mb-2">Orders by time of day</div>
+
             <div className="space-y-2">
               {TIMEOFDAY.map((t) => (
                 <div key={t.slot} className="flex items-center gap-2 text-[12px]">
@@ -332,12 +338,13 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
 
         {/* §6 Approval Performance */}
         <section ref={approvalRef} className={`${CARD} p-5`}>
-          <SectionHeader title="Genehmigungsperformance" subtitle="Durchlaufzeiten und Entscheidungsverhalten" />
+          <SectionHeader title="Approval performance" subtitle="Cycle times and decision behaviour" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
             {/* Chart A */}
             <div>
-              <div className="text-[13px] font-semibold text-[#111827] mb-1">Genehmigungszeiten</div>
-              <div className="text-[12px] text-[#6B7280] mb-2">Wie schnell werden Bestellungen genehmigt?</div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Approval times</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">How quickly are orders approved?</div>
+
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={APPROVAL_TIMES} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -353,13 +360,13 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="text-[12px] text-[#16A34A] font-medium mt-1">Ø 18 Minuten — Ziel: unter 30 Minuten ✓</div>
+              <div className="text-[12px] text-[#16A34A] font-medium mt-1">Avg. 18 minutes — target: under 30 minutes ✓</div>
             </div>
 
             {/* Chart B */}
             <div>
-              <div className="text-[13px] font-semibold text-[#111827] mb-1">Genehmigungen nach Schwellwert</div>
-              <div className="text-[12px] text-[#6B7280] mb-2">Aufschlüsselung nach Genehmigungsstufe</div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Approvals by threshold</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Breakdown by approval tier</div>
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -372,7 +379,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
                       formatter={(v: number, _n, p) => {
                         const payload = p?.payload as { pct: number; name: string } | undefined;
-                        return [`${v} Bestellungen (${payload?.pct ?? 0}%)`, payload?.name ?? ""];
+                        return [`${v} orders (${payload?.pct ?? 0}%)`, payload?.name ?? ""];
                       }}
                     />
 
@@ -392,10 +399,10 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
 
             {/* Chart C */}
             <div>
-              <div className="text-[13px] font-semibold text-[#111827] mb-1">Ablehnungsrate</div>
-              <div className="text-[12px] text-[#6B7280] mb-2">Übersicht abgelehnter Bestellungen</div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Rejection rate</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Overview of rejected orders</div>
               <div className="text-[44px] font-bold text-[#DC2626] leading-none mt-2">6%</div>
-              <div className="text-[12px] text-[#6B7280] mt-1 mb-3">3 von 47 Bestellungen abgelehnt</div>
+              <div className="text-[12px] text-[#6B7280] mt-1 mb-3">3 of 47 orders rejected</div>
               <div className="space-y-1.5">
                 {REJECTIONS.map((r) => (
                   <div key={r.reason} className="flex items-center justify-between text-[12px] border-t border-[#F3F4F6] pt-1.5">
@@ -408,7 +415,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                 to="/procurement/orders"
                 className="inline-block mt-3 text-xs px-3 py-1.5 rounded-md border border-[#E5E7EB] text-[#111827] hover:bg-[#F9FAFB]"
               >
-                Ablehnungen ansehen →
+                View rejections →
               </Link>
             </div>
           </div>
@@ -422,7 +429,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
           <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-white border-l border-[#E5E7EB] p-5 overflow-y-auto">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-[#6B7280]">Polier</div>
+                <div className="text-[11px] uppercase tracking-wide text-[#6B7280]">Foreman</div>
                 <div className="text-[18px] font-bold text-[#111827]">{foremanDrawer}</div>
               </div>
               <button onClick={() => setForemanDrawer(null)} className="p-1 rounded-md hover:bg-[#F3F4F6]">
@@ -430,7 +437,7 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
               </button>
             </div>
             <div className="text-[13px] text-[#6B7280] mt-4">
-              Bestellhistorie wird hier angezeigt (Demo). Verknüpfung mit echten Bestelldaten folgt.
+              Order history will appear here (demo). Linking to live order data coming soon.
             </div>
           </aside>
         </div>
@@ -485,7 +492,7 @@ function KpiCard({
       <div className="flex items-center gap-1 mt-1 text-[12px]" style={{ color }}>
         {Arrow && <Arrow className="size-3.5" />}
         <span>{flat ? "→ 0%" : `${Math.abs(trend)}%`}</span>
-        <span className="text-[#6B7280]">{trendLabel ?? "vs Vorperiode"}</span>
+        <span className="text-[#6B7280]">{trendLabel ?? "vs previous period"}</span>
       </div>
     </button>
   );
@@ -515,11 +522,11 @@ function SupplierTable({ rows }: { rows: ReturnType<typeof computeSuppliers> }) 
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-[#6B7280] border-b border-[#E5E7EB]">
-            <Th label="Lieferant" onClick={() => toggle("name")} />
-            <Th label="Bestellungen" onClick={() => toggle("orders")} align="right" />
-            <Th label="Ausgaben CHF" onClick={() => toggle("spend")} align="right" />
-            <Th label="Vertragskonform" onClick={() => toggle("compliance")} align="center" />
-            <Th label="Ø Lieferzeit" align="right" />
+            <Th label="Supplier" onClick={() => toggle("name")} />
+            <Th label="Orders" onClick={() => toggle("orders")} align="right" />
+            <Th label="Spend CHF" onClick={() => toggle("spend")} align="right" />
+            <Th label="Compliance" onClick={() => toggle("compliance")} align="center" />
+            <Th label="Avg. lead time" align="right" />
             <Th label="Status" />
           </tr>
         </thead>
@@ -585,11 +592,11 @@ function ForemanTable({
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-[#6B7280] border-b border-[#E5E7EB]">
-            <Th label="Polier" onClick={() => toggle("foreman")} />
-            <Th label="Projekt" onClick={() => toggle("project")} />
-            <Th label="Bestellungen" onClick={() => toggle("orders")} align="right" />
-            <Th label="Ausgaben CHF" onClick={() => toggle("spend")} align="right" />
-            <Th label="Ø Wert" onClick={() => toggle("avg")} align="right" />
+            <Th label="Foreman" onClick={() => toggle("foreman")} />
+            <Th label="Project" onClick={() => toggle("project")} />
+            <Th label="Orders" onClick={() => toggle("orders")} align="right" />
+            <Th label="Spend CHF" onClick={() => toggle("spend")} align="right" />
+            <Th label="Avg. value" onClick={() => toggle("avg")} align="right" />
             <Th label="Trend" onClick={() => toggle("trend")} align="right" />
           </tr>
         </thead>

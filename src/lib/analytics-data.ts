@@ -31,13 +31,12 @@ export type NegotiationRow = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   Fasteners: "#16A34A",
-  Befestigung: "#16A34A",
-  PSA: "#2563EB",
-  Elektro: "#0D9488",
-  "Hand Tools": "#D97706",
-  Werkzeug: "#D97706",
-  Sonstige: "#6B7280",
+  PPE: "#2563EB",
+  Electrical: "#0D9488",
+  Tools: "#D97706",
+  Other: "#6B7280",
 };
+
 
 const CATEGORY_PALETTE = ["#16A34A", "#2563EB", "#0D9488", "#D97706", "#7C3AED", "#DC2626", "#6B7280"];
 
@@ -131,7 +130,8 @@ export function computeDailySeries(rows: NegotiationRow[], period: Period) {
 export function computeProjects(rows: NegotiationRow[]) {
   const map = new Map<string, number>();
   for (const r of rows) {
-    const p = r.project ?? r.order_snapshot?.project ?? "Ohne Projekt";
+    const p = r.project ?? r.order_snapshot?.project ?? "No project";
+
     map.set(p, (map.get(p) ?? 0) + (r.order_snapshot?.subtotal ?? 0));
   }
   return Array.from(map, ([project, total]) => ({ project, total: Math.round(total) })).sort(
@@ -143,7 +143,7 @@ export function computeCategories(rows: NegotiationRow[]) {
   const map = new Map<string, { value: number; top: string; topQty: number }>();
   for (const r of rows) {
     for (const item of r.order_snapshot?.items ?? []) {
-      const cat = item.category ?? "Sonstige";
+      const cat = item.category ?? "Other";
       const lineTotal = (item.price ?? 0) * (item.qty ?? 0);
       const cur = map.get(cat) ?? { value: 0, top: item.name, topQty: 0 };
       cur.value += lineTotal;
@@ -196,10 +196,11 @@ export function computeSuppliers(rows: NegotiationRow[]): SupplierAgg[] {
       orders: v.orders,
       spend: Math.round(v.spend),
       compliance,
-      leadTime: v.replied ? `${leadDays.toFixed(1)} Tage` : "—",
+      leadTime: v.replied ? `${leadDays.toFixed(1)} days` : "—",
       status,
       statusLabel:
-        status === "active" ? "✓ Vertrag aktiv" : status === "partial" ? "⚠ Teilkonform" : "✗ Kein Vertrag",
+        status === "active" ? "✓ Contract active" : status === "partial" ? "⚠ Partially compliant" : "✗ No contract",
+
     };
   }).sort((a, b) => b.spend - a.spend);
 }
@@ -217,14 +218,15 @@ export function computeForemen(rows: NegotiationRow[]): ForemanAgg[] {
   // No foreman field in DB — group by project as a stand-in.
   const map = new Map<string, { orders: number; spend: number }>();
   for (const r of rows) {
-    const p = r.project ?? r.order_snapshot?.project ?? "Ohne Projekt";
+    const p = r.project ?? r.order_snapshot?.project ?? "No project";
     const cur = map.get(p) ?? { orders: 0, spend: 0 };
     cur.orders += 1;
     cur.spend += r.order_snapshot?.subtotal ?? 0;
     map.set(p, cur);
   }
   return Array.from(map, ([project, v]) => ({
-    foreman: `Polier ${project}`,
+    foreman: `Foreman ${project}`,
+
     project,
     orders: v.orders,
     spend: Math.round(v.spend),
@@ -234,12 +236,13 @@ export function computeForemen(rows: NegotiationRow[]): ForemanAgg[] {
 }
 
 export function computeWeekday(rows: NegotiationRow[]) {
-  const labels = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const counts = [0, 0, 0, 0, 0, 0, 0];
   for (const r of rows) counts[new Date(r.sent_at).getDay()] += 1;
-  // Reorder to Mo-So
+  // Reorder to Mon-Sun
   const order = [1, 2, 3, 4, 5, 6, 0];
   return order.map((i) => ({ day: labels[i], value: counts[i], weekend: i === 0 || i === 6 }));
+
 }
 
 export function computeTimeOfDay(rows: NegotiationRow[]) {
