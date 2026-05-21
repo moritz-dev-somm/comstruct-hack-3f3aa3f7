@@ -1313,9 +1313,12 @@ function ProductCard({
           </div>
         )}
 
-        <div className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-muted/50 rounded grid place-items-center text-4xl">
-          📦
-        </div>
+        <ProductImage
+          src={product.imageUrl}
+          alt={product.name}
+          className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded overflow-hidden"
+          fallbackClassName="shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-muted/50 rounded text-4xl"
+        />
 
 
 
