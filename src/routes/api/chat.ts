@@ -237,6 +237,7 @@ async function retrieveRelevant(
       try {
         const embedding = await embedQuery(intent.q, apiKey);
         if (embedding) {
+          // Attempt 1: hybrid (embedding + keyword)
           const { data, error } = await sb.rpc("hybrid_search_materials", {
             user_embedding: embedding as unknown as string,
             category_filter: intent.category_filter,
@@ -245,6 +246,20 @@ async function retrieveRelevant(
           });
           if (!error && Array.isArray(data) && data.length) {
             const skus = (data as Array<{ sku: string }>).map((r) => r.sku);
+            const full = await fetchProductsBySkus(skus);
+            const order = new Map(skus.map((s, i) => [s, i]));
+            full.sort((a, b) => (order.get(a.sku) ?? 0) - (order.get(b.sku) ?? 0));
+            return full.map((r) => ({ ...r, requested_quantity: intent.requested_quantity }));
+          }
+          // Attempt 2: pure semantic — drop keyword filter so embedding alone ranks
+          const sem = await sb.rpc("hybrid_search_materials", {
+            user_embedding: embedding as unknown as string,
+            category_filter: intent.category_filter,
+            keyword_filters: null,
+            match_count: 5,
+          });
+          if (!sem.error && Array.isArray(sem.data) && sem.data.length) {
+            const skus = (sem.data as Array<{ sku: string }>).map((r) => r.sku);
             const full = await fetchProductsBySkus(skus);
             const order = new Map(skus.map((s, i) => [s, i]));
             full.sort((a, b) => (order.get(a.sku) ?? 0) - (order.get(b.sku) ?? 0));
