@@ -10,6 +10,7 @@ import {
   Building2,
   Check,
   ClipboardList,
+  Clock,
   Droplets,
   Hammer,
   HardHat,
