@@ -237,7 +237,7 @@ async function callGateway(messages: ChatMsg[], apiKey: string) {
   const url = useOpenAI
     ? "https://api.openai.com/v1/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-4o-mini" : "google/gemini-2.5-pro";
+  const model = useOpenAI ? "gpt-4o-mini" : "openai/gpt-5-mini";
   return fetch(url, {
     method: "POST",
     headers: {

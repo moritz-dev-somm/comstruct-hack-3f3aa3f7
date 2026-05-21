@@ -146,7 +146,7 @@ export async function classifyReply(args: {
     };
   }
   const body = {
-    model: "google/gemini-2.5-flash",
+    model: "openai/gpt-5-mini",
     messages: [
       { role: "system", content: CLASSIFY_SYSTEM },
       {
