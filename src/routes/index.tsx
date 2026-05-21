@@ -184,8 +184,17 @@ function Home() {
   const cart = useCart();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { logout } = useRole();
+  const { role, logout } = useRole();
   const navigate = useNavigate();
+
+  // Root is the login page — if no role is set, send the user there.
+  // If a supervisor lands here, route them to their workspace.
+  useEffect(() => {
+    if (role === null) navigate({ to: "/login" });
+    else if (role === "supervisor") navigate({ to: "/procurement" });
+  }, [role, navigate]);
+
+  if (role !== "foreman") return null;
 
   const inConversation = messages.length > 0;
   const showCatalog = inConversation || selectedCategory !== null;
