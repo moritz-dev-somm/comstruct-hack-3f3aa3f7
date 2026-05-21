@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Upload, Check, ExternalLink } from "lucide-react";
 import { formatEUR, useProducts } from "@/lib/catalog";
+import { ProductImage } from "@/components/ProductImage";
 
 export const Route = createFileRoute("/procurement/catalog")({
   component: CatalogAdmin,
