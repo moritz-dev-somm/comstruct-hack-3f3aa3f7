@@ -226,7 +226,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                   <YAxis dataKey="project" type="category" width={150} tick={{ fontSize: 11, fill: "#111827" }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
-                    formatter={(v: number) => [formatCHF(v), "Ausgaben"]}
+                    formatter={(v: number) => [formatCHF(v), "Spend"]}
                   />
                   <Bar
                     dataKey="total"
