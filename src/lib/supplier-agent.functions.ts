@@ -5,25 +5,31 @@ import {
   ensureAgentInfra,
   adminClient,
   HARDCODED_SUPPLIER_EMAIL,
-  HARDCODED_SUPPLIER_NAME,
 } from "@agent/agent.server";
 import { composeOrderEmail, composeNudgeEmail } from "@agent/templates";
 import type { Order } from "@/lib/orders";
+
+const itemShape = z.object({
+  productId: z.string().optional(),
+  name: z.string(),
+  qty: z.number(),
+  price: z.number(),
+  unit: z.string().optional(),
+  category: z.string().optional(),
+  supplier: z.string().nullable().optional(),
+});
 
 const orderShape = z.object({
   id: z.string(),
   project: z.string(),
   subtotal: z.number(),
-  items: z.array(
-    z.object({
-      productId: z.string().optional(),
-      name: z.string(),
-      qty: z.number(),
-      price: z.number(),
-      unit: z.string().optional(),
-      category: z.string().optional(),
-    }),
-  ),
+  items: z.array(itemShape),
+});
+
+const attachmentShape = z.object({
+  supplierName: z.string().min(1),
+  filename: z.string().min(1),
+  pdfBase64: z.string().min(1),
 });
 
 /** Idempotently ensure inbox + webhook exist. UI uses this for a status read. */
@@ -40,52 +46,112 @@ export const ensureAgentInbox = createServerFn({ method: "POST" })
     }
   });
 
+const FALLBACK_SUPPLIER_NAME = "Generisch";
+
+async function resolveSupplierContact(
+  sb: ReturnType<typeof adminClient>,
+  supplierName: string,
+): Promise<{ name: string; email: string; phone: string }> {
+  const { data } = await sb
+    .from("suppliers")
+    .select("name,email,phone")
+    .eq("name", supplierName)
+    .maybeSingle();
+  if (data) return data as { name: string; email: string; phone: string };
+  return { name: supplierName, email: HARDCODED_SUPPLIER_EMAIL, phone: "" };
+}
+
 /**
- * Auto-triggered when the foreman submits a cart. Provisions infra, sends the
- * initial purchase-request email to the hardcoded supplier, and writes a
- * negotiation row so the webhook can match the reply back.
+ * Auto-triggered when the foreman submits a cart. Splits the order by supplier
+ * and sends one email per supplier with the matching purchase-order PDF
+ * attached. Each per-supplier email creates its own negotiation row so the
+ * webhook can match replies back.
  */
 export const startNegotiationForOrder = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ order: orderShape }))
+  .inputValidator(
+    z.object({
+      order: orderShape,
+      attachments: z.array(attachmentShape).default([]),
+    }),
+  )
   .handler(async ({ data }) => {
     try {
       const infra = await ensureAgentInfra();
-      const email = composeOrderEmail(data.order as unknown as Order);
-      const am = agentMail();
-      const sendRes = await am.inboxes.messages.send(infra.inboxId, {
-        to: HARDCODED_SUPPLIER_EMAIL,
-        subject: email.subject,
-        text: email.text,
-        html: email.html,
-      });
-      const threadId = (sendRes as { threadId?: string }).threadId ?? null;
-      const messageId = (sendRes as { messageId?: string }).messageId ?? null;
-
       const sb = adminClient();
-      const { data: inserted, error } = await sb
-        .from("negotiations")
-        .insert({
-          order_id: data.order.id,
-          project: data.order.project,
-          supplier_name: HARDCODED_SUPPLIER_NAME,
-          supplier_email: HARDCODED_SUPPLIER_EMAIL,
-          inbox_id: infra.inboxId,
-          thread_id: threadId,
-          message_id: messageId,
-          subject: email.subject,
-          status: "awaiting_reply",
-          order_snapshot: data.order,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
+      const am = agentMail();
 
-      return {
-        ok: true as const,
-        negotiationId: inserted.id,
-        threadId,
-        supplier: HARDCODED_SUPPLIER_EMAIL,
-      };
+      // Group items by supplier (fallback for items with no supplier).
+      const groups = new Map<string, typeof data.order.items>();
+      for (const it of data.order.items) {
+        const key = (it.supplier && it.supplier.trim()) || FALLBACK_SUPPLIER_NAME;
+        const arr = groups.get(key) ?? [];
+        arr.push(it);
+        groups.set(key, arr);
+      }
+
+      const attachmentByName = new Map(
+        data.attachments.map((a) => [a.supplierName, a]),
+      );
+
+      const results: Array<{ supplier: string; email: string; negotiationId?: string; error?: string }> = [];
+
+      for (const [supplierName, items] of groups) {
+        const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
+        const contact = await resolveSupplierContact(sb, supplierName);
+        const email = composeOrderEmail(data.order as unknown as Order, {
+          supplierName: contact.name,
+          items: items as Order["items"],
+          subtotal,
+        });
+        const attachment = attachmentByName.get(supplierName);
+        try {
+          const sendRes = await am.inboxes.messages.send(infra.inboxId, {
+            to: contact.email,
+            subject: email.subject,
+            text: email.text,
+            html: email.html,
+            attachments: attachment
+              ? [
+                  {
+                    filename: attachment.filename,
+                    contentType: "application/pdf",
+                    content: attachment.pdfBase64,
+                  },
+                ]
+              : undefined,
+          });
+          const threadId = (sendRes as { threadId?: string }).threadId ?? null;
+          const messageId = (sendRes as { messageId?: string }).messageId ?? null;
+
+          const { data: inserted, error } = await sb
+            .from("negotiations")
+            .insert({
+              order_id: data.order.id,
+              project: data.order.project,
+              supplier_name: contact.name,
+              supplier_email: contact.email,
+              inbox_id: infra.inboxId,
+              thread_id: threadId,
+              message_id: messageId,
+              subject: email.subject,
+              status: "awaiting_reply",
+              order_snapshot: { ...data.order, items, subtotal, supplier: contact.name },
+            })
+            .select("id")
+            .single();
+          if (error) throw error;
+          results.push({ supplier: contact.name, email: contact.email, negotiationId: inserted.id });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`startNegotiationForOrder: send to ${contact.name} failed:`, message);
+          results.push({ supplier: contact.name, email: contact.email, error: message });
+        }
+      }
+
+      const ok = results.every((r) => !r.error);
+      return ok
+        ? { ok: true as const, results }
+        : { ok: false as const, error: results.find((r) => r.error)?.error ?? "send failed", results };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("startNegotiationForOrder failed:", message);
@@ -93,7 +159,7 @@ export const startNegotiationForOrder = createServerFn({ method: "POST" })
     }
   });
 
-/** Manual send (used by the existing agent page). */
+/** Manual send (used by the existing agent page). Sends one email to one supplier. */
 export const sendOrderEmail = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
@@ -104,7 +170,11 @@ export const sendOrderEmail = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const email = composeOrderEmail(data.order as unknown as Order);
+    const email = composeOrderEmail(data.order as unknown as Order, {
+      supplierName: data.supplierName,
+      items: data.order.items as Order["items"],
+      subtotal: data.order.subtotal,
+    });
     try {
       const res = await agentMail().inboxes.messages.send(data.inboxId, {
         to: data.supplierEmail,
