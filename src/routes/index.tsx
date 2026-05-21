@@ -29,6 +29,7 @@ import { useCart } from "@/lib/cart";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
+import { ScanButton } from "@/components/ScanButton";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
 
 const CHOCOLATE_THRESHOLD = 500;
