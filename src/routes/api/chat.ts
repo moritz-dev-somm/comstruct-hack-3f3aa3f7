@@ -103,7 +103,7 @@ async function extractIntents(userMessage: string, apiKey: string): Promise<Sear
   const url = useOpenAI
     ? "https://api.openai.com/v1/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-4o-mini" : "google/gemini-2.5-flash-lite";
+  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
 
   const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
 Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
@@ -310,7 +310,7 @@ async function expandQueryToKeywords(
   const url = useOpenAI
     ? "https://api.openai.com/v1/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-4o-mini" : "google/gemini-2.5-flash-lite";
+  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
 
   const sys = `You expand a construction foreman's vague request into concrete C-material product keywords likely to exist in a supplier catalog.
 
@@ -486,7 +486,7 @@ async function callGateway(messages: ChatMsg[], apiKey: string) {
   const url = useOpenAI
     ? "https://api.openai.com/v1/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-4o-mini" : "openai/gpt-5-mini";
+  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
   return fetch(url, {
     method: "POST",
     headers: {
