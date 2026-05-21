@@ -31,6 +31,15 @@ function loadInbox(): StoredInbox | null {
   }
 }
 
+function saveInbox(v: StoredInbox) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(INBOX_KEY, JSON.stringify(v));
+  } catch {
+    /* ignore */
+  }
+}
+
 type InboxMessage = {
   id: string;
   threadId: string | null;
