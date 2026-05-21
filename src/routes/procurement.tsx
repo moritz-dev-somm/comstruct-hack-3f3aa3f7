@@ -1,6 +1,7 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat } from "lucide-react";
+import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat, LogOut } from "lucide-react";
 import { useOrders } from "@/lib/orders";
+import { useRole } from "@/lib/role";
 
 export const Route = createFileRoute("/procurement")({
   component: ProcurementLayout,
@@ -61,13 +62,14 @@ function ProcurementLayout() {
             );
           })}
         </nav>
-        <div className="p-2 border-t">
+        <div className="p-2 border-t space-y-1">
           <Link
             to="/"
             className="flex items-center gap-2 px-3 h-9 rounded-md text-xs text-muted-foreground hover:bg-accent"
           >
             <ArrowLeft className="size-4" /> Back to foreman view
           </Link>
+          <SwitchRoleButton />
         </div>
       </aside>
       <main className="flex-1 min-w-0">
