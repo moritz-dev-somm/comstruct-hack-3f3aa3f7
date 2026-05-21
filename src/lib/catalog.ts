@@ -38,9 +38,11 @@ export const SITE_CATEGORIES = [
 type Row = {
   sku: string;
   name: string;
+  name_en: string | null;
   category: string;
   source_category: string | null;
   unit: string;
+  unit_en: string | null;
   price_eur: number | string;
   supplier: string | null;
   consumable: string | null;
@@ -49,18 +51,21 @@ type Row = {
   typical_site: string | null;
   attributes: Record<string, unknown> | null;
   keywords: string[] | null;
+  keywords_en: string[] | null;
   description: string | null;
+  description_en: string | null;
   use_cases: UseCase[] | null;
+  use_cases_en: UseCase[] | null;
   enriched_at: string | null;
 };
 
 export function rowToProduct(r: Row): Product {
   return {
     sku: r.sku,
-    name: r.name,
+    name: r.name_en ?? r.name,
     category: r.category,
     sourceCategory: r.source_category,
-    unit: r.unit,
+    unit: r.unit_en ?? r.unit,
     price: typeof r.price_eur === "string" ? parseFloat(r.price_eur) : r.price_eur,
     supplier: r.supplier,
     consumable: r.consumable,
@@ -68,12 +73,13 @@ export function rowToProduct(r: Row): Product {
     storageLocation: r.storage_location,
     typicalSite: r.typical_site,
     attributes: r.attributes ?? {},
-    keywords: r.keywords ?? [],
-    description: r.description,
-    useCases: r.use_cases ?? [],
+    keywords: (r.keywords_en && r.keywords_en.length > 0 ? r.keywords_en : r.keywords) ?? [],
+    description: r.description_en ?? r.description,
+    useCases: (r.use_cases_en && r.use_cases_en.length > 0 ? r.use_cases_en : r.use_cases) ?? [],
     enrichedAt: r.enriched_at,
   };
 }
+
 
 export async function fetchProducts(): Promise<Product[]> {
   const { data, error } = await supabase
