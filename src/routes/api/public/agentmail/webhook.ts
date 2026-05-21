@@ -300,7 +300,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           .from("negotiations")
           .update({
             status: nextStatus,
-            classification: { ...cls, followup_count: nextFollowup, clarification_count: nextClarification, last_action: action.kind },
+            classification: { ...cls, followup_count: nextFollowup, clarification_count: nextClarification, reply_count: replyCount, answered_checklist: answeredChecklist, last_action: action.kind, last_action_reason: (action as { reason?: string }).reason ?? null },
             reply_excerpt: replyText.slice(0, 1000),
             reply_message_id: replyMessageId,
             needs_user_reason: needsUserReason,
