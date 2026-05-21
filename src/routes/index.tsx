@@ -55,6 +55,26 @@ type ChatMessage = {
   suggestions?: string[];
 };
 
+export type HybridExtracted = {
+  extracted_category: string | null;
+  extracted_keywords: string[];
+  semantic_search_string: string;
+};
+
+export type HybridSearchResult = {
+  sku: string;
+  name: string;
+  category: string;
+  description: string | null;
+  price_eur: number | string;
+  unit: string;
+  supplier: string | null;
+  keywords: string[] | null;
+  similarity: number;
+  keyword_score: number;
+  hybrid_score: number;
+};
+
 const SUGGESTED_CHIPS = [
   "I need screws to fix gypsum board to a metal stud",
   "PPE pack for a new worker starting tomorrow",
