@@ -147,6 +147,7 @@ function Home() {
   const [streaming, setStreaming] = useState(false);
   const [thinkingWord, setThinkingWord] = useState(THINKING_WORDS[0]);
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
+  const [followups, setFollowups] = useState<string[]>([]);
   const { data: products = [] } = useProducts();
   const [aMaterialFlag, setAMaterialFlag] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -214,6 +215,7 @@ function Home() {
     setMessages([...newHistory, { role: "assistant", content: "" }]);
     setInput("");
     setStreaming(true);
+    setFollowups([]);
     setThinkingWord(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
 
     try {
@@ -295,9 +297,25 @@ function Home() {
         handleTool(evt.name as string, evt.args as Record<string, unknown>);
         break;
       case "done":
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.role === "assistant") {
+            const m = last.content.match(FOLLOWUPS_RE);
+            if (m) {
+              const parts = m[1].split("|").map((s) => s.trim()).filter(Boolean).slice(0, 2);
+              setFollowups(parts);
+              next[next.length - 1] = { ...last, content: last.content.replace(FOLLOWUPS_RE, "").trimEnd() };
+            } else {
+              setFollowups([]);
+            }
+          }
+          return next;
+        });
         break;
     }
   }
+
 
   function handleTool(name: string, args: Record<string, unknown>) {
     if (name === "add_to_cart") {
@@ -317,6 +335,7 @@ function Home() {
   function reset() {
     setMessages([]);
     setRecommendedIds([]);
+    setFollowups([]);
     setSelectedCategory(null);
     setSearchResults(null);
     setSearchExtracted(null);
@@ -449,6 +468,7 @@ function Home() {
             onClearCategory={() => setSelectedCategory(null)}
             onResetRecommendations={() => setRecommendedIds([])}
             onSuggestion={(s) => send(s)}
+            followups={followups}
             allProducts={products}
             onRunSearch={runHybridSearch}
             searching={searching}
@@ -685,6 +705,7 @@ function ConversationView({
   onClearCategory,
   onResetRecommendations,
   onSuggestion,
+  followups,
   allProducts,
   onRunSearch,
   searching,
@@ -702,6 +723,7 @@ function ConversationView({
   onClearCategory: () => void;
   onResetRecommendations: () => void;
   onSuggestion: (s: string) => void;
+  followups: string[];
   allProducts: Product[];
   onRunSearch: () => void;
   searching: boolean;
@@ -739,12 +761,11 @@ function ConversationView({
             <SuggestionButton onClick={() => onSuggestion("Add the bundle to cart")}>
               Add the bundle to cart
             </SuggestionButton>
-            <SuggestionButton onClick={() => onSuggestion("Show me cheaper options")}>
-              Show me cheaper options
-            </SuggestionButton>
-            <SuggestionButton onClick={() => onSuggestion("Show me alternative suppliers")}>
-              Different brand
-            </SuggestionButton>
+            {followups.map((f) => (
+              <SuggestionButton key={f} onClick={() => onSuggestion(f)}>
+                {f}
+              </SuggestionButton>
+            ))}
           </div>
         )}
 
@@ -911,6 +932,7 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
 /* -------------------------------------------------------------------------- */
 
 const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+const FOLLOWUPS_RE = /\[\[followups:([^\]]+)\]\]/;
 // Marker we inject as inline `code` so markdown parsing preserves it.
 const TOKEN_PREFIX = "§§PROD§§";
 
@@ -923,9 +945,14 @@ function AssistantContent({
 }) {
   const prepared = useMemo(
     () =>
-      content.replace(PRODUCT_TOKEN_RE, (_m, sku, qty) =>
-        `\`${TOKEN_PREFIX}${sku}:${qty ?? ""}\``,
-      ),
+      content
+        .replace(FOLLOWUPS_RE, "")
+        // Hide partial trailing marker while streaming.
+        .replace(/\[\[followups:[^\]]*$/, "")
+        .replace(/\[\[follow?u?p?s?:?$/, "")
+        .replace(PRODUCT_TOKEN_RE, (_m, sku, qty) =>
+          `\`${TOKEN_PREFIX}${sku}:${qty ?? ""}\``,
+        ),
     [content],
   );
 
@@ -1079,7 +1106,7 @@ function SuggestionButton({ children, onClick }: { children: React.ReactNode; on
   return (
     <button
       onClick={onClick}
-      className="rounded-full border bg-card hover:bg-accent px-3 h-9 text-sm font-medium"
+      className="rounded-full bg-brand text-brand-foreground hover:opacity-90 px-3 h-9 text-sm font-medium"
     >
       {children}
     </button>
