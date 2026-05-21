@@ -23,6 +23,7 @@ import { Route as ApiScanRouteImport } from './routes/api/scan'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as ProcurementOrdersOrderIdRouteImport } from './routes/procurement.orders.$orderId'
+import { Route as OrdersOrderIdTrackRouteImport } from './routes/orders.$orderId.track'
 import { Route as ApiPublicAgentmailWebhookRouteImport } from './routes/api/public/agentmail/webhook'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -96,6 +97,11 @@ const ProcurementOrdersOrderIdRoute =
     path: '/$orderId',
     getParentRoute: () => ProcurementOrdersRoute,
   } as any)
+const OrdersOrderIdTrackRoute = OrdersOrderIdTrackRouteImport.update({
+  id: '/$orderId/track',
+  path: '/$orderId/track',
+  getParentRoute: () => OrdersRoute,
+} as any)
 const ApiPublicAgentmailWebhookRoute =
   ApiPublicAgentmailWebhookRouteImport.update({
     id: '/api/public/agentmail/webhook',
@@ -106,7 +112,7 @@ const ApiPublicAgentmailWebhookRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/orders': typeof OrdersRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
@@ -117,13 +123,14 @@ export interface FileRoutesByFullPath {
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement/': typeof ProcurementIndexRoute
+  '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
   '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
   '/api/public/agentmail/webhook': typeof ApiPublicAgentmailWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/orders': typeof OrdersRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement': typeof ProcurementIndexRoute
+  '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
   '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
   '/api/public/agentmail/webhook': typeof ApiPublicAgentmailWebhookRoute
 }
@@ -140,7 +148,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/orders': typeof OrdersRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement/': typeof ProcurementIndexRoute
+  '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
   '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
   '/api/public/agentmail/webhook': typeof ApiPublicAgentmailWebhookRoute
 }
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement/'
+    | '/orders/$orderId/track'
     | '/procurement/orders/$orderId'
     | '/api/public/agentmail/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement'
+    | '/orders/$orderId/track'
     | '/procurement/orders/$orderId'
     | '/api/public/agentmail/webhook'
   id:
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement/'
+    | '/orders/$orderId/track'
     | '/procurement/orders/$orderId'
     | '/api/public/agentmail/webhook'
   fileRoutesById: FileRoutesById
@@ -210,7 +222,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
-  OrdersRoute: typeof OrdersRoute
+  OrdersRoute: typeof OrdersRouteWithChildren
   ProcurementRoute: typeof ProcurementRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   AdminProductsRoute: typeof AdminProductsRoute
@@ -319,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProcurementOrdersOrderIdRouteImport
       parentRoute: typeof ProcurementOrdersRoute
     }
+    '/orders/$orderId/track': {
+      id: '/orders/$orderId/track'
+      path: '/$orderId/track'
+      fullPath: '/orders/$orderId/track'
+      preLoaderRoute: typeof OrdersOrderIdTrackRouteImport
+      parentRoute: typeof OrdersRoute
+    }
     '/api/public/agentmail/webhook': {
       id: '/api/public/agentmail/webhook'
       path: '/api/public/agentmail/webhook'
@@ -328,6 +347,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface OrdersRouteChildren {
+  OrdersOrderIdTrackRoute: typeof OrdersOrderIdTrackRoute
+}
+
+const OrdersRouteChildren: OrdersRouteChildren = {
+  OrdersOrderIdTrackRoute: OrdersOrderIdTrackRoute,
+}
+
+const OrdersRouteWithChildren =
+  OrdersRoute._addFileChildren(OrdersRouteChildren)
 
 interface ProcurementOrdersRouteChildren {
   ProcurementOrdersOrderIdRoute: typeof ProcurementOrdersOrderIdRoute
@@ -363,7 +393,7 @@ const ProcurementRouteWithChildren = ProcurementRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
-  OrdersRoute: OrdersRoute,
+  OrdersRoute: OrdersRouteWithChildren,
   ProcurementRoute: ProcurementRouteWithChildren,
   SettingsRoute: SettingsRoute,
   AdminProductsRoute: AdminProductsRoute,
@@ -374,13 +404,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
