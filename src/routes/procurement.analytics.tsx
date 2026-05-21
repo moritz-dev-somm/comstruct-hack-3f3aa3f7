@@ -217,7 +217,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
         {/* §3 Spend Breakdown */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className={`${CARD} p-5`}>
-            <SectionHeader title="Ausgaben nach Projekt" subtitle="Klick auf Balken filtert das gesamte Dashboard" />
+            <SectionHeader title="Spend by project" subtitle="Click a bar to filter the whole dashboard" />
             <div className="h-[280px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={projects} layout="vertical" margin={{ top: 10, right: 50, left: 10, bottom: 0 }}>
