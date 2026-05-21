@@ -89,7 +89,7 @@ function OrdersOverview() {
                 <td className="px-4 py-2.5 text-muted-foreground">{o.project}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{o.items.reduce((s, i) => s + i.qty, 0)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatEUR(o.subtotal)}</td>
-                <td className="px-4 py-2.5"><StatusPill status={o.status} /></td>
+                <td className="px-4 py-2.5"><StatusPill status={deriveOrderStatus(o, negotiationsByOrder[o.id])} /></td>
                 <td className="px-4 py-2.5 text-muted-foreground text-xs">{new Date(o.createdAt).toLocaleString()}</td>
                 <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-3 justify-end">
