@@ -96,7 +96,13 @@ export const STATUS_META: Record<
 
 type OrdersCtx = {
   orders: Order[];
-  createFromCart: (items: CartItem[]) => Order;
+  /**
+   * Create one Order per distinct supplier in the cart. Items without a
+   * supplier are grouped under a single "Unassigned" order. Each order
+   * gets its own ID, subtotal, tier and status — this mirrors procurement
+   * reality (one PO per supplier).
+   */
+  createFromCart: (items: CartItem[]) => Order[];
   approve: (id: string, actor: string) => void;
   reject: (id: string, actor: string, reason: string) => void;
   advanceToDelivered: (id: string) => void;
