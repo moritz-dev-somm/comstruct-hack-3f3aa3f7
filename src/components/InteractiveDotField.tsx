@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 const GRID = 22;
 const RADIUS = 140;
 const BASE_ALPHA = 0.16;
-const PEAK_ALPHA = 0.95;
+const PEAK_ALPHA = 0.45;
 const BASE_R = 0.9;
 const PEAK_R = 1.6;
 
