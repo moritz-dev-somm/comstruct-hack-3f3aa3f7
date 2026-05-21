@@ -114,6 +114,7 @@ export const startNegotiationForOrder = createServerFn({ method: "POST" })
           supplierName: contact.name,
           items: items as Order["items"],
           subtotal,
+          language: contact.language,
         });
         const attachment = attachmentByName.get(supplierName);
         try {
