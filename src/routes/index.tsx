@@ -210,7 +210,7 @@ function Home() {
         });
         // Detect inline product tokens as they stream in so the
         // "Recommended for this job" panel below stays in sync.
-        const re = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+        const re = /\[\[product:([A-Za-z0-9_-]+)(?::\d+)?\]\]/g;
         const found: string[] = [];
         let m: RegExpExecArray | null;
         while ((m = re.exec(chunk)) !== null) found.push(m[1]);
