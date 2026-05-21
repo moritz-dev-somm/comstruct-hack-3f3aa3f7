@@ -148,9 +148,22 @@ export type ReplyClassification = {
   answerable_questions?: string[];
   unanswerable_questions?: string[];
   unclear_points?: string[];
+  /** Subset of priorOpenQuestions the latest reply addresses (verbatim). */
+  answered_open_questions?: string[];
+  /** Subset of priorOpenQuestions still not addressed by the latest reply. */
+  still_open_questions?: string[];
   suggested_outbound?: SuggestedOutbound;
   followup_count?: number;
   clarification_count?: number;
+};
+
+export type ThreadContext = {
+  /** Open questions the agent has asked and is waiting on. */
+  priorOpenQuestions: string[];
+  /** Checklist fields the supplier already answered in earlier turns. */
+  priorAnsweredChecklist: ChecklistField[];
+  /** Short bullets of facts the supplier already gave us. */
+  priorAnswersSummary?: string[];
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
