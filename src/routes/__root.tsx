@@ -12,6 +12,8 @@ import { CartProvider } from "@/lib/cart";
 import { BudgetProvider } from "@/lib/budget";
 import { OrdersProvider } from "@/lib/orders";
 import { RoleProvider } from "@/lib/role";
+import { InteractiveDotField } from "@/components/InteractiveDotField";
+
 
 import appCss from "../styles.css?url";
 
@@ -126,6 +128,7 @@ function RootComponent() {
         <BudgetProvider>
           <CartProvider>
             <OrdersProvider>
+              <InteractiveDotField />
               <Outlet />
               <Toaster position="top-center" richColors />
             </OrdersProvider>
@@ -133,5 +136,6 @@ function RootComponent() {
         </BudgetProvider>
       </RoleProvider>
     </QueryClientProvider>
+
   );
 }
