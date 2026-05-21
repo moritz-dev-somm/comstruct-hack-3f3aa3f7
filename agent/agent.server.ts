@@ -20,7 +20,7 @@ export function agentMail(): AgentMailClient {
 
 export const AGENT_INBOX_CLIENT_ID = "comstruct-procurement-agent-v1";
 export const AGENT_WEBHOOK_CLIENT_ID = "comstruct-agent-webhook-v1";
-export const HARDCODED_SUPPLIER_EMAIL = "kessler.nicholas@gmx.ch";
+export const HARDCODED_SUPPLIER_EMAIL = "nicholas.r.kessler@gmail.com";
 export const HARDCODED_SUPPLIER_NAME = "Kessler Bauhandel (test)";
 
 function publicBaseUrl(): string {
@@ -51,8 +51,7 @@ export async function ensureAgentInfra(): Promise<{
     clientId: AGENT_INBOX_CLIENT_ID,
   });
   const inboxId = inbox.inboxId;
-  const inboxAddress =
-    (inbox as { address?: string }).address ?? inboxId;
+  const inboxAddress = (inbox as { address?: string }).address ?? inboxId;
 
   // 2. Webhook (clientId makes it idempotent)
   const url = webhookUrl();
@@ -70,10 +69,10 @@ export async function ensureAgentInfra(): Promise<{
   } catch (err) {
     // If already exists, find it and read the secret.
     const list = await am.webhooks.list();
-    const items = (list as { webhooks?: Array<{ webhookId: string; clientId?: string; secret: string; url: string }> }).webhooks ?? [];
-    const found = items.find(
-      (w) => w.clientId === AGENT_WEBHOOK_CLIENT_ID || w.url === url,
-    );
+    const items =
+      (list as { webhooks?: Array<{ webhookId: string; clientId?: string; secret: string; url: string }> }).webhooks ??
+      [];
+    const found = items.find((w) => w.clientId === AGENT_WEBHOOK_CLIENT_ID || w.url === url);
     if (!found) throw err;
     webhookId = found.webhookId;
     webhookSecret = found.secret;
@@ -109,11 +108,11 @@ export async function getAgentSettings(): Promise<{
 export type ReplyClassification = {
   /** Overall verdict on the reply. */
   verdict:
-    | "fully_confirmed"      // accepted, no caveats → auto-confirm
+    | "fully_confirmed" // accepted, no caveats → auto-confirm
     | "confirmed_with_issue" // accepted but with delay/price-change/partial → needs human
-    | "declined"             // refused → needs human
-    | "needs_clarification"  // asked us a question → needs human
-    | "unclear";             // couldn't tell → needs human
+    | "declined" // refused → needs human
+    | "needs_clarification" // asked us a question → needs human
+    | "unclear"; // couldn't tell → needs human
   /** Short human summary of the supplier's reply. */
   summary: string;
   /** Extracted delivery time / lead time string if mentioned. */
@@ -221,13 +220,7 @@ export async function verifySvixSignature(args: {
     keyBytes = new TextEncoder().encode(raw).buffer as ArrayBuffer;
   }
   const toSign = `${id}.${timestamp}.${body}`;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(toSign));
   const expected = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
 
