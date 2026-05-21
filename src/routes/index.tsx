@@ -29,6 +29,9 @@ import { useCart } from "@/lib/cart";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
+import chocolatesImg from "@/assets/chocolates-incentive.jpg";
+
+const CHOCOLATE_THRESHOLD = 500;
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -1236,6 +1239,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <ChocolateIncentive subtotal={cart.subtotal} />
           {cart.items.length === 0 && (
             <div className="text-sm text-muted-foreground text-center py-12">Cart is empty</div>
           )}
@@ -1294,6 +1298,47 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           >
             Adjust budget &amp; rules
           </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChocolateIncentive({ subtotal }: { subtotal: number }) {
+  const remaining = Math.max(0, CHOCOLATE_THRESHOLD - subtotal);
+  const unlocked = remaining === 0;
+  const progress = Math.min(100, (subtotal / CHOCOLATE_THRESHOLD) * 100);
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="aspect-[16/10] bg-muted overflow-hidden">
+        <img
+          src={chocolatesImg}
+          alt="Complimentary box of Swiss artisan chocolates"
+          width={1024}
+          height={640}
+          loading="lazy"
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="p-3 space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-sm font-semibold leading-tight">
+            Free box of Swiss chocolates
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+            Gift
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {unlocked
+            ? "Unlocked — we'll ship a box with your delivery."
+            : `Spend ${formatEUR(remaining)} more to unlock a complimentary box with your next delivery.`}
+        </p>
+        <div className="h-1.5 w-full rounded-sm bg-muted overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       </div>
     </div>
