@@ -1324,7 +1324,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     } else {
       toast.success(`${created.id} sent to ${CENTRAL.name} for approval · PO PDF downloaded`);
     }
-    navigate({ to: "/orders" });
+    navigate({ to: "/orders/$orderId/track", params: { orderId: created.id } });
   }
 
   const ctaLabel =
