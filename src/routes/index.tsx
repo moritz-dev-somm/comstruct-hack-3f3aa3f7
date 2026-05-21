@@ -147,6 +147,7 @@ function Home() {
   const [streaming, setStreaming] = useState(false);
   const [thinkingWord, setThinkingWord] = useState(THINKING_WORDS[0]);
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
+  const [followups, setFollowups] = useState<string[]>([]);
   const { data: products = [] } = useProducts();
   const [aMaterialFlag, setAMaterialFlag] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
