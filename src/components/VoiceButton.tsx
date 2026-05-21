@@ -405,20 +405,26 @@ function ListeningOverlay({
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        {/* Pulsing mic with live audio level */}
-        <div className="relative grid h-40 w-40 place-items-center">
-          <div
+        {/* Pulsing mic with live audio level — tap to stop/send */}
+        <button
+          type="button"
+          onClick={onSend}
+          aria-label="Stop recording and send"
+          className="relative grid h-40 w-40 place-items-center focus-visible:outline-none"
+        >
+          <span
             className="absolute inset-0 rounded-full bg-brand/15 transition-transform duration-75"
             style={{ transform: `scale(${scale})` }}
           />
-          <div
+          <span
             className="absolute inset-4 rounded-full bg-brand/25 transition-transform duration-75"
             style={{ transform: `scale(${1 + level * 0.3})` }}
           />
-          <div className="relative grid size-24 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg">
+          <span className="relative grid size-24 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg active:scale-95 transition-transform">
             <Mic className="size-10" strokeWidth={2.5} />
-          </div>
-        </div>
+          </span>
+        </button>
+        <span className="mt-2 text-xs text-muted-foreground">Tap the mic to stop</span>
 
         <div className="mt-8 min-h-[3em] max-w-md text-xl font-medium leading-snug">
           {transcript ? (
