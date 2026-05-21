@@ -1,5 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat, LogOut, Bot } from "lucide-react";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrders } from "@/lib/orders";
 import { useRole } from "@/lib/role";
 
