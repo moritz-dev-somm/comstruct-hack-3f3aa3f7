@@ -33,6 +33,58 @@ export function webhookUrl(): string {
 }
 
 /**
+ * Small/cheap/strong OpenAI model used for ALL supplier-email reasoning
+ * (classification, translation, recall verification). Good at JSON tool
+ * calls and multilingual (EN/DE/FR/IT) — exactly what this agent needs.
+ */
+export const OPENAI_AGENT_MODEL = "gpt-4o-mini";
+
+/**
+ * Call OpenAI chat completions directly using the project's OPENAI_API_KEY.
+ * Retries transient errors (429 / 5xx / network) up to `retries` times with
+ * exponential backoff so we never silently fall back to heuristics.
+ * Throws on persistent failure — callers must surface that.
+ */
+export async function callOpenAI(
+  body: Record<string, unknown>,
+  opts: { retries?: number; timeoutMs?: number } = {},
+): Promise<unknown> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  const retries = opts.retries ?? 3;
+  const timeoutMs = opts.timeoutMs ?? 45_000;
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: OPENAI_AGENT_MODEL, ...body }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) return await res.json();
+      const text = await res.text();
+      const transient = res.status === 429 || res.status >= 500;
+      lastErr = new Error(`OpenAI ${res.status}: ${text.slice(0, 500)}`);
+      if (!transient || attempt === retries) throw lastErr;
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt === retries) throw err;
+    }
+    await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)));
+  }
+  throw lastErr ?? new Error("OpenAI call failed");
+}
+
+/**
  * Idempotently ensure an inbox + a `message.received` webhook exist, and
  * persist the inbox id, webhook id and signing secret in `agent_settings`.
  */
