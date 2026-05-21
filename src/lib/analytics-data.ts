@@ -143,7 +143,7 @@ export function computeCategories(rows: NegotiationRow[]) {
   const map = new Map<string, { value: number; top: string; topQty: number }>();
   for (const r of rows) {
     for (const item of r.order_snapshot?.items ?? []) {
-      const cat = item.category ?? "Sonstige";
+      const cat = item.category ?? "Other";
       const lineTotal = (item.price ?? 0) * (item.qty ?? 0);
       const cur = map.get(cat) ?? { value: 0, top: item.name, topQty: 0 };
       cur.value += lineTotal;
