@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Camera, ScanLine, X, ArrowRight, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
+/** Portal to document.body so the full-screen scan flow escapes any
+ * ancestor with `transform`/`backdrop-filter` (e.g. the chat's blurred
+ * bottom action bar), which would otherwise clip a `position: fixed`
+ * child to a small box. SSR-safe. */
+function PortalToBody({ children }: { children: React.ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
 
 type ScanResult = {
   kind: "barcode" | "product" | "category" | "unknown";
