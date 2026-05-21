@@ -68,13 +68,15 @@ export function ScanButton({
       )}
 
       {open && (
-        <ScanFlow
-          onClose={() => setOpen(false)}
-          onResult={(prompt, raw) => {
-            setOpen(false);
-            onResult(prompt, raw);
-          }}
-        />
+        <PortalToBody>
+          <ScanFlow
+            onClose={() => setOpen(false)}
+            onResult={(prompt, raw) => {
+              setOpen(false);
+              onResult(prompt, raw);
+            }}
+          />
+        </PortalToBody>
       )}
     </>
   );
