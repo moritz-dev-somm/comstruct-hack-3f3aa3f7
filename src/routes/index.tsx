@@ -845,6 +845,7 @@ function ConversationView({
   onSelectCategory,
   onClearCategory,
   onResetRecommendations,
+  onAddBundle,
   onSuggestion,
   followups,
   allProducts,
