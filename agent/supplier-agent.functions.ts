@@ -1,57 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { AgentMailClient } from "agentmail";
+import {
+  agentMail,
+  ensureAgentInfra,
+  adminClient,
+  HARDCODED_SUPPLIER_EMAIL,
+  HARDCODED_SUPPLIER_NAME,
+} from "./agent.server";
 import { composeOrderEmail, composeNudgeEmail } from "./templates";
 import type { Order } from "@/lib/orders";
-
-/**
- * Server functions for the supplier-negotiation agent.
- *
- * Right now these are thin wrappers around the AgentMail SDK — enough to
- * (a) make sure we have an inbox to send from, (b) fire an order email at a
- * supplier, (c) list whatever has landed in the inbox so the UI can show it.
- *
- * Persistence of `Negotiation` records is intentionally NOT here yet. Once
- * we know which DB table to use, classification + decideOnReply should run
- * inside a server fn triggered by a polling/webhook route.
- */
-
-function client(): AgentMailClient {
-  const apiKey = process.env.AGENTMAIL_API_KEY;
-  if (!apiKey) throw new Error("AGENTMAIL_API_KEY is not configured");
-  return new AgentMailClient({ apiKey });
-}
-
-/**
- * Make sure an inbox exists for the agent. `client_id` makes this idempotent
- * — calling it repeatedly with the same id returns the same inbox.
- *
- * `username` is a placeholder until procurement picks the real handle.
- */
-export const ensureAgentInbox = createServerFn({ method: "POST" })
-  .inputValidator(
-    z.object({
-      username: z.string().min(1).max(64).optional(),
-      clientId: z.string().min(1).max(128).default("comstruct-procurement-agent-v1"),
-    }),
-  )
-  .handler(async ({ data }) => {
-    try {
-      const inbox = await client().inboxes.create({
-        username: data.username,
-        clientId: data.clientId,
-      });
-      return {
-        ok: true as const,
-        inboxId: inbox.inboxId,
-        address: (inbox as { inboxId: string; address?: string }).address ?? inbox.inboxId,
-      };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("ensureAgentInbox failed:", message);
-      return { ok: false as const, error: message };
-    }
-  });
 
 const orderShape = z.object({
   id: z.string(),
@@ -69,7 +26,74 @@ const orderShape = z.object({
   ),
 });
 
-/** Send the initial order email to a supplier. */
+/** Idempotently ensure inbox + webhook exist. UI uses this for a status read. */
+export const ensureAgentInbox = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ username: z.string().optional() }).optional().default({}))
+  .handler(async () => {
+    try {
+      const r = await ensureAgentInfra();
+      return { ok: true as const, inboxId: r.inboxId, address: r.inboxAddress };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("ensureAgentInbox failed:", message);
+      return { ok: false as const, error: message };
+    }
+  });
+
+/**
+ * Auto-triggered when the foreman submits a cart. Provisions infra, sends the
+ * initial purchase-request email to the hardcoded supplier, and writes a
+ * negotiation row so the webhook can match the reply back.
+ */
+export const startNegotiationForOrder = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ order: orderShape }))
+  .handler(async ({ data }) => {
+    try {
+      const infra = await ensureAgentInfra();
+      const email = composeOrderEmail(data.order as unknown as Order);
+      const am = agentMail();
+      const sendRes = await am.inboxes.messages.send(infra.inboxId, {
+        to: HARDCODED_SUPPLIER_EMAIL,
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+      });
+      const threadId = (sendRes as { threadId?: string }).threadId ?? null;
+      const messageId = (sendRes as { messageId?: string }).messageId ?? null;
+
+      const sb = adminClient();
+      const { data: inserted, error } = await sb
+        .from("negotiations")
+        .insert({
+          order_id: data.order.id,
+          project: data.order.project,
+          supplier_name: HARDCODED_SUPPLIER_NAME,
+          supplier_email: HARDCODED_SUPPLIER_EMAIL,
+          inbox_id: infra.inboxId,
+          thread_id: threadId,
+          message_id: messageId,
+          subject: email.subject,
+          status: "awaiting_reply",
+          order_snapshot: data.order,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+
+      return {
+        ok: true as const,
+        negotiationId: inserted.id,
+        threadId,
+        supplier: HARDCODED_SUPPLIER_EMAIL,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("startNegotiationForOrder failed:", message);
+      return { ok: false as const, error: message };
+    }
+  });
+
+/** Manual send (used by the existing agent page). */
 export const sendOrderEmail = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
@@ -80,10 +104,9 @@ export const sendOrderEmail = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    // We accept a partial Order shape over the wire; cast for the templater.
     const email = composeOrderEmail(data.order as unknown as Order);
     try {
-      const res = await client().inboxes.messages.send(data.inboxId, {
+      const res = await agentMail().inboxes.messages.send(data.inboxId, {
         to: data.supplierEmail,
         subject: email.subject,
         text: email.text,
@@ -91,9 +114,7 @@ export const sendOrderEmail = createServerFn({ method: "POST" })
       });
       return {
         ok: true as const,
-        messageId: (res as { messageId?: string; id?: string }).messageId
-          ?? (res as { id?: string }).id
-          ?? null,
+        messageId: (res as { messageId?: string }).messageId ?? null,
         sentAt: new Date().toISOString(),
       };
     } catch (err) {
@@ -103,7 +124,6 @@ export const sendOrderEmail = createServerFn({ method: "POST" })
     }
   });
 
-/** Send a "still waiting on you" nudge in the same thread. */
 export const sendNudgeEmail = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
@@ -115,7 +135,7 @@ export const sendNudgeEmail = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const email = composeNudgeEmail(data.order as unknown as Order);
     try {
-      await client().inboxes.messages.send(data.inboxId, {
+      await agentMail().inboxes.messages.send(data.inboxId, {
         to: data.supplierEmail,
         subject: email.subject,
         text: email.text,
@@ -129,7 +149,6 @@ export const sendNudgeEmail = createServerFn({ method: "POST" })
     }
   });
 
-/** List the latest messages in the agent inbox so the UI can display them. */
 export const listInboxMessages = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
@@ -139,10 +158,9 @@ export const listInboxMessages = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     try {
-      const res = await client().inboxes.messages.list(data.inboxId, {
+      const res = await agentMail().inboxes.messages.list(data.inboxId, {
         limit: data.limit,
       });
-      // Map to a serialization-safe DTO.
       const messages = ((res as { messages?: unknown[] }).messages ?? []).map((m: unknown) => {
         const anyM = m as Record<string, unknown>;
         return {
@@ -151,12 +169,11 @@ export const listInboxMessages = createServerFn({ method: "POST" })
           from: String(anyM.from ?? ""),
           to: Array.isArray(anyM.to) ? anyM.to.map(String) : [],
           subject: String(anyM.subject ?? ""),
-          preview:
-            String(
-              (anyM.extractedText as string | undefined) ??
-                (anyM.text as string | undefined) ??
-                "",
-            ).slice(0, 400),
+          preview: String(
+            (anyM.extractedText as string | undefined) ??
+              (anyM.text as string | undefined) ??
+              "",
+          ).slice(0, 400),
           receivedAt: String(anyM.receivedAt ?? anyM.createdAt ?? ""),
           labels: Array.isArray(anyM.labels) ? anyM.labels.map(String) : [],
         };
