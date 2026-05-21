@@ -43,25 +43,62 @@ function attrLine(attrs: Record<string, unknown> | null | undefined): string {
   return entries.map(([k, v]) => `${k}=${v}`).join(", ");
 }
 
-async function categorySummary(): Promise<string> {
+/** Heuristic language detection over the last user message. */
+function detectLang(text: string): "de" | "en" {
+  const t = text.toLowerCase();
+  const de = /\b(ich|wir|brauche|brauchen|für|nicht|und|oder|mit|das|der|die|wie|wo|wann|bitte|schraube|dübel|baustelle|heute|morgen|stk|grüß)\b/;
+  const en = /\b(i|we|need|for|not|and|or|with|the|how|where|when|please|screw|anchor|site|today|tomorrow|pc|hi|hey|hello)\b/;
+  const deHits = (t.match(de) || []).length;
+  const enHits = (t.match(en) || []).length;
+  if (deHits > enHits) return "de";
+  if (enHits > deHits) return "en";
+  // umlauts → German
+  if (/[äöüß]/.test(t)) return "de";
+  return "en";
+}
+
+/** Pick localized name/description/unit/keywords/use_cases per row, falling back to German. */
+function localized(row: ProductRow & {
+  name_en?: string | null; description_en?: string | null; unit_en?: string | null;
+  keywords_en?: string[] | null; use_cases_en?: UseCase[] | null;
+}, lang: "de" | "en") {
+  if (lang === "en") {
+    return {
+      name: row.name_en || row.name,
+      description: row.description_en || row.description,
+      unit: row.unit_en || row.unit,
+      keywords: (row.keywords_en && row.keywords_en.length ? row.keywords_en : row.keywords) ?? [],
+      use_cases: (row.use_cases_en && row.use_cases_en.length ? row.use_cases_en : row.use_cases) ?? [],
+    };
+  }
+  return {
+    name: row.name, description: row.description, unit: row.unit,
+    keywords: row.keywords ?? [], use_cases: row.use_cases ?? [],
+  };
+}
+
+const SELECT_COLS =
+  "sku,name,name_en,category,source_category,unit,unit_en,price_eur,supplier,hazardous,consumable,storage_location,typical_site,keywords,keywords_en,description,description_en,attributes,use_cases,use_cases_en";
+
+async function categorySummary(lang: "de" | "en"): Promise<string> {
   const sb = sbClient();
   const { data, error } = await sb
     .from("products")
-    .select(
-      "sku,name,category,source_category,unit,price_eur,supplier,hazardous,consumable,storage_location,typical_site,keywords,description,attributes,use_cases",
-    )
+    .select(SELECT_COLS)
     .order("category")
     .order("sku")
     .limit(5000);
   if (error || !data) return "(catalog unavailable)";
   const byCat: Record<string, ProductRow[]> = {};
   for (const r of data as ProductRow[]) (byCat[r.category] ??= []).push(r);
+  const usesLabel = lang === "en" ? "Use cases" : "Einsatz";
   return Object.entries(byCat)
     .map(([cat, items]) => {
       const lines = items
         .map((p) => {
+          const loc = localized(p as never, lang);
           const attrs = attrLine(p.attributes);
-          const uses = (p.use_cases ?? [])
+          const uses = (loc.use_cases ?? [])
             .map((u) => `        - ${u.scenario} — ${u.why}`)
             .join("\n");
           const meta: string[] = [];
@@ -73,12 +110,12 @@ async function categorySummary(): Promise<string> {
           if (p.typical_site) meta.push(`site: ${p.typical_site}`);
           const metaStr = meta.length ? ` (${meta.join(" · ")})` : "";
           const parts = [
-            `  • ${p.sku} ${p.name} — €${Number(p.price_eur).toFixed(2)}/${p.unit}${metaStr}`,
+            `  • ${p.sku} ${loc.name} — €${Number(p.price_eur).toFixed(2)}/${loc.unit}${metaStr}`,
           ];
-          if (p.description) parts.push(`      ${p.description}`);
+          if (loc.description) parts.push(`      ${loc.description}`);
           if (attrs) parts.push(`      [${attrs}]`);
-          if (p.keywords && p.keywords.length) parts.push(`      keywords: ${p.keywords.join(", ")}`);
-          if (uses) parts.push(`      Einsatz:\n${uses}`);
+          if (loc.keywords && loc.keywords.length) parts.push(`      keywords: ${loc.keywords.join(", ")}`);
+          if (uses) parts.push(`      ${usesLabel}:\n${uses}`);
           return parts.join("\n");
         })
         .join("\n");
@@ -94,23 +131,20 @@ async function searchProducts(args: {
   limit?: number;
 }): Promise<ProductRow[]> {
   const sb = sbClient();
-  let q = sb
-    .from("products")
-    .select(
-      "sku,name,category,source_category,unit,price_eur,supplier,hazardous,keywords,description,attributes,use_cases",
-    );
+  let q = sb.from("products").select(SELECT_COLS);
   if (args.category) q = q.eq("category", args.category);
   if (args.supplier) q = q.ilike("supplier", `%${args.supplier}%`);
   if (args.query) {
     const term = args.query.trim();
     q = q.or(
-      `name.ilike.%${term}%,sku.ilike.%${term}%,source_category.ilike.%${term}%,description.ilike.%${term}%`,
+      `name.ilike.%${term}%,name_en.ilike.%${term}%,sku.ilike.%${term}%,source_category.ilike.%${term}%,description.ilike.%${term}%,description_en.ilike.%${term}%`,
     );
   }
   const { data, error } = await q.limit(Math.min(args.limit ?? 20, 50));
   if (error) throw error;
   return (data ?? []) as ProductRow[];
 }
+
 
 const SYSTEM_PROMPT_BASE = `You are the comstruct ordering assistant — a helpful, no-nonsense procurement helper for construction site foremen ordering C-materials (screws, plugs, tape, PPE, drill bits, sealants).
 
