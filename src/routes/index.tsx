@@ -186,6 +186,25 @@ function Home() {
   const inConversation = messages.length > 0;
   const showCatalog = inConversation || selectedCategory !== null;
 
+  // Tiles derived from the live products table — every distinct `category`
+  // value becomes a tile, with a sensible icon fallback. Adding a product
+  // with a new category in the DB makes a new tile appear automatically.
+  const categoryTiles = useMemo<CategoryTileData[]>(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      if (!p.category) continue;
+      counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([category]) => ({
+        category,
+        label: labelForCategory(category),
+        icon: iconForCategory(category),
+      }));
+  }, [products]);
+
+
   // restore localStorage thread
   useEffect(() => {
     try {
