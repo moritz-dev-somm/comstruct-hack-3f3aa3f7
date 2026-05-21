@@ -194,6 +194,22 @@ function Home() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, streaming]);
 
+  // Auto-run hybrid catalog search after every completed assistant turn.
+  // Each new turn refines the search with the full chat log.
+  const lastSearchTurnRef = useRef(0);
+  useEffect(() => {
+    if (streaming) return;
+    if (messages.length === 0) return;
+    if (messages.length === lastSearchTurnRef.current) return;
+    const last = messages[messages.length - 1];
+    if (last?.role !== "assistant" || !last.content) return;
+    if (!messages.some((m) => m.role === "user")) return;
+    lastSearchTurnRef.current = messages.length;
+    runHybridSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streaming, messages]);
+
+
   const sortedProducts = useMemo(() => {
     const filtered = selectedCategory
       ? products.filter((p) => p.category === selectedCategory)
