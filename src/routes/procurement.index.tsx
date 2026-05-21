@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, PM, CENTRAL } from "@/lib/orders";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
+import { deriveOrderStatus } from "@/lib/order-status";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/")({
