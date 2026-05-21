@@ -1,56 +1,81 @@
-# Rebrand comstruct → Swiss Modernist
+# Advanced Spend Analytics — Plan
 
-Keep all functionality, copy, routes, and the comstruct name. Only the visual language changes. No wine/sommelier references, no sommelia logos.
+Replace the current minimal `src/routes/procurement.analytics.tsx` with a full single-page dashboard that follows the spec exactly. Rendered inside the existing procurement sidebar layout (no new routes).
 
-## 1. Tokens (`src/styles.css`)
+## Scope
 
-Replace the current petrol-teal palette + Inter/Chivo Mono setup with Swiss Modernist tokens. All values in `oklch` (converted from the brand HSL/hex).
+- One file rewritten: `src/routes/procurement.analytics.tsx`
+- Small helpers extracted into `src/lib/analytics-mock.ts` (mock data + CHF formatter + period scaling)
+- No DB / server / schema changes. Pure presentation using recharts + mock data per the spec.
 
-- `--background` → warm off-white (`#F5F2ED`)
-- `--foreground` → near-black blue-undertone (`#161A1F`)
-- `--primary` → bold warm red (`#C8281E`), `--primary-foreground` white
-- `--card` → `#FDFCFA`, `--card border` `#EDEBE7`
-- `--border` `#E0DDD6`, `--input` matches
-- `--muted` `#E7E4DD`, `--muted-foreground` `#666A6E`
-- `--secondary` `#C9C5BD`, `--accent` `#EEEBE4`
-- `--destructive` → blue `#1D4F9E` (per brand guide; red is reserved for CTAs)
-- `--ring` matches primary red
-- `--sidebar*` → `#EDEAE3` family
-- `--brand` / `--brand-foreground` → re-point to primary red + white (so existing `bg-brand` usages instantly re-skin; no component edits needed)
-- Chart tokens → steel-blue / warm-red / forest / amber / muted-purple
-- `--radius` → `0.5rem` (so `sm 3px / md 6px / lg 9px` come out right)
-- Fonts: `--font-sans` and `--font-mono` both → `'Helvetica Neue', Helvetica, Arial, sans-serif`. Brand uses one family; mono is unused in this app so we collapse it too. (Keeps any `font-mono` className from breaking the look.)
-- Remove the `.dark { … }` block entirely (light-only).
-- Remove the global `font-weight: 500` on body — Swiss minimalism leans on regular weight + tracking, not heavier base weight.
-- Keep the glove-friendly 48px min tap target and 18px base font-size (functional, not stylistic).
-- Zero box-shadow: add a base rule nulling `box-shadow` on shadcn surfaces, and rely on borders. Add `--elevate-1: rgba(0,0,0,.03)` and `--elevate-2: rgba(0,0,0,.08)` for hover/active overlays.
+## Page structure
 
-## 2. Root layout (`src/routes/__root.tsx`)
+Single scrollable page, white cards on `#F9FAFB`, German throughout.
 
-- Drop the Google Fonts `<link>` for Inter + Chivo Mono — Helvetica is system-installed, no webfont needed.
-- Update `<title>` and meta description to neutral comstruct copy (no sommelia references; current copy is already comstruct-flavored, just sanity-check).
+```text
+Header: "Spend Analytics" + "C-Material Beschaffung"
+        [Filter: Diese Woche | Dieser Monat* | Letztes Quartal | Dieses Jahr]   [📥 Export]
+        [optional active project filter chip: "Filter aktiv: <Projekt> ×"]
 
-## 3. Component touch-ups (minimal)
+§1 KPI row (6 cards)
+§2 Ausgabenverlauf — ComposedChart (Bar + 7d rolling avg Line) + 3 insight chips
+§3 Spend Breakdown — [Projekt horizontal bars | Kategorie donut]
+§4 Lieferantenanalyse — table + amber off-contract alert
+§5 Ordering Behaviour — [Top Besteller table | Wochentag/Tageszeit bars]
+§6 Genehmigungsperformance — 3 mini charts (Zeiten bar, Schwellwert pie, Ablehnung)
+```
 
-The big win comes from tokens. A few spots hardcode color or rely on the teal feeling — adjust only these:
+All numeric values, table rows, colours, and insight-chip texts come straight from the spec.
 
-- `src/routes/login.tsx`, `src/routes/procurement.tsx`: the brand square uses `bg-brand` with a `HardHat` icon. Keep the mark but switch the square to a clean red tile with white wordmark "comstruct" — no icon-in-tile, more Swiss. (Or keep `HardHat` if you prefer — confirm in implementation; default = remove icon, just a red square + wordmark beside it.)
-- Any amber/emerald status pills hardcoded in routes (e.g. `bg-amber-500/20 text-amber-700` in the procurement sidebar badge) → re-tint to neutral muted + primary text so red stays reserved for CTAs. Keep semantic colors (green = approved, amber = pending) where they encode state.
-- Sweep for hardcoded hex / `text-white` / `bg-black` and replace with tokens. Quick `rg` pass; expect a handful in chat / order detail / PDF preview.
-- Ensure cards use `border` instead of `shadow-*`. Replace any `shadow-sm` / `shadow-md` on Card-like elements with a 1px border.
+## Interactivity
 
-## 4. Memory update
+- `period` state (default `monat`). A `scale` factor (`woche=0.25`, `monat=1`, `quartal=3`, `jahr=12`) is applied to all CHF/count values and the time-series is regenerated for the period's date range. KPI trends recomputed against previous period of same length.
+- `projectFilter` state. Clicking a bar in §3A sets it; chip in header clears it. While active, §4 and §5 recompute from that project's slice (mock filter).
+- KPI cards have `onClick` that smooth-scrolls (`scrollIntoView`) to the relevant section via section `ref`s: spend → §2, supplier → §4, approval/Ø-time → §6.
+- Tables sortable: column header click toggles sort key + direction (small caret icon on hover).
+- All recharts have `<Tooltip>` with formatted CHF values.
+- Export button triggers the exact CSV blob download from the spec.
 
-Replace `mem://index.md` Core line and rewrite `mem://design/brand-comstruct.md` with the new Swiss Modernist tokens so future turns don't re-introduce petrol teal.
+## Formatting
+
+- `formatCHF(n)` → `CHF 4'284` (apostrophe thousands, no decimals).
+- Dates formatted `dd.MM` for x-axis, `dd.MM.yyyy` for tooltips.
+
+## Styling
+
+The spec mandates concrete hex colours that override the project's red Swiss-Modernist tokens for this dashboard only:
+
+- Primary chart green `#16A34A`, accent blue `#2563EB`, teal `#0D9488`, amber `#D97706`, gray `#6B7280`, danger `#DC2626`, amber bg `#FEF3C7`.
+- Cards: `rounded-xl border border-[#E5E7EB] shadow-sm bg-white`, page bg `#F9FAFB`.
+- Status pills: green/amber/red per "Vertragskonform" thresholds.
+- Off-contract row: `border-l-4 border-[#DC2626]`.
+
+Note: This deliberately deviates from the comstruct brand tokens (which forbid hardcoded hex and shadows) because the spec is explicit. Scope is contained to this one route.
+
+## Mock data module (`src/lib/analytics-mock.ts`)
+
+Exports:
+- `formatCHF`
+- `PERIODS` + `scaleFor(period)`
+- `buildDailySeries(period)` → array of `{ date, spend, rolling7 }` with Monday spikes + occasional 300–450 CHF days
+- `KPIS`, `BY_PROJECT`, `BY_CATEGORY`, `SUPPLIERS`, `TOP_FOREMEN`, `WEEKDAY`, `TIMEOFDAY`, `APPROVAL_TIMES`, `APPROVAL_TIERS`, `REJECTIONS` — base monthly values from spec, scaled at render time.
+- `applyProjectFilter(data, project)` helpers for §4/§5.
+
+## Build order (matches spec priority)
+
+1. Scaffold page shell + header + filters + section refs
+2. §1 KPI row
+3. §3 Spend breakdown (bars + donut)
+4. §2 Ausgabenverlauf ComposedChart + insight chips
+5. §5 Top Besteller + Wochentag/Tageszeit
+6. §4 Lieferanten table + off-contract alert
+7. §6 Approval performance trio
+8. Wire date filter → recompute everything
+9. Wire project bar click → filter chip + §4/§5 filtering + KPI scroll
+10. CSV export button
 
 ## Out of scope
 
-- No copy rewrites, no new routes, no business-logic changes.
-- No new logo asset — text wordmark "comstruct" in Helvetica Bold is the mark.
-- PDF generation (`po-pdf.ts`) keeps its existing layout; only swap the accent hex to the new red.
-
-## Technical notes
-
-- HSL→oklch conversion done at write-time; values above are reference hex.
-- `font-mono` collapse is intentional — only a couple of spots use it (price tickers); they'll render in Helvetica and look more Swiss, not worse.
-- Light-only: remove `.dark` block + the `dark:` Tailwind variants are harmless leftovers; no need to sweep them out, they just never activate.
+- No changes to sidebar, routing, DB, server functions, or other procurement pages.
+- The drawer for "click a Besteller row" is stubbed as a simple `Sheet` showing the foreman's filtered orders list (reuses existing `Sheet` ui component); no new routes.
+- "Bestellregeln anpassen →" and "Ablehnungen ansehen →" buttons link via `<Link>` to existing `/settings` and `/procurement/orders` respectively.
