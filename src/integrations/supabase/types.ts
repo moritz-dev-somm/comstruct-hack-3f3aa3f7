@@ -74,6 +74,7 @@ export type Database = {
           supplier_language: string | null
           supplier_name: string
           thread_id: string | null
+          thread_messages: Json
           updated_at: string
         }
         Insert: {
@@ -102,6 +103,7 @@ export type Database = {
           supplier_language?: string | null
           supplier_name: string
           thread_id?: string | null
+          thread_messages?: Json
           updated_at?: string
         }
         Update: {
@@ -130,6 +132,7 @@ export type Database = {
           supplier_language?: string | null
           supplier_name?: string
           thread_id?: string | null
+          thread_messages?: Json
           updated_at?: string
         }
         Relationships: []
