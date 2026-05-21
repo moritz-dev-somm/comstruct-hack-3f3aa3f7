@@ -637,6 +637,7 @@ function HeroView({
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onAddQuickOrder: (items: string[]) => void;
+  categoryTiles: CategoryTileData[];
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
