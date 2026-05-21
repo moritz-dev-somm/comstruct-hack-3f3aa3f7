@@ -36,6 +36,14 @@ import { ScanButton } from "@/components/ScanButton";
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
+import {
+  IconTile,
+  CompassIcon,
+  GearIcon,
+  ShovelIcon,
+  CraneIcon,
+  ConeIcon,
+} from "@/components/construction-icons";
 
 const CHOCOLATE_THRESHOLD = 500;
 
@@ -599,12 +607,22 @@ function HeroView({
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-2xl">
+        {/* Decorative icon row — SubBase-style colored tiles */}
+        <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
+          <IconTile icon={CompassIcon} tone="brand" size="sm" />
+          <IconTile icon={CraneIcon} tone="dark" size="sm" />
+          <IconTile icon={GearIcon} tone="light" size="sm" />
+          <IconTile icon={ShovelIcon} tone="brand" size="sm" />
+          <IconTile icon={ConeIcon} tone="outline" size="sm" />
+        </div>
+
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-center">
           What do you need on site?
         </h1>
         <p className="mt-3 text-center text-muted-foreground">
           Speak it, snap a photo, or type — we'll figure out what you need.
         </p>
+
 
         {/* Primary action CTAs — voice (brand) + scan (grey), visually distinct */}
         <div className="mt-8 flex justify-center items-start gap-8">
