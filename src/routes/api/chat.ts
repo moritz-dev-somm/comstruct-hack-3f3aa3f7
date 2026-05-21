@@ -206,6 +206,75 @@ async function retrieveRelevant(intents: SearchIntent[]): Promise<RetrievedItem[
   return merged;
 }
 
+/**
+ * Fallback expansion: when direct retrieval finds nothing, ask an LLM to
+ * brainstorm concrete C-material products a foreman would want for this
+ * request, and return them as search keywords we can query the DB with.
+ *
+ * E.g. "PPE gear for a new hire" → ["safety helmet", "safety gloves",
+ *       "safety glasses", "high-vis vest", "ear plugs", "dust mask",
+ *       "steel toe boots", "knee pads"].
+ */
+async function expandQueryToKeywords(
+  userMessage: string,
+  apiKey: string,
+): Promise<SearchIntent[]> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const useOpenAI = !!openaiKey;
+  const url = useOpenAI
+    ? "https://api.openai.com/v1/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const model = useOpenAI ? "gpt-4o-mini" : "google/gemini-2.5-flash-lite";
+
+  const sys = `You expand a construction foreman's vague request into concrete C-material product keywords likely to exist in a supplier catalog.
+
+C-materials = small consumables and tools bought at a builders' merchant: PPE, gloves, masks, screws, plugs, anchors, drill bits, sealants, tapes, batteries, blades, small hand tools. NOT concrete, doors, windows, or major building materials.
+
+Given the request, list 5-10 distinct generic product types that would plausibly fulfil it. Each keyword must be a short noun phrase (1-3 words) suitable for an ILIKE catalog search — no brand names, no quantities, no sentences.
+
+Return JSON: { "keywords": [ { "q": string, "category_filter": string|null } ] }.
+Valid category_filter values (else null): ${VALID_CATEGORIES.map((c) => `'${c}'`).join(", ")}.
+Use the same language as the user.`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: userMessage },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content);
+    const arr = Array.isArray(parsed.keywords) ? parsed.keywords : [];
+    return arr
+      .filter((x: { q?: unknown }) => x && typeof x.q === "string" && x.q.trim())
+      .slice(0, 10)
+      .map((x: { q: string; category_filter?: unknown }) => ({
+        q: x.q.trim(),
+        category_filter:
+          typeof x.category_filter === "string" &&
+          (VALID_CATEGORIES as readonly string[]).includes(x.category_filter)
+            ? x.category_filter
+            : null,
+        requested_quantity: null,
+      }));
+  } catch (e) {
+    console.error("expandQueryToKeywords failed", e);
+    return [];
+  }
+}
+
 function buildRelevantItemsContext(items: RetrievedItem[], lang: "de" | "en"): string {
   if (!items.length) {
     return "(no catalog items matched this turn — call search_products if you need to look something up)";
