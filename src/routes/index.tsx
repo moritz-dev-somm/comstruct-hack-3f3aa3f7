@@ -450,7 +450,12 @@ function Home() {
             onResetRecommendations={() => setRecommendedIds([])}
             onSuggestion={(s) => send(s)}
             allProducts={products}
+            onRunSearch={runHybridSearch}
+            searching={searching}
+            searchResults={searchResults}
+            searchExtracted={searchExtracted}
           />
+
         )}
       </main>
 
