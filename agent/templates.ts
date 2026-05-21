@@ -585,14 +585,18 @@ export function composeClarificationRequestEmail(
   language: SupplierLanguage = "en",
   points: string[] = [],
   pendingChecklist: ChecklistField[] = ["delivery_date", "shipping_cost"],
+  pointsEn: string[] = [],
 ): ComposedEmail {
-  const cleaned = points.map((p) => p.trim()).filter(Boolean);
-  const bulletsNative = cleaned.length
-    ? cleaned
+  const cleanedNative = points.map((p) => p.trim()).filter(Boolean);
+  const cleanedEn = pointsEn.map((p) => p.trim()).filter(Boolean);
+  const bulletsNative = cleanedNative.length
+    ? cleanedNative
     : pendingChecklist.map((f) => checklistBullet(language, f));
-  const bulletsEn = cleaned.length
-    ? cleaned
-    : pendingChecklist.map((f) => checklistBullet("en", f));
+  const bulletsEn = cleanedEn.length
+    ? cleanedEn
+    : cleanedNative.length && language === "en"
+      ? cleanedNative
+      : pendingChecklist.map((f) => checklistBullet("en", f));
   return assembleBilingual({
     language,
     subjectEn: `Re: [${order.id}] ${CLARIFY.en.subject}`,
