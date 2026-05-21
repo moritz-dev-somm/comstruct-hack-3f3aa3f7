@@ -43,8 +43,6 @@ import {
   ShovelIcon,
   CraneIcon,
   ConeIcon,
-  WheelbarrowIcon,
-  BlueprintIcon,
 } from "@/components/construction-icons";
 
 const CHOCOLATE_THRESHOLD = 500;
