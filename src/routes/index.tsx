@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import {
   Anchor,
@@ -210,7 +212,7 @@ function Home() {
         });
         // Detect inline product tokens as they stream in so the
         // "Recommended for this job" panel below stays in sync.
-        const re = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+        const re = /\[\[product:([A-Za-z0-9_-]+)(?::\d+)?\]\]/g;
         const found: string[] = [];
         let m: RegExpExecArray | null;
         while ((m = re.exec(chunk)) !== null) found.push(m[1]);
@@ -678,11 +680,13 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
 }
 
 /* -------------------------------------------------------------------------- */
-/* Assistant content: splits prose around [[product:SKU]] tokens and renders  */
-/* an inline product bubble in place of each token.                           */
+/* Assistant content: renders markdown, with [[product:SKU:QTY]] tokens       */
+/* replaced by inline product pills.                                          */
 /* -------------------------------------------------------------------------- */
 
-const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+// Marker we inject as inline `code` so markdown parsing preserves it.
+const TOKEN_PREFIX = "§§PROD§§";
 
 function AssistantContent({
   content,
@@ -691,54 +695,79 @@ function AssistantContent({
   content: string;
   products: Product[];
 }) {
-  const nodes = useMemo(() => {
-    const out: React.ReactNode[] = [];
-    let last = 0;
-    let m: RegExpExecArray | null;
-    PRODUCT_TOKEN_RE.lastIndex = 0;
-    while ((m = PRODUCT_TOKEN_RE.exec(content)) !== null) {
-      if (m.index > last) {
-        out.push(
-          <span key={`t-${last}`} className="whitespace-pre-wrap">
-            {content.slice(last, m.index)}
-          </span>,
-        );
-      }
-      const sku = m[1];
-      const p = products.find((x) => x.sku === sku);
-      if (p) {
-        out.push(<InlineProductBubble key={`p-${m.index}-${sku}`} product={p} />);
-      } else {
-        // Token streamed but product not loaded yet — fall back to the SKU.
-        out.push(
-          <span
-            key={`u-${m.index}-${sku}`}
-            className="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-          >
-            {sku}
-          </span>,
-        );
-      }
-      last = m.index + m[0].length;
-    }
-    if (last < content.length) {
-      out.push(
-        <span key={`t-end-${last}`} className="whitespace-pre-wrap">
-          {content.slice(last)}
-        </span>,
-      );
-    }
-    return out;
-  }, [content, products]);
+  const prepared = useMemo(
+    () =>
+      content.replace(PRODUCT_TOKEN_RE, (_m, sku, qty) =>
+        `\`${TOKEN_PREFIX}${sku}:${qty ?? ""}\``,
+      ),
+    [content],
+  );
 
-  return <>{nodes}</>;
+  return (
+    <div className="text-[15px] leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="my-2">{children}</p>,
+          h1: ({ children }) => <h1 className="text-lg font-bold mt-4 mb-2">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-base font-bold mt-3 mb-2">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-[15px] font-bold mt-3 mb-1.5">{children}</h3>,
+          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          ul: ({ children }) => <ul className="my-2 pl-5 list-disc marker:text-brand space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="my-2 pl-5 list-decimal marker:text-brand space-y-1">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          a: ({ children, href }) => (
+            <a href={href} className="text-brand underline underline-offset-2" target="_blank" rel="noreferrer">
+              {children}
+            </a>
+          ),
+          hr: () => <hr className="my-3 border-border" />,
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-brand/40 pl-3 my-2 italic text-muted-foreground">
+              {children}
+            </blockquote>
+          ),
+          code: ({ children, className, ...rest }: { children?: React.ReactNode; className?: string }) => {
+            const raw = String(children ?? "");
+            if (raw.startsWith(TOKEN_PREFIX)) {
+              const body = raw.slice(TOKEN_PREFIX.length);
+              const [sku, qtyStr] = body.split(":");
+              const qty = qtyStr ? parseInt(qtyStr, 10) : undefined;
+              const p = products.find((x) => x.sku === sku);
+              if (p) return <InlineProductBubble product={p} suggestedQty={qty} />;
+              return (
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {sku}
+                </span>
+              );
+            }
+            return (
+              <code className={`font-mono text-[0.85em] px-1 py-0.5 rounded bg-muted ${className ?? ""}`} {...rest}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {prepared}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
-function InlineProductBubble({ product }: { product: Product }) {
+function InlineProductBubble({
+  product,
+  suggestedQty,
+}: {
+  product: Product;
+  suggestedQty?: number;
+}) {
   const cart = useCart();
   const [showDetail, setShowDetail] = useState(false);
   const inCart = cart.items.find((i) => i.productId === product.sku);
   const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const addQty = suggestedQty && suggestedQty > 0 ? suggestedQty : 1;
 
   function add(e: React.MouseEvent) {
     stop(e);
@@ -746,7 +775,7 @@ function InlineProductBubble({ product }: { product: Product }) {
       productId: product.sku,
       name: product.name,
       price: product.price,
-      qty: 1,
+      qty: addQty,
       category: product.category,
       unit: product.unit,
     });
@@ -803,11 +832,13 @@ function InlineProductBubble({ product }: { product: Product }) {
         ) : (
           <button
             onClick={add}
-            className="ml-1 shrink-0 inline-flex items-center gap-1 rounded-full bg-brand text-brand-foreground px-2 h-7 text-xs font-bold"
-            aria-label={`Add ${product.name} to cart`}
+            className="ml-1 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand text-brand-foreground px-2.5 h-7 text-xs font-bold"
+            aria-label={`Add ${addQty} ${product.name} to cart`}
           >
             <Plus className="size-3.5" />
-            <span className="tabular-nums">{formatEUR(product.price)}</span>
+            <span className="tabular-nums">
+              {addQty > 1 ? `Add ${addQty} · ${formatEUR(product.price)} ea` : `Add · ${formatEUR(product.price)}`}
+            </span>
           </button>
         )}
       </span>
