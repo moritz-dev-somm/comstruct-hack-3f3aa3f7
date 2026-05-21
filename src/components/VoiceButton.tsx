@@ -339,13 +339,15 @@ export function VoiceButton({
           <span className="text-xs text-muted-foreground">Hands-free on site</span>
         </div>
         {listening && (
-          <ListeningOverlay
-            interim={interim}
-            finalText={finalText}
-            level={level}
-            onCancel={cancel}
-            onSend={sendNow}
-          />
+          <PortalToBody>
+            <ListeningOverlay
+              interim={interim}
+              finalText={finalText}
+              level={level}
+              onCancel={cancel}
+              onSend={sendNow}
+            />
+          </PortalToBody>
         )}
       </>
     );
