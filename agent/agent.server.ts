@@ -156,46 +156,60 @@ export type ReplyClassification = {
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
 The reply may be in any language (commonly en, de, fr, it). Do NOT require English.
 
-Decide the verdict strictly:
-- "fully_confirmed": supplier accepts ALL items at the proposed prices AND raises NO issues, NO delays, NO price changes, NO partial availability, NO questions. The delivery date or shipping cost MAY be missing — that is handled separately via the checklist.
-- "confirmed_with_issue": supplier accepts but mentions ANY of: delay, longer lead time, partial availability, price change, substitution, shipping surcharge that exceeds expectations, stock issue, anything that procurement should review.
-- "declined": supplier refuses or cannot fulfil.
-- "needs_clarification": supplier asks us a question or requests info from us (e.g. asks for our VAT ID, delivery address, payment terms, line-item details).
-- "unclear": you cannot tell.
-Be conservative: if in doubt between fully_confirmed and confirmed_with_issue, choose confirmed_with_issue.
+You receive THREE inputs:
+  1. ORIGINAL PURCHASE ORDER (items, prices, project).
+  2. THREAD CONTEXT — what the agent already asked AND what the supplier already answered in earlier replies. Treat this as authoritative ground truth.
+  3. LATEST SUPPLIER REPLY — only the new message.
 
-Extract the checklist:
-- delivery_date: earliest committed delivery date or lead time, normalised to "YYYY-MM-DD" or e.g. "2 weeks". Null if not stated.
-- shipping_cost: "included", "€0", or the literal amount (e.g. "CHF 45"). Null if not mentioned.
-- order_confirmed: true if the supplier accepts the order in some form, false otherwise.
-List any of ["delivery_date","shipping_cost"] still null in missing_checklist.
+CRITICAL RULES FOR RECOGNISING ANSWERS:
+- Read THREAD CONTEXT first. For every "OPEN QUESTION FROM AGENT" listed, judge ONLY whether the LATEST reply addresses it. Be generous: a short, partial, or implicit answer ("included", "next Tuesday", "yes", "no extra cost", "in stock", a single number, a single date) counts as an answer. Do NOT require the supplier to re-quote the question.
+- For every "ALREADY ANSWERED IN PRIOR TURNS" item, treat it as resolved unless the LATEST reply explicitly contradicts or retracts it. Never re-flag it as missing or unclear.
+- Combine prior turns with the latest reply when deciding the verdict — do not evaluate the latest reply in isolation.
+
+Verdict (strict):
+- "fully_confirmed": supplier has accepted ALL items at the proposed prices across the thread AND raises NO issues, delays, price changes, partial availability or open questions in the latest reply. delivery_date / shipping_cost MAY still be missing — that's the checklist's job.
+- "confirmed_with_issue": supplier accepts but mentions ANY of: delay, longer lead time, partial availability, price change, substitution, shipping surcharge, stock issue.
+- "declined": supplier refuses or cannot fulfil.
+- "needs_clarification": supplier asks US a question.
+- "unclear": use SPARINGLY — only when the latest reply is genuinely vague AND no prior turn resolved it. If the latest reply answers every OPEN QUESTION FROM AGENT, do NOT pick "unclear".
+Be conservative between fully_confirmed and confirmed_with_issue.
+
+Checklist (combine LATEST reply with THREAD CONTEXT — once answered, stays answered):
+- delivery_date: normalised date or lead time. Null only if never stated across the whole thread.
+- shipping_cost: "included" / "€0" / literal amount. Null only if never mentioned across the whole thread.
+- order_confirmed: true if the supplier has accepted the order at any point in the thread.
+missing_checklist: any of ["delivery_date","shipping_cost"] still null after combining.
+
+Answered-questions tracking (REQUIRED):
+- answered_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply addresses (even partially). Copy each string VERBATIM from the OPEN QUESTION list. [] if none.
+- still_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply did NOT address. Copy verbatim. [] if all answered.
 
 Always provide:
-- reply_language: ISO 639-1 of the supplier reply (e.g. "de", "fr", "it", "en"). Best guess.
-- summary: 1–2 sentences in the SUPPLIER'S language (or English if unknown).
-- summary_en: ALWAYS English, 1–2 sentences, for the procurement UI.
+- reply_language: ISO 639-1.
+- summary: 1–2 sentences in the SUPPLIER'S language.
+- summary_en: ALWAYS English, 1–2 sentences.
 
-If the supplier asks us questions, split them:
-- answerable_questions: questions we can answer from purchase-order data (delivery address, VAT ID, payment terms, line items, contact, project reference). Use the supplier's own wording, translated to English.
-- unanswerable_questions: questions that need a human (custom discounts, off-PO terms, anything we don't know).
+Questions FROM supplier TO us (split):
+- answerable_questions: from PO data (delivery address, VAT ID, payment terms, line items, contact, project reference). Translated to English.
+- unanswerable_questions: need a human.
 
-Also extract:
-- lead_time_days: integer best estimate of the lead time in days (e.g. "2 weeks" → 14, "next Tuesday" → relative days from today, "in stock, ships tomorrow" → 1). Null if the supplier did not state a lead time.
-- shipping_cost_eur: numeric shipping cost in EUR. Use 0 if shipping is "included" / "free". Null if not mentioned. Convert CHF → EUR roughly 1:1 if no rate hint is available.
-- wants_human: true ONLY if the supplier explicitly asks to talk to / be contacted by a real person, sales rep, account manager, or similar. False otherwise.
+Also:
+- lead_time_days: integer best estimate. Null if not stated anywhere in the thread.
+- shipping_cost_eur: numeric EUR (0 = included). Null if never mentioned.
+- wants_human: true ONLY if supplier explicitly asks to talk to a person.
 
-If the verdict is "unclear" OR the supplier replied but left specific points vague or unanswered, populate unclear_points with ONLY the items the supplier actually left vague or unanswered in THIS reply — do not list anything the supplier already answered clearly, and do not add generic boilerplate about availability/price/delivery if those were addressed. Be minimal: if only delivery time is unclear, return exactly ONE bullet about delivery time. If two items are unclear, return two bullets (or a single combined bullet when they naturally belong together, e.g. unit price + total). Max 4 bullets, but prefer 1. Phrase each bullet in the SUPPLIER'S language as a direct, specific question referencing the exact item/SKU/phrase the supplier used — e.g. "Confirm earliest delivery date for the steel beams (you mentioned 'soon')", "Confirm unit price for SKU Y after the discount you mentioned". Never write generic prose. If nothing is unclear, return [].
+unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
 
-Finally pick suggested_outbound (the policy layer may still override):
-- "confirm" when fully_confirmed AND missing_checklist is empty AND no issues
+Finally pick suggested_outbound (policy may override):
+- "confirm" when fully_confirmed AND missing_checklist empty AND no issues AND still_open_questions empty
 - "checklist_followup" when fully_confirmed but missing_checklist has fields
-- "answer_questions" when needs_clarification AND answerable_questions is non-empty
-- "request_clarification" when verdict is "unclear"
+- "answer_questions" when needs_clarification AND answerable_questions non-empty
+- "request_clarification" when still_open_questions non-empty OR verdict is "unclear"
 - "acknowledge_decline" when declined
 - "acknowledge_issues" when confirmed_with_issue
 - "escalate_silent" otherwise
 
-Always reply with strict JSON matching the schema. No prose.`;
+Always reply with strict JSON. No prose.`;
 
 const EMPTY_CHECKLIST: ReplyChecklist = {
   order_confirmed: false,
