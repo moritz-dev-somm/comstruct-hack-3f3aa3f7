@@ -454,6 +454,32 @@ function Home() {
             send={send}
             onSelectCategory={setSelectedCategory}
             inputRef={inputRef}
+            onAddQuickOrder={(items) => {
+              let added = 0;
+              for (const itemName of items) {
+                const product = products.find((p) =>
+                  p.name.toLowerCase().includes(itemName.toLowerCase()) ||
+                  itemName.toLowerCase().includes(p.name.toLowerCase())
+                );
+                if (product) {
+                  cart.add({
+                    productId: product.sku,
+                    name: product.name,
+                    price: product.price,
+                    category: product.category,
+                    unit: product.unit,
+                    qty: 1,
+                  });
+                  added++;
+                }
+              }
+              if (added > 0) {
+                toast.success(`Added ${added} item${added === 1 ? "" : "s"} to cart`);
+                setCartOpen(true);
+              } else {
+                toast.info("No matching products found in catalog");
+              }
+            }}
           />
         ) : (
           <ConversationView
