@@ -508,7 +508,6 @@ function Home() {
           <HeroView
             categoryTiles={categoryTiles}
             input={input}
-            input={input}
             setInput={setInput}
             send={send}
             onSelectCategory={setSelectedCategory}
