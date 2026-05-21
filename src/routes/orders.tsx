@@ -59,8 +59,19 @@ function OrdersPage() {
   );
 }
 
-function OrderRow({ order, open, onToggle }: { order: Order; open: boolean; onToggle: () => void }) {
+function OrderRow({
+  order,
+  negotiations,
+  open,
+  onToggle,
+}: {
+  order: Order;
+  negotiations: NegotiationRow[] | undefined;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
+  const derived = deriveOrderStatus(order, negotiations);
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
@@ -70,8 +81,12 @@ function OrderRow({ order, open, onToggle }: { order: Order; open: boolean; onTo
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm font-mono">{order.id}</span>
-            <StatusPill status={order.status} />
+            <StatusPill status={derived} />
           </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
+          </div>
+        </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
           </div>
