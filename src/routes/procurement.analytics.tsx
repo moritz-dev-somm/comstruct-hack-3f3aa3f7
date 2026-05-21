@@ -271,7 +271,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="text-[11px] text-[#6B7280]">Gesamt</div>
+                <div className="text-[11px] text-[#6B7280]">Total</div>
                 <div className="text-[18px] font-bold text-[#111827]">{formatCHF(categoryTotal)}</div>
               </div>
             </div>
