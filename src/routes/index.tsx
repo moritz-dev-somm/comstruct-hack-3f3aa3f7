@@ -215,6 +215,7 @@ function Home() {
     setMessages([...newHistory, { role: "assistant", content: "" }]);
     setInput("");
     setStreaming(true);
+    setFollowups([]);
     setThinkingWord(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
 
     try {
