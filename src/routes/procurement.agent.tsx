@@ -420,7 +420,8 @@ function AgentPage() {
           <ul className="divide-y">
             {threads.map((t, idx) => {
               const isOpen = effectiveExpanded(t.key, idx);
-              const threadVerdict = verdictByThread.get(t.key);
+              const neg = negByThread.get(t.key);
+              const status = neg ? statusOf(neg.status) : t.hasInbound ? "awaiting_reply" : "sent";
               return (
                 <li key={t.key}>
                   <button
@@ -443,18 +444,11 @@ function AgentPage() {
                         <span className="truncate">{t.supplierName}</span>
                         <span className="text-muted-foreground/60">·</span>
                         <span className="tabular-nums">{t.messages.length} message{t.messages.length === 1 ? "" : "s"}</span>
-                        {threadVerdict ? (
-                          <VerdictPill verdict={threadVerdict.verdict} size="md" />
-                        ) : t.hasInbound ? (
-                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border border-brand/30 bg-brand/10 text-brand text-[10px] font-medium">
-                            <InboxIcon className="size-3" /> Reply
-                          </span>
-                        ) : t.hasOutbound ? (
-                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border text-[10px] font-medium text-muted-foreground">
-                            <Send className="size-3" /> Awaiting reply
-                          </span>
-                        ) : null}
+                        <StatusPill status={status} size="md" />
                       </div>
+                      {neg?.needs_user_reason && status === "needs_user" && (
+                        <p className="mt-1 text-xs text-brand line-clamp-2">{neg.needs_user_reason}</p>
+                      )}
                     </div>
                   </button>
 
@@ -462,16 +456,13 @@ function AgentPage() {
                     <ol className="px-5 pb-4 space-y-2">
                       {t.messages.map((m) => {
                         const out = isOutbound(m, inbox.address);
-                        // Tag inbound (supplier) messages with their verdict when
-                        // we have a classification for that specific reply, or
-                        // fall back to the thread-level verdict for the latest one.
-                        const msgVerdict: Verdict | undefined =
-                          !out
-                            ? verdictByMessageId.get(m.id) ??
-                              (threadVerdict && (threadVerdict.replyMessageId === m.id || !threadVerdict.replyMessageId)
-                                ? threadVerdict.verdict
-                                : undefined)
-                            : undefined;
+                        const msgVerdict: Verdict | undefined = !out
+                          ? verdictByMessageId.get(m.id) ??
+                            (neg?.classification?.verdict &&
+                            (neg.reply_message_id === m.id || !neg.reply_message_id)
+                              ? (neg.classification.verdict as Verdict)
+                              : undefined)
+                          : undefined;
                         return (
                           <li key={m.id}>
                             <button
