@@ -7,7 +7,7 @@ import {
   ensureAgentInbox,
   listInboxMessages,
   sendOrderEmail,
-} from "@agent/supplier-agent.functions";
+} from "@/lib/supplier-agent.functions";
 import { useOrders } from "@/lib/orders";
 import { formatEUR } from "@/lib/catalog";
 
