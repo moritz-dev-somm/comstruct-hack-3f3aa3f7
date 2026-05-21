@@ -6,7 +6,14 @@ import {
   adminClient,
   HARDCODED_SUPPLIER_EMAIL,
 } from "@agent/agent.server";
-import { composeOrderEmail, composeNudgeEmail } from "@agent/templates";
+import {
+  composeOrderEmail,
+  composeNudgeEmail,
+  composeConfirmationEmail,
+  composeDeclineAckEmail,
+  composeHumanReplyEmail,
+  type SupplierLanguage,
+} from "@agent/templates";
 import type { Order } from "@/lib/orders";
 
 const itemShape = z.object({
@@ -314,7 +321,7 @@ export const listNegotiationsForInbox = createServerFn({ method: "POST" })
       const { data: rows, error } = await adminClient()
         .from("negotiations")
         .select(
-          "id, order_id, thread_id, status, classification, reply_message_id, last_reply_at, supplier_email, subject",
+          "id, order_id, project, thread_id, status, classification, reply_message_id, message_id, last_reply_at, sent_at, supplier_name, supplier_email, supplier_language, subject, needs_user_reason, inbox_id",
         )
         .eq("inbox_id", data.inboxId)
         .order("updated_at", { ascending: false })
@@ -325,6 +332,161 @@ export const listNegotiationsForInbox = createServerFn({ method: "POST" })
       const message = err instanceof Error ? err.message : String(err);
       console.error("listNegotiationsForInbox failed:", message);
       return { ok: false as const, error: message, negotiations: [] };
+    }
+  });
+
+/* ============================================================
+   Human-in-the-loop actions (used by "Needs your attention").
+   ============================================================ */
+
+const SUPPORTED_LANGS: SupplierLanguage[] = ["en", "de", "fr", "it"];
+function pickLang(snapshot: { supplier_language?: string } | null, fallback: string | null | undefined): SupplierLanguage {
+  const s = (snapshot?.supplier_language || "").toLowerCase().slice(0, 2) as SupplierLanguage;
+  if (SUPPORTED_LANGS.includes(s)) return s;
+  const f = (fallback || "").toLowerCase().slice(0, 2) as SupplierLanguage;
+  if (SUPPORTED_LANGS.includes(f)) return f;
+  return "en";
+}
+
+type NegotiationFull = {
+  id: string;
+  inbox_id: string | null;
+  thread_id: string | null;
+  message_id: string | null;
+  reply_message_id: string | null;
+  supplier_email: string | null;
+  supplier_language: string | null;
+  subject: string | null;
+  order_snapshot: Order & { supplier_language?: string };
+  classification: Record<string, unknown> | null;
+};
+
+async function loadNegotiation(id: string): Promise<NegotiationFull> {
+  const sb = adminClient();
+  const { data, error } = await sb
+    .from("negotiations")
+    .select("id, inbox_id, thread_id, message_id, reply_message_id, supplier_email, supplier_language, subject, order_snapshot, classification")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data as NegotiationFull;
+}
+
+async function sendReplyOrFresh(
+  neg: NegotiationFull,
+  email: { subject: string; text: string; html: string },
+): Promise<string | null> {
+  const am = agentMail();
+  const inboxId = neg.inbox_id;
+  if (!inboxId) throw new Error("Negotiation has no inbox_id");
+  const replyTo = neg.reply_message_id || neg.message_id;
+  try {
+    if (replyTo) {
+      const sent = await am.inboxes.messages.reply(inboxId, replyTo, {
+        text: email.text,
+        html: email.html,
+      });
+      return (sent as { messageId?: string }).messageId ?? null;
+    }
+    const sent = await am.inboxes.messages.send(inboxId, {
+      to: neg.supplier_email ?? "",
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+    return (sent as { messageId?: string }).messageId ?? null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("sendReplyOrFresh failed:", message);
+    throw err;
+  }
+}
+
+/** Human approves: send confirmation to supplier, mark confirmed. */
+export const approveNegotiation = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ negotiationId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const neg = await loadNegotiation(data.negotiationId);
+      const lang = pickLang(neg.order_snapshot, neg.supplier_language);
+      const leadTime =
+        (neg.classification as { lead_time?: string | null } | null)?.lead_time ?? null;
+      const email = composeConfirmationEmail(neg.order_snapshot, { leadTime }, lang);
+      const replyMessageId = await sendReplyOrFresh(neg, email);
+      const sb = adminClient();
+      await sb
+        .from("negotiations")
+        .update({
+          status: "confirmed",
+          confirmed_at: new Date().toISOString(),
+          needs_user_reason: null,
+          reply_message_id: replyMessageId,
+          last_reply_at: new Date().toISOString(),
+        })
+        .eq("id", neg.id);
+      return { ok: true as const };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("approveNegotiation failed:", message);
+      return { ok: false as const, error: message };
+    }
+  });
+
+/** Human declines + sources elsewhere: send decline-ack, mark declined. */
+export const declineAndReplaceNegotiation = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ negotiationId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const neg = await loadNegotiation(data.negotiationId);
+      const lang = pickLang(neg.order_snapshot, neg.supplier_language);
+      const email = composeDeclineAckEmail(neg.order_snapshot, lang);
+      const replyMessageId = await sendReplyOrFresh(neg, email);
+      const sb = adminClient();
+      await sb
+        .from("negotiations")
+        .update({
+          status: "declined_replaced",
+          needs_user_reason: null,
+          reply_message_id: replyMessageId,
+          last_reply_at: new Date().toISOString(),
+        })
+        .eq("id", neg.id);
+      return { ok: true as const };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("declineAndReplaceNegotiation failed:", message);
+      return { ok: false as const, error: message };
+    }
+  });
+
+/** Human writes a free-text reply to the supplier. */
+export const humanFollowupNegotiation = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      negotiationId: z.string().min(1),
+      message: z.string().min(1).max(5000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const neg = await loadNegotiation(data.negotiationId);
+      const email = composeHumanReplyEmail(neg.order_snapshot, data.message);
+      const replyMessageId = await sendReplyOrFresh(neg, email);
+      const sb = adminClient();
+      await sb
+        .from("negotiations")
+        .update({
+          status: "awaiting_reply",
+          needs_user_reason: null,
+          reply_message_id: replyMessageId,
+          last_reply_at: new Date().toISOString(),
+        })
+        .eq("id", neg.id);
+      return { ok: true as const };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("humanFollowupNegotiation failed:", message);
+      return { ok: false as const, error: message };
     }
   });
 

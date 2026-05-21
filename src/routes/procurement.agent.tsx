@@ -1,16 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import {
   Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send,
   Inbox as InboxIcon, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Circle,
+  Clock, UserRound, ShieldAlert,
 } from "lucide-react";
 import {
   listInboxMessages,
   getInboxMessage,
   listNegotiationsForInbox,
   ensureAgentInbox,
+  approveNegotiation,
+  declineAndReplaceNegotiation,
+  humanFollowupNegotiation,
 } from "@/lib/supplier-agent.functions";
 
 export const Route = createFileRoute("/procurement/agent")({
@@ -128,58 +132,146 @@ type Verdict =
   | "needs_clarification"
   | "unclear";
 
-type VerdictInfo = {
-  verdict: Verdict;
-  replyMessageId: string | null;
-  lastReplyAt: string | null;
-};
+/** Operational status: what is happening right now with this negotiation. */
+type NegStatus =
+  | "sent"
+  | "awaiting_reply"
+  | "following_up"
+  | "clarifying"
+  | "answering_questions"
+  | "confirmed"
+  | "needs_user"
+  | "declined_replaced";
 
-type NegotiationLite = {
+type NegotiationFull = {
   id: string;
+  order_id: string;
+  project: string | null;
   thread_id: string | null;
   reply_message_id: string | null;
+  message_id: string | null;
   last_reply_at: string | null;
-  classification: { verdict?: Verdict } | null;
+  sent_at: string;
+  status: NegStatus | string | null;
+  supplier_name: string | null;
+  supplier_email: string | null;
+  supplier_language: string | null;
+  subject: string | null;
+  needs_user_reason: string | null;
+  inbox_id: string | null;
+  classification: {
+    verdict?: Verdict;
+    summary_en?: string;
+    summary?: string;
+    lead_time?: string | null;
+    shipping_cost_eur?: number | null;
+    last_action?: string;
+    last_action_reason?: string | null;
+  } | null;
 };
 
-const VERDICT_META: Record<Verdict, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
-  fully_confirmed: {
-    label: "Approved",
-    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
-    Icon: CheckCircle2,
+const STATUS_META: Record<
+  NegStatus,
+  { label: string; cls: string; Icon: typeof CheckCircle2 }
+> = {
+  sent: {
+    label: "Sent",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Send,
   },
-  confirmed_with_issue: {
-    label: "Partial",
-    cls: "border-amber-500/40 bg-amber-500/10 text-amber-700",
-    Icon: AlertTriangle,
+  awaiting_reply: {
+    label: "Waiting on supplier",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Clock,
   },
-  declined: {
-    label: "Declined",
-    cls: "border-destructive/40 bg-destructive/10 text-destructive",
-    Icon: XCircle,
+  following_up: {
+    label: "Following up",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: Send,
   },
-  needs_clarification: {
-    label: "Question",
+  clarifying: {
+    label: "Clarifying",
     cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
     Icon: HelpCircle,
   },
-  unclear: {
-    label: "Unclear",
+  answering_questions: {
+    label: "Answered questions",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: HelpCircle,
+  },
+  confirmed: {
+    label: "Confirmed",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+    Icon: CheckCircle2,
+  },
+  needs_user: {
+    label: "Needs you",
+    cls: "border-brand/40 bg-brand/10 text-brand",
+    Icon: ShieldAlert,
+  },
+  declined_replaced: {
+    label: "Sourced elsewhere",
     cls: "border-border bg-muted text-muted-foreground",
-    Icon: Circle,
+    Icon: XCircle,
   },
 };
 
-function VerdictPill({ verdict, size = "sm" }: { verdict: Verdict; size?: "sm" | "md" }) {
-  const m = VERDICT_META[verdict];
+function statusOf(s: string | null | undefined): NegStatus {
+  if (!s) return "sent";
+  if (s in STATUS_META) return s as NegStatus;
+  return "awaiting_reply";
+}
+
+function StatusPill({ status, size = "sm" }: { status: NegStatus; size?: "sm" | "md" }) {
+  const m = STATUS_META[status];
   const h = size === "md" ? "h-6 text-[11px]" : "h-5 text-[10px]";
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 ${h} rounded-full border font-semibold ${m.cls}`}>
+    <span className={`inline-flex items-center gap-1 px-2 ${h} rounded-full border font-semibold ${m.cls}`}>
       <m.Icon className="size-3" />
       {m.label}
     </span>
   );
 }
+
+/** Per-message annotation: was this inbound the trigger for the current verdict? */
+const VERDICT_META: Record<Verdict, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
+  fully_confirmed: {
+    label: "Supplier confirmed",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+    Icon: CheckCircle2,
+  },
+  confirmed_with_issue: {
+    label: "Confirmed with issue",
+    cls: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+    Icon: AlertTriangle,
+  },
+  declined: {
+    label: "Supplier declined",
+    cls: "border-destructive/40 bg-destructive/10 text-destructive",
+    Icon: XCircle,
+  },
+  needs_clarification: {
+    label: "Asked a question",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: HelpCircle,
+  },
+  unclear: {
+    label: "Unclear reply",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Circle,
+  },
+};
+
+function VerdictPill({ verdict }: { verdict: Verdict }) {
+  const m = VERDICT_META[verdict];
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full border font-semibold text-[10px] ${m.cls}`}>
+      <m.Icon className="size-3" />
+      {m.label}
+    </span>
+  );
+}
+
 
 
 function AgentPage() {
@@ -243,19 +335,12 @@ function AgentPage() {
     return buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address);
   }, [messagesQ.data, inbox]);
 
-  // Map: latest classification per AgentMail thread_id, and per reply_message_id.
-  const verdictByThread = useMemo(() => {
-    const m = new Map<string, VerdictInfo>();
+  // Map negotiations by thread_id (and by reply_message_id for per-msg verdicts).
+  const negByThread = useMemo(() => {
+    const m = new Map<string, NegotiationFull>();
     if (negotiationsQ.data?.ok !== true) return m;
-    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
-      const v = (n.classification?.verdict ?? null) as Verdict | null;
-      if (!v) continue;
-      const info: VerdictInfo = {
-        verdict: v,
-        replyMessageId: n.reply_message_id ?? null,
-        lastReplyAt: n.last_reply_at ?? null,
-      };
-      if (n.thread_id) m.set(n.thread_id, info);
+    for (const n of negotiationsQ.data.negotiations as NegotiationFull[]) {
+      if (n.thread_id) m.set(n.thread_id, n);
     }
     return m;
   }, [negotiationsQ.data]);
@@ -263,16 +348,27 @@ function AgentPage() {
   const verdictByMessageId = useMemo(() => {
     const m = new Map<string, Verdict>();
     if (negotiationsQ.data?.ok !== true) return m;
-    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
+    for (const n of negotiationsQ.data.negotiations as NegotiationFull[]) {
       const v = (n.classification?.verdict ?? null) as Verdict | null;
       if (v && n.reply_message_id) m.set(n.reply_message_id, v);
     }
     return m;
   }, [negotiationsQ.data]);
 
+  // Queue: anything that needs the human to act now.
+  const needsAttention = useMemo<NegotiationFull[]>(() => {
+    if (negotiationsQ.data?.ok !== true) return [];
+    return (negotiationsQ.data.negotiations as NegotiationFull[])
+      .filter((n) => statusOf(n.status) === "needs_user")
+      .sort((a, b) =>
+        (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
+      );
+  }, [negotiationsQ.data]);
+
   // Default: most recent thread expanded.
   const effectiveExpanded = (key: string, idx: number) =>
     key in expanded ? expanded[key] : idx === 0;
+
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-6">
@@ -285,6 +381,14 @@ function AgentPage() {
           Email exchanges with suppliers, grouped by conversation.
         </p>
       </header>
+
+      <NeedsAttentionQueue
+        items={needsAttention}
+        onChanged={() => {
+          negotiationsQ.refetch();
+          messagesQ.refetch();
+        }}
+      />
 
       <section className="rounded-xl border bg-card overflow-hidden">
         <div className="px-5 py-3 border-b flex items-center justify-between">
@@ -324,7 +428,8 @@ function AgentPage() {
           <ul className="divide-y">
             {threads.map((t, idx) => {
               const isOpen = effectiveExpanded(t.key, idx);
-              const threadVerdict = verdictByThread.get(t.key);
+              const neg = negByThread.get(t.key);
+              const status = neg ? statusOf(neg.status) : t.hasInbound ? "awaiting_reply" : "sent";
               return (
                 <li key={t.key}>
                   <button
@@ -347,18 +452,11 @@ function AgentPage() {
                         <span className="truncate">{t.supplierName}</span>
                         <span className="text-muted-foreground/60">·</span>
                         <span className="tabular-nums">{t.messages.length} message{t.messages.length === 1 ? "" : "s"}</span>
-                        {threadVerdict ? (
-                          <VerdictPill verdict={threadVerdict.verdict} size="md" />
-                        ) : t.hasInbound ? (
-                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border border-brand/30 bg-brand/10 text-brand text-[10px] font-medium">
-                            <InboxIcon className="size-3" /> Reply
-                          </span>
-                        ) : t.hasOutbound ? (
-                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border text-[10px] font-medium text-muted-foreground">
-                            <Send className="size-3" /> Awaiting reply
-                          </span>
-                        ) : null}
+                        <StatusPill status={status} size="md" />
                       </div>
+                      {neg?.needs_user_reason && status === "needs_user" && (
+                        <p className="mt-1 text-xs text-brand line-clamp-2">{neg.needs_user_reason}</p>
+                      )}
                     </div>
                   </button>
 
@@ -366,16 +464,13 @@ function AgentPage() {
                     <ol className="px-5 pb-4 space-y-2">
                       {t.messages.map((m) => {
                         const out = isOutbound(m, inbox.address);
-                        // Tag inbound (supplier) messages with their verdict when
-                        // we have a classification for that specific reply, or
-                        // fall back to the thread-level verdict for the latest one.
-                        const msgVerdict: Verdict | undefined =
-                          !out
-                            ? verdictByMessageId.get(m.id) ??
-                              (threadVerdict && (threadVerdict.replyMessageId === m.id || !threadVerdict.replyMessageId)
-                                ? threadVerdict.verdict
-                                : undefined)
-                            : undefined;
+                        const msgVerdict: Verdict | undefined = !out
+                          ? verdictByMessageId.get(m.id) ??
+                            (neg?.classification?.verdict &&
+                            (neg.reply_message_id === m.id || !neg.reply_message_id)
+                              ? (neg.classification.verdict as Verdict)
+                              : undefined)
+                          : undefined;
                         return (
                           <li key={m.id}>
                             <button
@@ -520,3 +615,171 @@ function Legend() {
     </div>
   );
 }
+
+function NeedsAttentionQueue({
+  items,
+  onChanged,
+}: {
+  items: NegotiationFull[];
+  onChanged: () => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="rounded-xl border border-brand/40 bg-brand/5 overflow-hidden">
+      <div className="px-4 sm:px-5 py-3 border-b border-brand/30 flex items-center gap-2">
+        <ShieldAlert className="size-4 text-brand" />
+        <h2 className="font-semibold text-sm text-brand">
+          Needs your attention
+          <span className="ml-2 text-xs font-normal text-brand/80">
+            {items.length} item{items.length === 1 ? "" : "s"}
+          </span>
+        </h2>
+      </div>
+      <ul className="divide-y divide-brand/20">
+        {items.map((n) => (
+          <NeedsAttentionRow key={n.id} neg={n} onChanged={onChanged} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function NeedsAttentionRow({
+  neg,
+  onChanged,
+}: {
+  neg: NegotiationFull;
+  onChanged: () => void;
+}) {
+  const [showReply, setShowReply] = useState(false);
+  const [draft, setDraft] = useState("");
+  const qc = useQueryClient();
+
+  const approveFn = useServerFn(approveNegotiation);
+  const declineFn = useServerFn(declineAndReplaceNegotiation);
+  const followupFn = useServerFn(humanFollowupNegotiation);
+
+  const after = () => {
+    qc.invalidateQueries({ queryKey: ["agent-negotiations"] });
+    onChanged();
+  };
+
+  const approve = useMutation({
+    mutationFn: () => approveFn({ data: { negotiationId: neg.id } }),
+    onSuccess: after,
+  });
+  const decline = useMutation({
+    mutationFn: () => declineFn({ data: { negotiationId: neg.id } }),
+    onSuccess: after,
+  });
+  const followup = useMutation({
+    mutationFn: () =>
+      followupFn({ data: { negotiationId: neg.id, message: draft.trim() } }),
+    onSuccess: () => {
+      setDraft("");
+      setShowReply(false);
+      after();
+    },
+  });
+
+  const busy = approve.isPending || decline.isPending || followup.isPending;
+  const summary =
+    neg.classification?.summary_en ||
+    neg.classification?.summary ||
+    neg.needs_user_reason ||
+    "Supplier reply needs your review.";
+
+  return (
+    <li className="p-4 sm:p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-semibold text-sm truncate">
+            {neg.supplier_name || neg.supplier_email}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            {neg.subject || `Order ${neg.order_id}`}
+          </div>
+        </div>
+        <div className="text-[11px] text-muted-foreground shrink-0 tabular-nums">
+          {neg.last_reply_at
+            ? new Date(neg.last_reply_at).toLocaleString()
+            : new Date(neg.sent_at).toLocaleString()}
+        </div>
+      </div>
+      <p className="text-sm">{summary}</p>
+      {neg.needs_user_reason && (
+        <p className="text-xs text-brand">{neg.needs_user_reason}</p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => approve.mutate()}
+          disabled={busy}
+          className="h-9 px-3 rounded-md bg-brand text-brand-foreground text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <CheckCircle2 className="size-4" />
+          Approve &amp; confirm
+        </button>
+        <button
+          onClick={() => decline.mutate()}
+          disabled={busy}
+          className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <XCircle className="size-4" />
+          Source elsewhere
+        </button>
+        <button
+          onClick={() => setShowReply((s) => !s)}
+          disabled={busy}
+          className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <UserRound className="size-4" />
+          Reply yourself
+        </button>
+      </div>
+
+      {showReply && (
+        <div className="space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={4}
+            placeholder="Write your reply to the supplier…"
+            className="w-full text-sm rounded-md border border-border p-2 bg-background"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowReply(false);
+                setDraft("");
+              }}
+              className="h-8 px-3 rounded-md border text-xs"
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => followup.mutate()}
+              disabled={busy || draft.trim().length === 0}
+              className="h-8 px-3 rounded-md bg-brand text-brand-foreground text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Send className="size-3.5" />
+              Send reply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(approve.data && !approve.data.ok) ||
+      (decline.data && !decline.data.ok) ||
+      (followup.data && !followup.data.ok) ? (
+        <p className="text-xs text-destructive">
+          {approve.data && !approve.data.ok && approve.data.error}
+          {decline.data && !decline.data.ok && decline.data.error}
+          {followup.data && !followup.data.ok && followup.data.error}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+

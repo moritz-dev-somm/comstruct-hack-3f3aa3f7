@@ -25,6 +25,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as ProcurementOrdersOrderIdRouteImport } from './routes/procurement.orders.$orderId'
 import { Route as OrdersOrderIdTrackRouteImport } from './routes/orders.$orderId.track'
+import { Route as ApiPublicAgentTimeoutsRouteImport } from './routes/api/public/agent-timeouts'
 import { Route as ApiPublicAgentmailWebhookRouteImport } from './routes/api/public/agentmail/webhook'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -108,6 +109,11 @@ const OrdersOrderIdTrackRoute = OrdersOrderIdTrackRouteImport.update({
   path: '/$orderId/track',
   getParentRoute: () => OrdersRoute,
 } as any)
+const ApiPublicAgentTimeoutsRoute = ApiPublicAgentTimeoutsRouteImport.update({
+  id: '/api/public/agent-timeouts',
+  path: '/api/public/agent-timeouts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAgentmailWebhookRoute =
   ApiPublicAgentmailWebhookRouteImport.update({
     id: '/api/public/agentmail/webhook',
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement/': typeof ProcurementIndexRoute
+  '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
   '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
   '/api/public/agentmail/webhook': typeof ApiPublicAgentmailWebhookRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement': typeof ProcurementIndexRoute
+  '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
   '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
   '/api/public/agentmail/webhook': typeof ApiPublicAgentmailWebhookRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/procurement/catalog': typeof ProcurementCatalogRoute
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement/': typeof ProcurementIndexRoute
+  '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
   '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
   '/api/public/agentmail/webhook': typeof ApiPublicAgentmailWebhookRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement/'
+    | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
     | '/procurement/orders/$orderId'
     | '/api/public/agentmail/webhook'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement'
+    | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
     | '/procurement/orders/$orderId'
     | '/api/public/agentmail/webhook'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement/'
+    | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
     | '/procurement/orders/$orderId'
     | '/api/public/agentmail/webhook'
@@ -241,6 +253,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiHybridSearchRoute: typeof ApiHybridSearchRoute
   ApiScanRoute: typeof ApiScanRoute
+  ApiPublicAgentTimeoutsRoute: typeof ApiPublicAgentTimeoutsRoute
   ApiPublicAgentmailWebhookRoute: typeof ApiPublicAgentmailWebhookRoute
 }
 
@@ -358,6 +371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersOrderIdTrackRouteImport
       parentRoute: typeof OrdersRoute
     }
+    '/api/public/agent-timeouts': {
+      id: '/api/public/agent-timeouts'
+      path: '/api/public/agent-timeouts'
+      fullPath: '/api/public/agent-timeouts'
+      preLoaderRoute: typeof ApiPublicAgentTimeoutsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/agentmail/webhook': {
       id: '/api/public/agentmail/webhook'
       path: '/api/public/agentmail/webhook'
@@ -420,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiHybridSearchRoute: ApiHybridSearchRoute,
   ApiScanRoute: ApiScanRoute,
+  ApiPublicAgentTimeoutsRoute: ApiPublicAgentTimeoutsRoute,
   ApiPublicAgentmailWebhookRoute: ApiPublicAgentmailWebhookRoute,
 }
 export const routeTree = rootRouteImport
