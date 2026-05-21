@@ -317,9 +317,11 @@ function Home() {
             sortedProducts={sortedProducts}
             recommendedIds={recommendedIds}
             selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
             onClearCategory={() => setSelectedCategory(null)}
             onResetRecommendations={() => setRecommendedIds([])}
             onSuggestion={(s) => send(s)}
+            allProducts={products}
           />
         )}
       </main>
