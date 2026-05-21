@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat, LogOut } from "lucide-react";
+import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat, LogOut, Bot } from "lucide-react";
 import { useOrders } from "@/lib/orders";
 import { useRole } from "@/lib/role";
 
@@ -20,6 +20,7 @@ function ProcurementLayout() {
   const nav = [
     { to: "/procurement", label: "Approvals", icon: Inbox, badge: pendingCount },
     { to: "/procurement/orders", label: "Orders", icon: ListChecks },
+    { to: "/procurement/agent", label: "Supplier agent", icon: Bot },
     { to: "/procurement/analytics", label: "Analytics", icon: BarChart3 },
     { to: "/procurement/catalog", label: "Catalog", icon: Package },
   ] as const;
