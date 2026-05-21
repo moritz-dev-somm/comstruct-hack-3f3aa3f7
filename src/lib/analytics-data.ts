@@ -130,7 +130,8 @@ export function computeDailySeries(rows: NegotiationRow[], period: Period) {
 export function computeProjects(rows: NegotiationRow[]) {
   const map = new Map<string, number>();
   for (const r of rows) {
-    const p = r.project ?? r.order_snapshot?.project ?? "Ohne Projekt";
+    const p = r.project ?? r.order_snapshot?.project ?? "No project";
+
     map.set(p, (map.get(p) ?? 0) + (r.order_snapshot?.subtotal ?? 0));
   }
   return Array.from(map, ([project, total]) => ({ project, total: Math.round(total) })).sort(
