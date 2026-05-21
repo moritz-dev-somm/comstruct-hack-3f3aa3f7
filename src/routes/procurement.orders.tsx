@@ -97,7 +97,7 @@ function OrdersOverview() {
                       <Eye className="size-3.5" /> Preview
                     </button>
                     <button
-                      onClick={() => downloadPurchaseOrderPdf(o)}
+                      onClick={() => downloadPurchaseOrdersBySupplier(o, contacts)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                       title="Download PO PDF"
                     >
