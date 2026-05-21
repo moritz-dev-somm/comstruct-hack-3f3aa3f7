@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat, LogOut, Bot } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrders } from "@/lib/orders";
 import { useRole } from "@/lib/role";
@@ -14,9 +14,13 @@ export const Route = createFileRoute("/procurement")({
 
 function ProcurementLayout() {
   const { orders } = useOrders();
-  const pendingCount = orders.filter(
-    (o) => o.status === "pending_pm" || o.status === "pending_central",
-  ).length;
+  // Orders are loaded from localStorage on the client only — avoid rendering
+  // the count badge during SSR so hydration matches.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const pendingCount = mounted
+    ? orders.filter((o) => o.status === "pending_pm" || o.status === "pending_central").length
+    : 0;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [project, setProject] = useState("ramistrasse-101");
 
