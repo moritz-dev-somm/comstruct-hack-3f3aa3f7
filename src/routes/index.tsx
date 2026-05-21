@@ -523,13 +523,10 @@ function Home() {
             send={send}
             onSelectCategory={setSelectedCategory}
             inputRef={inputRef}
-            onAddQuickOrder={(items) => {
+            onAddQuickOrder={(skus) => {
               let added = 0;
-              for (const itemName of items) {
-                const product = products.find((p) =>
-                  p.name.toLowerCase().includes(itemName.toLowerCase()) ||
-                  itemName.toLowerCase().includes(p.name.toLowerCase())
-                );
+              for (const sku of skus) {
+                const product = products.find((p) => p.sku === sku);
                 if (product) {
                   cart.add({
                     productId: product.sku,
@@ -550,6 +547,7 @@ function Home() {
                 toast.info("No matching products found in catalog");
               }
             }}
+            products={products}
           />
         ) : (
           <ConversationView
