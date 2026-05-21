@@ -24,8 +24,8 @@ export const HARDCODED_SUPPLIER_EMAIL = "nicholas.r.kessler@gmail.com";
 export const HARDCODED_SUPPLIER_NAME = "Kessler Bauhandel (test)";
 
 function publicBaseUrl(): string {
-  // Stable Lovable URLs (prefer published; preview also works).
-  return "https://comstruct-hack.lovable.app";
+  // PUBLIC_APP_URL allows non-Lovable deploys to register the correct webhook.
+  return process.env.PUBLIC_APP_URL ?? "https://comstruct-hack.lovable.app";
 }
 
 export function webhookUrl(): string {
