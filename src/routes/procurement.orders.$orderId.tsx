@@ -61,16 +61,17 @@ function OrderDetail() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => openPurchaseOrderPdf(order)}
+            onClick={() => openFirstPurchaseOrderPdf(order, contacts)}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm font-medium hover:bg-accent"
           >
             <FileText className="size-4" /> View PO
           </button>
           <button
-            onClick={() => downloadPurchaseOrderPdf(order)}
+            onClick={() => downloadPurchaseOrdersBySupplier(order, contacts)}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm font-medium hover:bg-accent"
+            title="Downloads one PDF per supplier"
           >
-            <Download className="size-4" /> Download
+            <Download className="size-4" /> Download PO{order.items.some((i) => i.supplier) ? "s" : ""}
           </button>
           {order.status === "ordered" && (
             <button
