@@ -560,7 +560,7 @@ function ForemanTable({
   rows,
   onSelect,
 }: {
-  rows: ReturnType<typeof scaleForemen>;
+  rows: ReturnType<typeof computeForemen>;
   onSelect: (name: string) => void;
 }) {
   const [sort, setSort] = useState<{ key: keyof typeof rows[number]; dir: "asc" | "desc" }>({
