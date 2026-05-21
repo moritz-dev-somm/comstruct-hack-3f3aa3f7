@@ -1,30 +1,45 @@
 ## Goal
-Add a `/login` landing page with two buttons — **Foreman** and **Supervisor** — that route into the two existing sides of the app. No real auth yet (just role selection persisted locally).
+Move all email-agent code out of `src/lib/` into a new root-level `/agent/` folder, and make sure it still runs against `AGENTMAIL_API_KEY` (now stored as a Cloud secret, not in `.env`).
 
-## Scope
+## Files to move
 
-### 1. New route `src/routes/login.tsx`
-- Full-screen centered layout matching brand (petrol-teal primary, Inter), comstruct logo/wordmark on top.
-- Title: "Who's signing in?"
-- Two large `Card` buttons side-by-side (stacked on mobile):
-  - **Foreman** — icon `HardHat`, subtitle "Order materials from the site" → on click: store role, navigate to `/` (the existing foreman/order chat home).
-  - **Supervisor** — icon `ClipboardList` (or `BarChart3`), subtitle "Approvals, orders, analytics, catalog" → on click: store role, navigate to `/procurement`.
-- No password / form fields for now.
+```text
+src/lib/agent-mail/conditions.ts        → agent/conditions.ts
+src/lib/agent-mail/templates.ts         → agent/templates.ts
+src/lib/agent-mail/types.ts             → agent/types.ts
+src/lib/supplier-agent.functions.ts     → agent/supplier-agent.functions.ts
+```
 
-### 2. Lightweight role state
-- Add `src/lib/role.tsx` with a tiny context + `localStorage` persistence: `role: "foreman" | "supervisor" | null`, `setRole`, `logout`.
-- Wrap app in `RoleProvider` inside `src/routes/__root.tsx` (alongside existing `CartProvider`/`OrdersProvider`).
-- No route guards in this step — login is opt-in entry, deep links still work. (We can add `_authenticated` guards in a follow-up if desired.)
+The route file `src/routes/procurement.agent.tsx` **stays put** — TanStack file-based routing requires it under `src/routes/`. Only its import path changes.
 
-### 3. Minor wiring
-- Add a small "Switch role" / logout link in the procurement sidebar footer (`src/routes/procurement.tsx`) and in the foreman header on `/` that clears role and returns to `/login`. Keeps the two sides discoverable.
-- `/login` route head: title "Sign in — comstruct".
+## Wiring changes
 
-## Out of scope (ask if you want it)
-- Real authentication (Supabase email/Google) and route protection via `_authenticated` layouts.
-- Per-role permissions enforced server-side.
-- Distinguishing individual users (names, avatars).
+1. **tsconfig.json**
+   - Extend `include` to cover the new folder: add `"agent/**/*.ts"`.
+   - Add path alias: `"@agent/*": ["./agent/*"]` next to the existing `@/*` alias.
 
-## Files touched
-- new: `src/routes/login.tsx`, `src/lib/role.tsx`
-- edit: `src/routes/__root.tsx` (provider), `src/routes/procurement.tsx` (switch-role link), `src/routes/index.tsx` (switch-role link in header)
+2. **Update imports**
+   - `agent/supplier-agent.functions.ts`: change `./agent-mail/templates` → `./templates` (and same for `./types` / `./conditions` as needed).
+   - `src/routes/procurement.agent.tsx`: change `@/lib/supplier-agent.functions` → `@agent/supplier-agent.functions`, and update the inline doc-comment paths that mention `src/lib/agent-mail/...`.
+
+3. **Delete old files** after the move so nothing imports the stale paths.
+
+## Secret handling
+
+`AGENTMAIL_API_KEY` is already present as a Cloud secret (confirmed via `fetch_secrets`). The existing code reads it correctly inside the server-function handler:
+
+```ts
+const apiKey = process.env.AGENTMAIL_API_KEY;
+if (!apiKey) throw new Error("AGENTMAIL_API_KEY is not configured");
+```
+
+Because this lookup happens inside `.handler()` (not at module scope), it works for runtime secrets injected by Cloud — no further change needed. Nothing reads it from `import.meta.env`, so removing it from `.env` is safe.
+
+## Verification
+
+- Typecheck passes after alias + include update.
+- `/procurement/agent` route still renders and the "Provision inbox" / "Send email" actions execute the server functions without `AGENTMAIL_API_KEY is not configured`.
+
+## Notes
+- No business-logic changes — purely a file move + import rewrite + tsconfig tweak.
+- Vite's `@lovable.dev/vite-tanstack-config` uses `tsConfigPaths`, so adding the alias in `tsconfig.json` is enough; no `vite.config.ts` edit required.
