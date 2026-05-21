@@ -889,7 +889,10 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           <div className="flex gap-4 items-start">
-            <ProductImage sku={product.sku} name={product.name} className="shrink-0 w-32 h-32" iconSize="text-5xl" />
+            <div className="shrink-0 w-32 h-32 bg-muted/50 rounded grid place-items-center text-5xl">
+              📦
+            </div>
+
 
             <div className="flex-1 min-w-0 space-y-3">
               <div>
