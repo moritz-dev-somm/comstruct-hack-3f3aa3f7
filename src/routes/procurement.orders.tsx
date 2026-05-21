@@ -96,16 +96,9 @@ function OrdersOverview() {
                     <button
                       onClick={() => setPreviewOrder(o)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                      title="Preview PO PDF"
+                      title="View PO PDF"
                     >
-                      <Eye className="size-3.5" /> Preview
-                    </button>
-                    <button
-                      onClick={() => downloadPurchaseOrdersBySupplier(o, contacts)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                      title="Download PO PDF"
-                    >
-                      <Download className="size-3.5" />
+                      <Eye className="size-3.5" /> View
                     </button>
                     {o.status === "ordered" && (
                       <button
