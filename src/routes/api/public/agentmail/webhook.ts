@@ -6,7 +6,7 @@ import {
   getAgentSettings,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import type { ReplyClassification } from "../../../../../agent/agent.server";
+import type { ReplyClassification, ThreadContext } from "../../../../../agent/agent.server";
 import {
   composeAnswerQuestionsEmail,
   composeClarificationRequestEmail,
@@ -24,6 +24,20 @@ import {
   senderMatchesNegotiation,
 } from "../../../../../agent/email-match";
 import type { Order } from "@/lib/orders";
+
+// English labels for the two checklist questions — used as canonical strings
+// in the classifier's "OPEN QUESTION FROM AGENT" list.
+const CHECKLIST_LABEL_EN: Record<ChecklistField, string> = {
+  delivery_date: "Earliest delivery date you can commit to",
+  shipping_cost: "Shipping costs (or confirm shipping is included)",
+};
+
+type NegotiationClassification = Partial<ReplyClassification> & {
+  answered_checklist?: ChecklistField[];
+  reply_count?: number;
+  open_questions?: string[];
+  prior_answers?: string[];
+};
 
 type NegotiationRow = {
   id: string;
