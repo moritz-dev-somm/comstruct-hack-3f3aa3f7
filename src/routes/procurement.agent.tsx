@@ -2,10 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send, Inbox as InboxIcon } from "lucide-react";
+import {
+  Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send,
+  Inbox as InboxIcon, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Circle,
+} from "lucide-react";
 import {
   listInboxMessages,
   getInboxMessage,
+  listNegotiationsForInbox,
 } from "@/lib/supplier-agent.functions";
 
 export const Route = createFileRoute("/procurement/agent")({
@@ -94,8 +98,8 @@ function buildThreads(messages: InboxMessage[], inboxAddress: string): Thread[] 
   }
 
   for (const t of byKey.values()) {
-    // Sort messages oldest → newest so threads read naturally top-down.
-    t.messages.sort((a, b) => (a.receivedAt > b.receivedAt ? 1 : -1));
+    // Sort messages newest → oldest so the latest reply is always on top.
+    t.messages.sort((a, b) => (a.receivedAt > b.receivedAt ? -1 : 1));
     // Supplier name = the first non-inbox party we see.
     const supplier = t.messages
       .map((m) => (isOutbound(m, inboxAddress) ? (m.to?.[0] ?? "") : m.from))
@@ -107,6 +111,67 @@ function buildThreads(messages: InboxMessage[], inboxAddress: string): Thread[] 
   return Array.from(byKey.values()).sort((a, b) => (a.lastAt > b.lastAt ? -1 : 1));
 }
 
+type Verdict =
+  | "fully_confirmed"
+  | "confirmed_with_issue"
+  | "declined"
+  | "needs_clarification"
+  | "unclear";
+
+type VerdictInfo = {
+  verdict: Verdict;
+  replyMessageId: string | null;
+  lastReplyAt: string | null;
+};
+
+type NegotiationLite = {
+  id: string;
+  thread_id: string | null;
+  reply_message_id: string | null;
+  last_reply_at: string | null;
+  classification: { verdict?: Verdict } | null;
+};
+
+const VERDICT_META: Record<Verdict, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
+  fully_confirmed: {
+    label: "Approved",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+    Icon: CheckCircle2,
+  },
+  confirmed_with_issue: {
+    label: "Partial",
+    cls: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+    Icon: AlertTriangle,
+  },
+  declined: {
+    label: "Declined",
+    cls: "border-destructive/40 bg-destructive/10 text-destructive",
+    Icon: XCircle,
+  },
+  needs_clarification: {
+    label: "Question",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: HelpCircle,
+  },
+  unclear: {
+    label: "Unclear",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Circle,
+  },
+};
+
+function VerdictPill({ verdict, size = "sm" }: { verdict: Verdict; size?: "sm" | "md" }) {
+  const m = VERDICT_META[verdict];
+  const h = size === "md" ? "h-6 text-[11px]" : "h-5 text-[10px]";
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 ${h} rounded-full border font-semibold ${m.cls}`}>
+      <m.Icon className="size-3" />
+      {m.label}
+    </span>
+  );
+}
+
+
 function AgentPage() {
   const [inbox] = useState<StoredInbox | null>(() => loadInbox());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -114,11 +179,19 @@ function AgentPage() {
 
   const listFn = useServerFn(listInboxMessages);
   const getFn = useServerFn(getInboxMessage);
+  const negFn = useServerFn(listNegotiationsForInbox);
 
   const messagesQ = useQuery({
     queryKey: ["agent-inbox", inbox?.inboxId],
     enabled: !!inbox,
     queryFn: () => listFn({ data: { inboxId: inbox!.inboxId, limit: 50 } }),
+    refetchInterval: 15_000,
+  });
+
+  const negotiationsQ = useQuery({
+    queryKey: ["agent-negotiations", inbox?.inboxId],
+    enabled: !!inbox,
+    queryFn: () => negFn({ data: { inboxId: inbox!.inboxId } }),
     refetchInterval: 15_000,
   });
 
@@ -136,6 +209,33 @@ function AgentPage() {
     if (!inbox || messagesQ.data?.ok !== true) return [];
     return buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address);
   }, [messagesQ.data, inbox]);
+
+  // Map: latest classification per AgentMail thread_id, and per reply_message_id.
+  const verdictByThread = useMemo(() => {
+    const m = new Map<string, VerdictInfo>();
+    if (negotiationsQ.data?.ok !== true) return m;
+    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
+      const v = (n.classification?.verdict ?? null) as Verdict | null;
+      if (!v) continue;
+      const info: VerdictInfo = {
+        verdict: v,
+        replyMessageId: n.reply_message_id ?? null,
+        lastReplyAt: n.last_reply_at ?? null,
+      };
+      if (n.thread_id) m.set(n.thread_id, info);
+    }
+    return m;
+  }, [negotiationsQ.data]);
+
+  const verdictByMessageId = useMemo(() => {
+    const m = new Map<string, Verdict>();
+    if (negotiationsQ.data?.ok !== true) return m;
+    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
+      const v = (n.classification?.verdict ?? null) as Verdict | null;
+      if (v && n.reply_message_id) m.set(n.reply_message_id, v);
+    }
+    return m;
+  }, [negotiationsQ.data]);
 
   // Default: most recent thread expanded.
   const effectiveExpanded = (key: string, idx: number) =>
@@ -185,6 +285,7 @@ function AgentPage() {
           <ul className="divide-y">
             {threads.map((t, idx) => {
               const isOpen = effectiveExpanded(t.key, idx);
+              const threadVerdict = verdictByThread.get(t.key);
               return (
                 <li key={t.key}>
                   <button
@@ -203,20 +304,21 @@ function AgentPage() {
                           {t.lastAt ? new Date(t.lastAt).toLocaleString() : ""}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                         <span className="truncate">{t.supplierName}</span>
                         <span className="text-muted-foreground/60">·</span>
                         <span className="tabular-nums">{t.messages.length} message{t.messages.length === 1 ? "" : "s"}</span>
-                        {t.hasInbound && (
+                        {threadVerdict ? (
+                          <VerdictPill verdict={threadVerdict.verdict} size="md" />
+                        ) : t.hasInbound ? (
                           <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border border-brand/30 bg-brand/10 text-brand text-[10px] font-medium">
                             <InboxIcon className="size-3" /> Reply
                           </span>
-                        )}
-                        {!t.hasInbound && t.hasOutbound && (
+                        ) : t.hasOutbound ? (
                           <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border text-[10px] font-medium text-muted-foreground">
                             <Send className="size-3" /> Awaiting reply
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </button>
@@ -225,6 +327,16 @@ function AgentPage() {
                     <ol className="px-5 pb-4 space-y-2">
                       {t.messages.map((m) => {
                         const out = isOutbound(m, inbox.address);
+                        // Tag inbound (supplier) messages with their verdict when
+                        // we have a classification for that specific reply, or
+                        // fall back to the thread-level verdict for the latest one.
+                        const msgVerdict: Verdict | undefined =
+                          !out
+                            ? verdictByMessageId.get(m.id) ??
+                              (threadVerdict && (threadVerdict.replyMessageId === m.id || !threadVerdict.replyMessageId)
+                                ? threadVerdict.verdict
+                                : undefined)
+                            : undefined;
                         return (
                           <li key={m.id}>
                             <button
@@ -236,7 +348,7 @@ function AgentPage() {
                               }`}
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                   <span
                                     className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-semibold uppercase tracking-wide shrink-0 ${
                                       out
@@ -246,6 +358,7 @@ function AgentPage() {
                                   >
                                     {out ? <><Send className="size-3" /> Agent</> : <><InboxIcon className="size-3" /> Supplier</>}
                                   </span>
+                                  {msgVerdict && <VerdictPill verdict={msgVerdict} />}
                                   <span className="text-xs truncate text-muted-foreground">
                                     {out ? `to ${m.to?.[0] ?? ""}` : `from ${m.from}`}
                                   </span>
