@@ -192,17 +192,18 @@ export function VoiceButton({
     };
 
     rec.onend = () => {
+      // If user still intends to record (continuous mode dropped by browser),
+      // restart the recognizer transparently. Otherwise tear down.
+      if (intentRef.current && !cancelledRef.current && !deliveredRef.current) {
+        try {
+          rec.start();
+          return;
+        } catch {
+          /* fallthrough — treat as ended */
+        }
+      }
       setListening(false);
       teardownAudio();
-      if (cancelledRef.current || deliveredRef.current) return;
-      // Auto-deliver if we already have something usable
-      const text = (finalTextLatestRef.current + " " + interimLatestRef.current).trim();
-      if (text) {
-        deliveredRef.current = true;
-        onTranscript(text);
-        setInterim("");
-        setFinalText("");
-      }
     };
 
     recRef.current = rec;
