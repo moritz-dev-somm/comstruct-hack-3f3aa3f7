@@ -109,15 +109,16 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-[24px] font-bold text-[#111827] leading-tight">Spend Analytics</h1>
-            <p className="text-[13px] text-[#6B7280]">C-Material Beschaffung</p>
+            <p className="text-[13px] text-[#6B7280]">C-material procurement</p>
             {projectFilter && (
               <div className="mt-2 inline-flex items-center gap-2 bg-[#ECFDF5] text-[#065F46] text-xs px-2.5 py-1 rounded-full border border-[#A7F3D0]">
-                Filter aktiv: {projectFilter}
-                <button onClick={() => setProjectFilter(null)} aria-label="Filter entfernen">
+                Active filter: {projectFilter}
+                <button onClick={() => setProjectFilter(null)} aria-label="Remove filter">
                   <X className="size-3.5" />
                 </button>
               </div>
             )}
+
           </div>
           <div className="flex items-center gap-3">
             <div className="inline-flex bg-white border border-[#E5E7EB] rounded-full p-1">
