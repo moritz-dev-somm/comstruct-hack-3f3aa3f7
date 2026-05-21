@@ -73,6 +73,11 @@ export function VoiceButton({
   // Mobile Safari sometimes fires `end` after a few seconds of silence — track
   // whether we've already delivered a transcript so we don't double-send.
   const deliveredRef = useRef(false);
+  // True while the user wants the mic open (used to auto-restart if the
+  // browser drops continuous recognition mid-session).
+  const intentRef = useRef(false);
+  // Timestamp of pointerdown for press-vs-hold detection.
+  const pressStartRef = useRef<number>(0);
 
   useEffect(() => {
     setSupported(isVoiceSupported());
