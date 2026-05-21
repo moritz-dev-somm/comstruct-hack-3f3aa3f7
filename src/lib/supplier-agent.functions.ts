@@ -301,3 +301,30 @@ export const getInboxMessage = createServerFn({ method: "POST" })
       return { ok: false as const, error: message };
     }
   });
+
+/**
+ * List negotiations for an inbox with their latest classification.
+ * Used to tag supplier replies in the conversation UI (approved / partial /
+ * declined / question) without the user having to open each email.
+ */
+export const listNegotiationsForInbox = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ inboxId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const { data: rows, error } = await adminClient()
+        .from("negotiations")
+        .select(
+          "id, order_id, thread_id, status, classification, reply_message_id, last_reply_at, supplier_email, subject",
+        )
+        .eq("inbox_id", data.inboxId)
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return { ok: true as const, negotiations: rows ?? [] };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("listNegotiationsForInbox failed:", message);
+      return { ok: false as const, error: message, negotiations: [] };
+    }
+  });
+
