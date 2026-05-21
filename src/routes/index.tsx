@@ -1623,14 +1623,11 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     const contacts = supplierContactMap(await fetchSuppliers().catch(() => []));
 
     // One Order is already one supplier — so each yields exactly one PO PDF.
-    // Stagger downloads so the browser keeps them all.
-    let dlIndex = 0;
+    // PDFs are generated in-memory for supplier email attachments; we do NOT
+    // auto-download them to the user's browser. They remain accessible from
+    // the order detail page if needed.
     const perOrderPOs = createdOrders.map((created) => {
       const pos = generatePurchaseOrdersBySupplier(created, contacts);
-      pos.forEach((p) => {
-        const i = dlIndex++;
-        setTimeout(() => p.doc.save(p.filename), i * 250);
-      });
       return { created, pos };
     });
 
