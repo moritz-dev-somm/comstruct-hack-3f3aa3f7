@@ -279,7 +279,7 @@ export const getInboxMessage = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const res = await agentMail().inboxes.messages.get(data.inboxId, data.messageId);
-      const anyM = res as Record<string, unknown>;
+      const anyM = res as unknown as Record<string, unknown>;
       return {
         ok: true as const,
         message: {
