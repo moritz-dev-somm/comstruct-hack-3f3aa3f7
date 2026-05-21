@@ -18,8 +18,10 @@ import {
   ShoppingCart,
   X,
   Zap,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
+import { useRole } from "@/lib/role";
 import { useProducts, formatEUR, type Product } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
@@ -93,6 +95,8 @@ function Home() {
   const cart = useCart();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { logout } = useRole();
+  const navigate = useNavigate();
 
   const inConversation = messages.length > 0;
   const showCatalog = inConversation || selectedCategory !== null;
@@ -283,6 +287,16 @@ function Home() {
             >
               <SlidersHorizontal className="size-4" />
             </Link>
+            <button
+              onClick={() => {
+                logout();
+                navigate({ to: "/login" });
+              }}
+              aria-label="Switch role"
+              className="grid size-10 place-items-center rounded-full border hover:bg-accent"
+            >
+              <LogOut className="size-4" />
+            </button>
             <button
               onClick={() => setCartOpen(true)}
               className="relative inline-flex items-center gap-2 rounded-full border px-3 h-10 text-sm font-medium hover:bg-accent"

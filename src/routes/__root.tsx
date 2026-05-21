@@ -11,6 +11,7 @@ import { Toaster } from "sonner";
 import { CartProvider } from "@/lib/cart";
 import { BudgetProvider } from "@/lib/budget";
 import { OrdersProvider } from "@/lib/orders";
+import { RoleProvider } from "@/lib/role";
 
 import appCss from "../styles.css?url";
 
@@ -127,14 +128,16 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BudgetProvider>
-        <CartProvider>
-          <OrdersProvider>
-            <Outlet />
-            <Toaster position="top-center" richColors />
-          </OrdersProvider>
-        </CartProvider>
-      </BudgetProvider>
+      <RoleProvider>
+        <BudgetProvider>
+          <CartProvider>
+            <OrdersProvider>
+              <Outlet />
+              <Toaster position="top-center" richColors />
+            </OrdersProvider>
+          </CartProvider>
+        </BudgetProvider>
+      </RoleProvider>
     </QueryClientProvider>
   );
 }
