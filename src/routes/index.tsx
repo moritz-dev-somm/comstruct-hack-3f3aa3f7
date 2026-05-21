@@ -198,16 +198,31 @@ function Home() {
 
   function handleEvent(evt: { type: string; [k: string]: unknown }) {
     switch (evt.type) {
-      case "delta":
+      case "delta": {
+        const chunk = evt.content as string;
         setMessages((prev) => {
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.role === "assistant") {
-            next[next.length - 1] = { ...last, content: last.content + (evt.content as string) };
+            next[next.length - 1] = { ...last, content: last.content + chunk };
           }
           return next;
         });
+        // Detect inline product tokens as they stream in so the
+        // "Recommended for this job" panel below stays in sync.
+        const re = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+        const found: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(chunk)) !== null) found.push(m[1]);
+        if (found.length) {
+          setRecommendedIds((prev) => {
+            const set = new Set(prev);
+            const add = found.filter((s) => !set.has(s));
+            return add.length ? [...prev, ...add] : prev;
+          });
+        }
         break;
+      }
       case "recommend":
         setRecommendedIds((prev) => {
           const skus = (evt.skus as string[]) ?? [];
@@ -540,7 +555,7 @@ function ConversationView({
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-4 py-6 space-y-4 pb-32">
         {messages.map((m, i) => (
-          <MessageBubble key={i} msg={m} />
+          <MessageBubble key={i} msg={m} products={allProducts} />
         ))}
         {isThinking && (
           <div className="text-sm text-muted-foreground italic flex items-center gap-2">
@@ -642,7 +657,7 @@ function ConversationView({
 }
 
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[] }) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
@@ -654,11 +669,152 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   }
   return (
     <div className="flex">
-      <div className="text-[15px] leading-relaxed whitespace-pre-wrap max-w-[90%]">
-        {msg.content}
+      <div className="text-[15px] leading-relaxed max-w-[90%]">
+        <AssistantContent content={msg.content} products={products} />
         {msg.content === "" && <span className="inline-block w-1 h-4 bg-foreground/40 animate-pulse" />}
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Assistant content: splits prose around [[product:SKU]] tokens and renders  */
+/* an inline product bubble in place of each token.                           */
+/* -------------------------------------------------------------------------- */
+
+const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+
+function AssistantContent({
+  content,
+  products,
+}: {
+  content: string;
+  products: Product[];
+}) {
+  const nodes = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    PRODUCT_TOKEN_RE.lastIndex = 0;
+    while ((m = PRODUCT_TOKEN_RE.exec(content)) !== null) {
+      if (m.index > last) {
+        out.push(
+          <span key={`t-${last}`} className="whitespace-pre-wrap">
+            {content.slice(last, m.index)}
+          </span>,
+        );
+      }
+      const sku = m[1];
+      const p = products.find((x) => x.sku === sku);
+      if (p) {
+        out.push(<InlineProductBubble key={`p-${m.index}-${sku}`} product={p} />);
+      } else {
+        // Token streamed but product not loaded yet — fall back to the SKU.
+        out.push(
+          <span
+            key={`u-${m.index}-${sku}`}
+            className="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+          >
+            {sku}
+          </span>,
+        );
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < content.length) {
+      out.push(
+        <span key={`t-end-${last}`} className="whitespace-pre-wrap">
+          {content.slice(last)}
+        </span>,
+      );
+    }
+    return out;
+  }, [content, products]);
+
+  return <>{nodes}</>;
+}
+
+function InlineProductBubble({ product }: { product: Product }) {
+  const cart = useCart();
+  const [showDetail, setShowDetail] = useState(false);
+  const inCart = cart.items.find((i) => i.productId === product.sku);
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
+  function add(e: React.MouseEvent) {
+    stop(e);
+    cart.add({
+      productId: product.sku,
+      name: product.name,
+      price: product.price,
+      qty: 1,
+      category: product.category,
+      unit: product.unit,
+    });
+  }
+
+  return (
+    <>
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={() => setShowDetail(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setShowDetail(true);
+          }
+        }}
+        className="inline-flex align-middle items-center gap-2 my-0.5 mx-0.5 max-w-full rounded-full border border-brand/40 bg-brand/5 hover:bg-brand/10 hover:border-brand transition-colors cursor-pointer pr-1 pl-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        title={`${product.sku} — ${product.name}`}
+      >
+        <span className="shrink-0 size-7 rounded-full bg-muted grid place-items-center text-base">
+          📦
+        </span>
+        <span className="font-semibold text-[13px] leading-tight truncate max-w-[14rem] sm:max-w-[20rem]">
+          {product.name}
+        </span>
+        {inCart ? (
+          <span
+            onClick={stop}
+            className="ml-1 inline-flex items-center rounded-full bg-background border h-7 overflow-hidden shrink-0"
+          >
+            <button
+              onClick={(e) => {
+                stop(e);
+                cart.setQty(product.sku, inCart.qty - 1);
+              }}
+              className="w-7 h-full grid place-items-center hover:bg-accent text-base font-semibold"
+              aria-label="Decrease"
+            >
+              −
+            </button>
+            <span className="px-1.5 text-xs font-bold tabular-nums">{inCart.qty}</span>
+            <button
+              onClick={(e) => {
+                stop(e);
+                cart.setQty(product.sku, inCart.qty + 1);
+              }}
+              className="w-7 h-full grid place-items-center hover:bg-accent text-base font-semibold"
+              aria-label="Increase"
+            >
+              +
+            </button>
+          </span>
+        ) : (
+          <button
+            onClick={add}
+            className="ml-1 shrink-0 inline-flex items-center gap-1 rounded-full bg-brand text-brand-foreground px-2 h-7 text-xs font-bold"
+            aria-label={`Add ${product.name} to cart`}
+          >
+            <Plus className="size-3.5" />
+            <span className="tabular-nums">{formatEUR(product.price)}</span>
+          </button>
+        )}
+      </span>
+      {showDetail && (
+        <ProductDetailModal product={product} onClose={() => setShowDetail(false)} />
+      )}
+    </>
   );
 }
 
