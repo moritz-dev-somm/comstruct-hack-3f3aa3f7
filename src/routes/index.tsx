@@ -1410,49 +1410,44 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
   const tier = tierFor(cart.subtotal);
   const startNegotiation = useServerFn(startNegotiationForOrder);
 
-  function submit() {
+  async function submit() {
     if (cart.items.length === 0) return;
     const created = orders.createFromCart(cart.items);
     cart.clear();
     onClose();
     // Generate the EU-standard PO PDF and trigger a download for the foreman.
-    // The supervisor can re-download it from /procurement/orders later.
     import("@/lib/po-pdf").then(({ downloadPurchaseOrderPdf }) => {
       downloadPurchaseOrderPdf(created);
     });
     if (created.tier === "auto") {
-      toast.success(`${created.id} sent to supplier · PO PDF downloaded`);
-      // Fire-and-forget: kick off the AgentMail negotiation with the supplier.
-      // Auto-tier orders go straight to the supplier; PM/Central tiers wait
-      // for human approval before an email is sent.
-      startNegotiation({
-        data: {
-          order: {
-            id: created.id,
-            project: created.project,
-            subtotal: created.subtotal,
-            items: created.items.map((i) => ({
-              productId: i.productId,
-              name: i.name,
-              qty: i.qty,
-              price: i.price,
-              unit: i.unit,
-              category: i.category,
-            })),
+      const sendingToast = toast.loading(`${created.id}: contacting supplier…`);
+      try {
+        const res = (await startNegotiation({
+          data: {
+            order: {
+              id: created.id,
+              project: created.project,
+              subtotal: created.subtotal,
+              items: created.items.map((i) => ({
+                productId: i.productId,
+                name: i.name,
+                qty: i.qty,
+                price: i.price,
+                unit: i.unit,
+                category: i.category,
+              })),
+            },
           },
-        },
-      })
-        .then((res: { ok: true; supplier: string } | { ok: false; error: string } | undefined) => {
-          if (res && res.ok) {
-            toast.success(`Email agent contacted ${res.supplier}`);
-          } else {
-            toast.error(`Email agent failed: ${res && !res.ok ? res.error : "unknown error"}`);
-          }
-        })
-        .catch((e: unknown) => {
-          console.error("startNegotiationForOrder error:", e);
-          toast.error("Email agent failed to start");
-        });
+        })) as { ok: true; supplier: string } | { ok: false; error: string };
+        if (res?.ok) {
+          toast.success(`${created.id} sent to ${res.supplier} · PO PDF downloaded`, { id: sendingToast });
+        } else {
+          toast.error(`Email agent failed: ${res?.error ?? "unknown error"}`, { id: sendingToast });
+        }
+      } catch (e) {
+        console.error("startNegotiationForOrder error:", e);
+        toast.error("Email agent failed to start", { id: sendingToast });
+      }
     } else if (created.tier === "pm") {
       toast.success(`${created.id} sent to ${PM.name} for approval · PO PDF downloaded`);
     } else {
@@ -1460,6 +1455,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     }
     navigate({ to: "/orders/$orderId/track", params: { orderId: created.id } });
   }
+
 
   const ctaLabel =
     tier === "auto"
