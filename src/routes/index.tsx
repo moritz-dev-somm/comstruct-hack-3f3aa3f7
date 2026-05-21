@@ -555,7 +555,7 @@ function ConversationView({
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-4 py-6 space-y-4 pb-32">
         {messages.map((m, i) => (
-          <MessageBubble key={i} msg={m} />
+          <MessageBubble key={i} msg={m} products={allProducts} />
         ))}
         {isThinking && (
           <div className="text-sm text-muted-foreground italic flex items-center gap-2">
