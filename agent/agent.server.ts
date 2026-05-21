@@ -740,12 +740,6 @@ export async function translateForSupplier(
   if (!trimmed) return { en: "", native: "" };
   if (supplierLang === "en") return { en: trimmed, native: trimmed };
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    console.warn("translateForSupplier: LOVABLE_API_KEY missing — sending untranslated.");
-    return { en: trimmed, native: trimmed };
-  }
-
   const LANG_NAME = { en: "English", de: "German", fr: "French", it: "Italian" } as const;
   const system =
     "You translate short business emails between a construction procurement team and their suppliers. " +
@@ -754,34 +748,19 @@ export async function translateForSupplier(
     "Preserve meaning, tone, numbers, dates and product names exactly. Do NOT add greetings, signatures or commentary — translate only what is given. " +
     "If the input is already in the target language, return it unchanged in that field.";
 
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5-mini",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: trimmed },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (!res.ok) {
-      console.error("translateForSupplier gateway error", res.status, await res.text());
-      return { en: trimmed, native: trimmed };
-    }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as { en?: string; native?: string };
-    return {
-      en: (parsed.en || trimmed).trim(),
-      native: (parsed.native || trimmed).trim(),
-    };
-  } catch (err) {
-    console.error("translateForSupplier failed:", err);
-    return { en: trimmed, native: trimmed };
-  }
+  const data = (await callOpenAI({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: trimmed },
+    ],
+    response_format: { type: "json_object" },
+  })) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(content) as { en?: string; native?: string };
+  return {
+    en: (parsed.en || trimmed).trim(),
+    native: (parsed.native || trimmed).trim(),
+  };
 }
 
 /**
