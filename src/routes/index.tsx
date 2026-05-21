@@ -45,7 +45,6 @@ import {
   ConeIcon,
   WheelbarrowIcon,
   BlueprintIcon,
-  HardHatIcon as _unused, // not exported
 } from "@/components/construction-icons";
 
 const CHOCOLATE_THRESHOLD = 500;
