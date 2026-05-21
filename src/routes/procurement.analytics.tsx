@@ -360,13 +360,13 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="text-[12px] text-[#16A34A] font-medium mt-1">Ø 18 Minuten — Ziel: unter 30 Minuten ✓</div>
+              <div className="text-[12px] text-[#16A34A] font-medium mt-1">Avg. 18 minutes — target: under 30 minutes ✓</div>
             </div>
 
             {/* Chart B */}
             <div>
-              <div className="text-[13px] font-semibold text-[#111827] mb-1">Genehmigungen nach Schwellwert</div>
-              <div className="text-[12px] text-[#6B7280] mb-2">Aufschlüsselung nach Genehmigungsstufe</div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Approvals by threshold</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Breakdown by approval tier</div>
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -379,7 +379,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
                       formatter={(v: number, _n, p) => {
                         const payload = p?.payload as { pct: number; name: string } | undefined;
-                        return [`${v} Bestellungen (${payload?.pct ?? 0}%)`, payload?.name ?? ""];
+                        return [`${v} orders (${payload?.pct ?? 0}%)`, payload?.name ?? ""];
                       }}
                     />
 
@@ -399,10 +399,10 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
 
             {/* Chart C */}
             <div>
-              <div className="text-[13px] font-semibold text-[#111827] mb-1">Ablehnungsrate</div>
-              <div className="text-[12px] text-[#6B7280] mb-2">Übersicht abgelehnter Bestellungen</div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Rejection rate</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">Overview of rejected orders</div>
               <div className="text-[44px] font-bold text-[#DC2626] leading-none mt-2">6%</div>
-              <div className="text-[12px] text-[#6B7280] mt-1 mb-3">3 von 47 Bestellungen abgelehnt</div>
+              <div className="text-[12px] text-[#6B7280] mt-1 mb-3">3 of 47 orders rejected</div>
               <div className="space-y-1.5">
                 {REJECTIONS.map((r) => (
                   <div key={r.reason} className="flex items-center justify-between text-[12px] border-t border-[#F3F4F6] pt-1.5">
@@ -415,7 +415,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                 to="/procurement/orders"
                 className="inline-block mt-3 text-xs px-3 py-1.5 rounded-md border border-[#E5E7EB] text-[#111827] hover:bg-[#F9FAFB]"
               >
-                Ablehnungen ansehen →
+                View rejections →
               </Link>
             </div>
           </div>
@@ -429,7 +429,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
           <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-white border-l border-[#E5E7EB] p-5 overflow-y-auto">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-[#6B7280]">Polier</div>
+                <div className="text-[11px] uppercase tracking-wide text-[#6B7280]">Foreman</div>
                 <div className="text-[18px] font-bold text-[#111827]">{foremanDrawer}</div>
               </div>
               <button onClick={() => setForemanDrawer(null)} className="p-1 rounded-md hover:bg-[#F3F4F6]">
@@ -437,7 +437,7 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
               </button>
             </div>
             <div className="text-[13px] text-[#6B7280] mt-4">
-              Bestellhistorie wird hier angezeigt (Demo). Verknüpfung mit echten Bestelldaten folgt.
+              Order history will appear here (demo). Linking to live order data coming soon.
             </div>
           </aside>
         </div>
@@ -492,7 +492,7 @@ function KpiCard({
       <div className="flex items-center gap-1 mt-1 text-[12px]" style={{ color }}>
         {Arrow && <Arrow className="size-3.5" />}
         <span>{flat ? "→ 0%" : `${Math.abs(trend)}%`}</span>
-        <span className="text-[#6B7280]">{trendLabel ?? "vs Vorperiode"}</span>
+        <span className="text-[#6B7280]">{trendLabel ?? "vs previous period"}</span>
       </div>
     </button>
   );
@@ -522,11 +522,11 @@ function SupplierTable({ rows }: { rows: ReturnType<typeof computeSuppliers> }) 
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-[#6B7280] border-b border-[#E5E7EB]">
-            <Th label="Lieferant" onClick={() => toggle("name")} />
-            <Th label="Bestellungen" onClick={() => toggle("orders")} align="right" />
-            <Th label="Ausgaben CHF" onClick={() => toggle("spend")} align="right" />
-            <Th label="Vertragskonform" onClick={() => toggle("compliance")} align="center" />
-            <Th label="Ø Lieferzeit" align="right" />
+            <Th label="Supplier" onClick={() => toggle("name")} />
+            <Th label="Orders" onClick={() => toggle("orders")} align="right" />
+            <Th label="Spend CHF" onClick={() => toggle("spend")} align="right" />
+            <Th label="Compliance" onClick={() => toggle("compliance")} align="center" />
+            <Th label="Avg. lead time" align="right" />
             <Th label="Status" />
           </tr>
         </thead>
@@ -592,11 +592,11 @@ function ForemanTable({
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-[#6B7280] border-b border-[#E5E7EB]">
-            <Th label="Polier" onClick={() => toggle("foreman")} />
-            <Th label="Projekt" onClick={() => toggle("project")} />
-            <Th label="Bestellungen" onClick={() => toggle("orders")} align="right" />
-            <Th label="Ausgaben CHF" onClick={() => toggle("spend")} align="right" />
-            <Th label="Ø Wert" onClick={() => toggle("avg")} align="right" />
+            <Th label="Foreman" onClick={() => toggle("foreman")} />
+            <Th label="Project" onClick={() => toggle("project")} />
+            <Th label="Orders" onClick={() => toggle("orders")} align="right" />
+            <Th label="Spend CHF" onClick={() => toggle("spend")} align="right" />
+            <Th label="Avg. value" onClick={() => toggle("avg")} align="right" />
             <Th label="Trend" onClick={() => toggle("trend")} align="right" />
           </tr>
         </thead>
