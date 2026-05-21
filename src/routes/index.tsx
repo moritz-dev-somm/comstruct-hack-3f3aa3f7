@@ -1207,8 +1207,7 @@ function InlineProductBubble({
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   const addQty = suggestedQty && suggestedQty > 0 ? suggestedQty : 1;
 
-  function add(e: React.MouseEvent) {
-    stop(e);
+  function addBatch() {
     cart.add({
       productId: product.sku,
       name: product.name,
@@ -1250,27 +1249,28 @@ function InlineProductBubble({
             className="ml-1 inline-flex items-center rounded-full bg-background border h-7 overflow-hidden shrink-0"
           >
             <HoldButton
-              onTick={() => cart.adjust(product.sku, -1)}
+              onTick={() => cart.adjust(product.sku, -addQty)}
               stopPropagation
               className="w-7 h-full grid place-items-center hover:bg-accent text-base font-semibold"
-              aria-label="Decrease"
+              aria-label={addQty > 1 ? `Decrease by ${addQty}` : "Decrease"}
             >
               −
             </HoldButton>
             <span className="px-1.5 text-xs font-bold tabular-nums">{inCart.qty}</span>
             <HoldButton
-              onTick={() => cart.adjust(product.sku, +1)}
+              onTick={() => cart.adjust(product.sku, +addQty)}
               stopPropagation
               className="w-7 h-full grid place-items-center hover:bg-accent text-base font-semibold"
-              aria-label="Increase"
+              aria-label={addQty > 1 ? `Increase by ${addQty}` : "Increase"}
             >
               +
             </HoldButton>
 
           </span>
         ) : (
-          <button
-            onClick={add}
+          <HoldButton
+            onTick={addBatch}
+            stopPropagation
             className="ml-1 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand text-brand-foreground px-2.5 h-7 text-xs font-bold"
             aria-label={`Add ${addQty} ${product.name} to cart`}
           >
@@ -1278,8 +1278,9 @@ function InlineProductBubble({
             <span className="tabular-nums">
               {addQty > 1 ? `Add ${addQty} · ${formatEUR(product.price)} ea` : `Add · ${formatEUR(product.price)}`}
             </span>
-          </button>
+          </HoldButton>
         )}
+
       </span>
       {showDetail && (
         <ProductDetailModal product={product} onClose={() => setShowDetail(false)} />
