@@ -116,16 +116,29 @@ export type ReplyChecklist = {
   shipping_cost: string | null;
 };
 
+export type SuggestedOutbound =
+  | "confirm"
+  | "checklist_followup"
+  | "answer_questions"
+  | "request_clarification"
+  | "acknowledge_decline"
+  | "acknowledge_issues"
+  | "escalate_silent";
+
 export type ReplyClassification = {
   /** Overall verdict on the reply. */
   verdict:
-    | "fully_confirmed" // accepted, no caveats → auto-confirm
-    | "confirmed_with_issue" // accepted but with delay/price-change/partial → needs human
-    | "declined" // refused → needs human
-    | "needs_clarification" // asked us a question → needs human
-    | "unclear"; // couldn't tell → needs human
-  /** Short human summary of the supplier's reply. */
+    | "fully_confirmed"
+    | "confirmed_with_issue"
+    | "declined"
+    | "needs_clarification"
+    | "unclear";
+  /** Short summary in the supplier's language (mirrors summary_en for legacy). */
   summary: string;
+  /** Always-English 1–2 sentence summary, used in procurement UI. */
+  summary_en?: string;
+  /** ISO 639-1 of the supplier reply (de, fr, it, en, …). null if unknown. */
+  reply_language?: string | null;
   /** Extracted delivery time / lead time string if mentioned. */
   lead_time: string | null;
   /** Concrete list of issues that require user attention. */
@@ -134,8 +147,16 @@ export type ReplyClassification = {
   checklist: ReplyChecklist;
   /** Fields from the initial PO request that the supplier has not answered yet. */
   missing_checklist: ChecklistField[];
+  /** Questions we can confidently answer from order / company context. */
+  answerable_questions?: string[];
+  /** Questions that require a human to answer. */
+  unanswerable_questions?: string[];
+  /** Hint from the classifier as to which outbound action fits. Policy may override. */
+  suggested_outbound?: SuggestedOutbound;
   /** Number of automated targeted follow-ups already sent for the missing fields. */
   followup_count?: number;
+  /** Number of clarification requests already sent for unclear replies. */
+  clarification_count?: number;
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
