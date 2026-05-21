@@ -388,20 +388,45 @@ export function composeConfirmationEmail(
    3. Nudge (silent supplier) — only used by the manual nudge fn
    ============================================================ */
 
-export function composeNudgeEmail(order: Order): ComposedEmail {
-  const subject = `Re: [${order.id}] Friendly nudge — still need confirmation`;
-  const text = [
-    `Hello,`,
-    ``,
-    `Just following up on our request ${order.id}. Could you confirm availability and earliest delivery date today?`,
-    ``,
-    `Thanks,`,
-    `${COMPANY.agentName}`,
-    ``,
-    `--`,
-    AGENT_DISCLOSURE_TEXT,
-  ].join("\n");
-  return { subject, text, html: `<p>${text.replace(/\n/g, "<br/>")}</p>` };
+const NUDGE: Record<SupplierLanguage, { subject: string; body: (id: string) => string; sign: string }> = {
+  en: {
+    subject: "Friendly nudge — still need confirmation",
+    body: (id) => `Just following up on our request ${id}. Could you confirm availability and earliest delivery date today?`,
+    sign: "Thanks,",
+  },
+  de: {
+    subject: "Freundliche Erinnerung — Bestätigung noch ausstehend",
+    body: (id) => `Wir kommen kurz auf unsere Anfrage ${id} zurück. Können Sie heute Verfügbarkeit und frühestmöglichen Liefertermin bestätigen?`,
+    sign: "Vielen Dank,",
+  },
+  fr: {
+    subject: "Petite relance — confirmation toujours attendue",
+    body: (id) => `Petit rappel concernant notre demande ${id}. Pouvez-vous confirmer aujourd'hui la disponibilité et la date de livraison la plus proche ?`,
+    sign: "Merci,",
+  },
+  it: {
+    subject: "Cortese sollecito — conferma ancora necessaria",
+    body: (id) => `Un breve sollecito sulla nostra richiesta ${id}. Potete confermare oggi disponibilità e data di consegna più rapida?`,
+    sign: "Grazie,",
+  },
+};
+
+export function composeNudgeEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
+  const en = NUDGE.en;
+  const native = NUDGE[language];
+  const block = (s: typeof NUDGE["en"], greeting: string) =>
+    [greeting, ``, s.body(order.id), ``, s.sign, COMPANY.agentName].join("\n");
+  const blockHtml = (s: typeof NUDGE["en"], greeting: string) =>
+    `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.body(order.id))}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
+  return assembleBilingual({
+    language,
+    subjectEn: `Re: [${order.id}] ${en.subject}`,
+    subjectNative: native.subject,
+    textEn: block(en, GREETING.en),
+    textNative: block(native, GREETING[language]),
+    htmlEn: blockHtml(en, GREETING.en),
+    htmlNative: blockHtml(native, GREETING[language]),
+  });
 }
 
 /* ============================================================
