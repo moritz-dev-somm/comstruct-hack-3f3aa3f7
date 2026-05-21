@@ -905,9 +905,18 @@ function ConversationView({
               </p>
             ) : searchResults ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {searchResults.slice(0, 5).map((r) => (
-                  <SearchResultCard key={r.sku} result={r} />
-                ))}
+                {searchResults.slice(0, 5).map((r) => {
+                  const product =
+                    allProducts.find((p) => p.sku === r.sku) ?? hybridResultToProduct(r);
+                  return (
+                    <ProductCard
+                      key={r.sku}
+                      product={product}
+                      recommended={recSet.has(r.sku)}
+                      dimmed={false}
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </div>
