@@ -491,7 +491,7 @@ function KpiCard({
   );
 }
 
-function SupplierTable({ rows }: { rows: ReturnType<typeof scaleSuppliers> }) {
+function SupplierTable({ rows }: { rows: ReturnType<typeof computeSuppliers> }) {
   const [sort, setSort] = useState<{ key: keyof typeof rows[number]; dir: "asc" | "desc" }>({
     key: "spend",
     dir: "desc",
