@@ -46,7 +46,13 @@ function OrdersPage() {
           </div>
         )}
         {orders.map((o) => (
-          <OrderRow key={o.id} order={o} open={openId === o.id} onToggle={() => setOpenId(openId === o.id ? null : o.id)} />
+          <OrderRow
+            key={o.id}
+            order={o}
+            negotiations={negotiationsByOrder[o.id]}
+            open={openId === o.id}
+            onToggle={() => setOpenId(openId === o.id ? null : o.id)}
+          />
         ))}
       </main>
     </div>
