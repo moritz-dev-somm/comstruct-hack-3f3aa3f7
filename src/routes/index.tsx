@@ -349,15 +349,22 @@ function Home() {
         });
         // Detect inline product tokens as they stream in so the
         // "Recommended for this job" panel below stays in sync.
-        const re = /\[\[product:([A-Za-z0-9_-]+)(?::\d+)?\]\]/g;
-        const found: string[] = [];
+        const re = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+        const found: { sku: string; qty: number }[] = [];
         let m: RegExpExecArray | null;
-        while ((m = re.exec(chunk)) !== null) found.push(m[1]);
+        while ((m = re.exec(chunk)) !== null) {
+          found.push({ sku: m[1], qty: m[2] ? parseInt(m[2], 10) : 1 });
+        }
         if (found.length) {
           setRecommendedIds((prev) => {
             const set = new Set(prev);
-            const add = found.filter((s) => !set.has(s));
+            const add = found.map((f) => f.sku).filter((s) => !set.has(s));
             return add.length ? [...prev, ...add] : prev;
+          });
+          setRecommendedQty((prev) => {
+            const next = { ...prev };
+            for (const f of found) next[f.sku] = f.qty;
+            return next;
           });
         }
         break;
