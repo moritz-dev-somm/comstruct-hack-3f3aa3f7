@@ -79,6 +79,7 @@ export function rowToProduct(r: Row): Product {
     description: r.description_en ?? r.description,
     useCases: (r.use_cases_en && r.use_cases_en.length > 0 ? r.use_cases_en : r.use_cases) ?? [],
     enrichedAt: r.enriched_at,
+    imageUrl: r.image_url ?? null,
   };
 }
 
