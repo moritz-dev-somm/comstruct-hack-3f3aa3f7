@@ -7,7 +7,11 @@ import {
   verifyAnsweredQuestions,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import type { ReplyClassification, ThreadContext, ThreadMessage } from "../../../../../agent/agent.server";
+import type {
+  ReplyClassification,
+  ThreadContext,
+  ThreadMessage,
+} from "../../../../../agent/agent.server";
 import {
   composeAnswerQuestionsEmail,
   composeClarificationRequestEmail,
@@ -16,7 +20,11 @@ import {
   buildAnswersFromOrder,
   type SupplierLanguage,
 } from "../../../../../agent/templates";
-import { decideAction, mergeAnsweredChecklist, type CounterState } from "../../../../../agent/conditions";
+import {
+  decideAction,
+  mergeAnsweredChecklist,
+  type CounterState,
+} from "../../../../../agent/conditions";
 import type { ChecklistField } from "../../../../../agent/agent.server";
 import {
   extractOrderIdFromSubject,
@@ -61,7 +69,10 @@ type NegotiationRow = {
 };
 
 const SUPPORTED_LANGS: SupplierLanguage[] = ["en", "de", "fr", "it"];
-function pickLang(reply: string | null | undefined, snapshot: string | null | undefined): SupplierLanguage {
+function pickLang(
+  reply: string | null | undefined,
+  snapshot: string | null | undefined,
+): SupplierLanguage {
   const c = (reply || "").toLowerCase().slice(0, 2) as SupplierLanguage;
   if (SUPPORTED_LANGS.includes(c)) return c;
   const s = (snapshot || "").toLowerCase().slice(0, 2) as SupplierLanguage;
@@ -108,9 +119,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             "",
         );
         const inboxId = String(
-          (message.inbox_id as string | undefined) ??
-            (message.inboxId as string | undefined) ??
-            "",
+          (message.inbox_id as string | undefined) ?? (message.inboxId as string | undefined) ?? "",
         );
         const from = String(message.from ?? "");
         const subject = String(message.subject ?? "");
@@ -130,7 +139,10 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         const sb = adminClient();
 
         // Ignore loops on our own outbound.
-        if (settings.inbox_id && from.toLowerCase().includes(String(settings.inbox_id).toLowerCase())) {
+        if (
+          settings.inbox_id &&
+          from.toLowerCase().includes(String(settings.inbox_id).toLowerCase())
+        ) {
           return new Response("self", { status: 200 });
         }
 
@@ -161,7 +173,10 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
               .order("sent_at", { ascending: false });
             const candidates = (data as NegotiationRow[] | null) ?? [];
             const matches = candidates.filter((n) =>
-              senderMatchesNegotiation(from, { supplier_email: n.supplier_email, status: n.status }),
+              senderMatchesNegotiation(from, {
+                supplier_email: n.supplier_email,
+                status: n.status,
+              }),
             );
             if (matches.length === 1) {
               neg = matches[0];
@@ -260,7 +275,12 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         // missed, we move it out of still_open and into prior_answers.
         const verifyTranscript: ThreadMessage[] = [
           ...prevTranscript,
-          { role: "supplier", lang: cls.reply_language ?? undefined, text: replyText, at: new Date().toISOString() },
+          {
+            role: "supplier",
+            lang: cls.reply_language ?? undefined,
+            text: replyText,
+            at: new Date().toISOString(),
+          },
         ];
         const verify = await verifyAnsweredQuestions({
           stillOpen: cls.still_open_questions ?? [],
@@ -280,7 +300,10 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         const answeredChecklist = mergeAnsweredChecklist(prevAnswered, cls);
         const prevReplyCount = Number(prevClassification.reply_count ?? 0);
         const replyCount = prevReplyCount + 1;
-        const lang = pickLang(cls.reply_language, (neg.order_snapshot as { supplier_language?: string })?.supplier_language);
+        const lang = pickLang(
+          cls.reply_language,
+          (neg.order_snapshot as { supplier_language?: string })?.supplier_language,
+        );
 
         // Build effective classification used by the policy decision.
         const effectiveCls: ReplyClassification = {
@@ -300,10 +323,13 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
 
         // Accumulate concise "facts already given" — include verifier evidence.
         const newAnswers: string[] = [];
-        if (cls.checklist?.delivery_date) newAnswers.push(`delivery_date: ${cls.checklist.delivery_date}`);
-        if (cls.checklist?.shipping_cost) newAnswers.push(`shipping_cost: ${cls.checklist.shipping_cost}`);
+        if (cls.checklist?.delivery_date)
+          newAnswers.push(`delivery_date: ${cls.checklist.delivery_date}`);
+        if (cls.checklist?.shipping_cost)
+          newAnswers.push(`shipping_cost: ${cls.checklist.shipping_cost}`);
         for (const ans of verifiedAnsweredOpen) newAnswers.push(`answered: ${ans}`);
-        for (const ev of verify.newlyAnswered) newAnswers.push(`evidence (${ev.question}): ${ev.evidence}`);
+        for (const ev of verify.newlyAnswered)
+          newAnswers.push(`evidence (${ev.question}): ${ev.evidence}`);
         const mergedAnswers = Array.from(new Set([...prevAnswers, ...newAnswers])).slice(-30);
 
         /* -------- 5. Decide + execute -------- */
@@ -325,10 +351,14 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         const am = agentMail();
         const reply = async (e: { text: string; html: string }) => {
           try {
-            const sent = await am.inboxes.messages.reply(inboxId || neg!.inbox_id || "", messageId, {
-              text: e.text,
-              html: e.html,
-            });
+            const sent = await am.inboxes.messages.reply(
+              inboxId || neg!.inbox_id || "",
+              messageId,
+              {
+                text: e.text,
+                html: e.html,
+              },
+            );
             replyMessageId = (sent as { messageId?: string }).messageId ?? null;
           } catch (err) {
             console.error("webhook: send failed", err);
@@ -403,7 +433,12 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         // Append this turn (inbound + any outbound) to the raw transcript.
         const nextTranscript: ThreadMessage[] = [
           ...prevTranscript,
-          { role: "supplier", lang: cls.reply_language ?? undefined, text: replyText.slice(0, 5000), at: new Date().toISOString() },
+          {
+            role: "supplier",
+            lang: cls.reply_language ?? undefined,
+            text: replyText.slice(0, 5000),
+            at: new Date().toISOString(),
+          },
         ];
         if (outboundText) {
           nextTranscript.push({
@@ -414,8 +449,6 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           });
         }
         const cappedTranscript = nextTranscript.slice(-MAX_TRANSCRIPT_TURNS);
-
-
 
         const { email: fromEmail } = parseEmailAddress(from);
 

@@ -149,7 +149,8 @@ const ORDER_STRINGS: Record<SupplierLanguage, OrderStrings> = {
     pleaseTellUs: "Could you also let us know:",
     earliestDelivery: "The earliest delivery date you can commit to",
     shippingCosts: "Any shipping costs that are not already included",
-    flagDiscrepancy: "If anything is unavailable, delayed, or differently priced, please flag it in your reply.",
+    flagDiscrepancy:
+      "If anything is unavailable, delayed, or differently priced, please flag it in your reply.",
     needResponse: "We need a response within 24 hours to keep the project on schedule.",
     thanks: "Thank you,",
     qty: "Qty",
@@ -169,12 +170,15 @@ const ORDER_STRINGS: Record<SupplierLanguage, OrderStrings> = {
     items: "Positionen",
     estimatedSubtotal: "Voraussichtliche Zwischensumme",
     exclVat: "(exkl. MwSt., exkl. Versand)",
-    poAttached: "Die vollständige Bestellung ist als PDF angehängt — bitte bestätigen Sie deren Richtigkeit.",
+    poAttached:
+      "Die vollständige Bestellung ist als PDF angehängt — bitte bestätigen Sie deren Richtigkeit.",
     pleaseTellUs: "Könnten Sie uns zusätzlich mitteilen:",
     earliestDelivery: "Den frühestmöglichen Liefertermin, den Sie zusichern können",
     shippingCosts: "Allfällige Versandkosten, die noch nicht enthalten sind",
-    flagDiscrepancy: "Falls etwas nicht verfügbar, verzögert oder zu einem abweichenden Preis lieferbar ist, weisen Sie uns bitte in Ihrer Antwort darauf hin.",
-    needResponse: "Wir benötigen eine Antwort innerhalb von 24 Stunden, um den Projektplan einzuhalten.",
+    flagDiscrepancy:
+      "Falls etwas nicht verfügbar, verzögert oder zu einem abweichenden Preis lieferbar ist, weisen Sie uns bitte in Ihrer Antwort darauf hin.",
+    needResponse:
+      "Wir benötigen eine Antwort innerhalb von 24 Stunden, um den Projektplan einzuhalten.",
     thanks: "Vielen Dank,",
     qty: "Menge",
     item: "Artikel",
@@ -197,8 +201,10 @@ const ORDER_STRINGS: Record<SupplierLanguage, OrderStrings> = {
     pleaseTellUs: "Pourriez-vous également nous indiquer :",
     earliestDelivery: "La date de livraison la plus proche que vous pouvez garantir",
     shippingCosts: "Les éventuels frais de port non encore inclus",
-    flagDiscrepancy: "Si un article est indisponible, retardé ou à un prix différent, merci de le signaler dans votre réponse.",
-    needResponse: "Nous avons besoin d'une réponse sous 24 heures pour respecter le planning du projet.",
+    flagDiscrepancy:
+      "Si un article est indisponible, retardé ou à un prix différent, merci de le signaler dans votre réponse.",
+    needResponse:
+      "Nous avons besoin d'une réponse sous 24 heures pour respecter le planning du projet.",
     thanks: "Merci,",
     qty: "Qté",
     item: "Article",
@@ -217,12 +223,15 @@ const ORDER_STRINGS: Record<SupplierLanguage, OrderStrings> = {
     items: "Articoli",
     estimatedSubtotal: "Subtotale stimato",
     exclVat: "(IVA esclusa, spedizione esclusa)",
-    poAttached: "L'ordine d'acquisto completo è allegato in PDF — vi preghiamo di confermarne la correttezza.",
+    poAttached:
+      "L'ordine d'acquisto completo è allegato in PDF — vi preghiamo di confermarne la correttezza.",
     pleaseTellUs: "Potreste inoltre comunicarci:",
     earliestDelivery: "La data di consegna più rapida che potete garantire",
     shippingCosts: "Eventuali costi di spedizione non ancora inclusi",
-    flagDiscrepancy: "Se qualcosa non è disponibile, è in ritardo o ha un prezzo diverso, vi preghiamo di segnalarlo nella risposta.",
-    needResponse: "Abbiamo bisogno di una risposta entro 24 ore per rispettare la pianificazione del progetto.",
+    flagDiscrepancy:
+      "Se qualcosa non è disponibile, è in ritardo o ha un prezzo diverso, vi preghiamo di segnalarlo nella risposta.",
+    needResponse:
+      "Abbiamo bisogno di una risposta entro 24 ore per rispettare la pianificazione del progetto.",
     thanks: "Grazie,",
     qty: "Qtà",
     item: "Articolo",
@@ -236,7 +245,8 @@ const ORDER_STRINGS: Record<SupplierLanguage, OrderStrings> = {
 function renderOrderText(s: OrderStrings, order: Order, ctx: OrderEmailContext): string {
   const { supplierName, items, subtotal } = ctx;
   const lines = items.map(
-    (i) => `- ${i.qty} × ${i.name} (${i.unit}) @ ${formatEUR(i.price)} → ${formatEUR(i.qty * i.price)}`,
+    (i) =>
+      `- ${i.qty} × ${i.name} (${i.unit}) @ ${formatEUR(i.price)} → ${formatEUR(i.qty * i.price)}`,
   );
   return [
     s.greeting(supplierName),
@@ -332,7 +342,10 @@ export function composeOrderEmail(order: Order, ctx: OrderEmailContext): Compose
    2. Confirmation (short)
    ============================================================ */
 
-const CONFIRM: Record<SupplierLanguage, { subject: string; body: (id: string, eta: string) => string }> = {
+const CONFIRM: Record<
+  SupplierLanguage,
+  { subject: string; body: (id: string, eta: string) => string }
+> = {
   en: {
     subject: "Order confirmed — thank you",
     body: (id, eta) =>
@@ -358,22 +371,48 @@ const CONFIRM: Record<SupplierLanguage, { subject: string; body: (id: string, et
 function etaLine(lang: SupplierLanguage, leadTime: string | null | undefined): string {
   if (!leadTime) return "";
   switch (lang) {
-    case "de": return `Liefertermin notiert: ${leadTime}.`;
-    case "fr": return `Livraison notée : ${leadTime}.`;
-    case "it": return `Consegna annotata: ${leadTime}.`;
-    default: return `Noted delivery: ${leadTime}.`;
+    case "de":
+      return `Liefertermin notiert: ${leadTime}.`;
+    case "fr":
+      return `Livraison notée : ${leadTime}.`;
+    case "it":
+      return `Consegna annotata: ${leadTime}.`;
+    default:
+      return `Noted delivery: ${leadTime}.`;
   }
 }
 
-function renderConfirmText(s: typeof CONFIRM["en"], greeting: string, sign: string, orderId: string, eta: string): string {
+function renderConfirmText(
+  s: (typeof CONFIRM)["en"],
+  greeting: string,
+  sign: string,
+  orderId: string,
+  eta: string,
+): string {
   return [greeting, ``, s.body(orderId, eta), ``, sign, COMPANY.agentName].join("\n");
 }
-function renderConfirmHtml(s: typeof CONFIRM["en"], greeting: string, sign: string, orderId: string, eta: string): string {
+function renderConfirmHtml(
+  s: (typeof CONFIRM)["en"],
+  greeting: string,
+  sign: string,
+  orderId: string,
+  eta: string,
+): string {
   return `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.body(orderId, eta))}</p><p>${escapeHtml(sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
 }
 
-const GREETING: Record<SupplierLanguage, string> = { en: "Hello,", de: "Guten Tag,", fr: "Bonjour,", it: "Salve," };
-const SIGN: Record<SupplierLanguage, string> = { en: "Best regards,", de: "Mit freundlichen Grüssen,", fr: "Cordialement,", it: "Cordiali saluti," };
+const GREETING: Record<SupplierLanguage, string> = {
+  en: "Hello,",
+  de: "Guten Tag,",
+  fr: "Bonjour,",
+  it: "Salve,",
+};
+const SIGN: Record<SupplierLanguage, string> = {
+  en: "Best regards,",
+  de: "Mit freundlichen Grüssen,",
+  fr: "Cordialement,",
+  it: "Cordiali saluti,",
+};
 
 export function composeConfirmationEmail(
   order: Order,
@@ -399,25 +438,32 @@ export function composeConfirmationEmail(
    3. Nudge (silent supplier) — only used by the manual nudge fn
    ============================================================ */
 
-const NUDGE: Record<SupplierLanguage, { subject: string; body: (id: string) => string; sign: string }> = {
+const NUDGE: Record<
+  SupplierLanguage,
+  { subject: string; body: (id: string) => string; sign: string }
+> = {
   en: {
     subject: "Friendly nudge — still need confirmation",
-    body: (id) => `Just following up on our request ${id}. Could you confirm availability and earliest delivery date today?`,
+    body: (id) =>
+      `Just following up on our request ${id}. Could you confirm availability and earliest delivery date today?`,
     sign: "Thanks,",
   },
   de: {
     subject: "Freundliche Erinnerung — Bestätigung noch ausstehend",
-    body: (id) => `Wir kommen kurz auf unsere Anfrage ${id} zurück. Können Sie heute Verfügbarkeit und frühestmöglichen Liefertermin bestätigen?`,
+    body: (id) =>
+      `Wir kommen kurz auf unsere Anfrage ${id} zurück. Können Sie heute Verfügbarkeit und frühestmöglichen Liefertermin bestätigen?`,
     sign: "Vielen Dank,",
   },
   fr: {
     subject: "Petite relance — confirmation toujours attendue",
-    body: (id) => `Petit rappel concernant notre demande ${id}. Pouvez-vous confirmer aujourd'hui la disponibilité et la date de livraison la plus proche ?`,
+    body: (id) =>
+      `Petit rappel concernant notre demande ${id}. Pouvez-vous confirmer aujourd'hui la disponibilité et la date de livraison la plus proche ?`,
     sign: "Merci,",
   },
   it: {
     subject: "Cortese sollecito — conferma ancora necessaria",
-    body: (id) => `Un breve sollecito sulla nostra richiesta ${id}. Potete confermare oggi disponibilità e data di consegna più rapida?`,
+    body: (id) =>
+      `Un breve sollecito sulla nostra richiesta ${id}. Potete confermare oggi disponibilità e data di consegna più rapida?`,
     sign: "Grazie,",
   },
 };
@@ -425,9 +471,9 @@ const NUDGE: Record<SupplierLanguage, { subject: string; body: (id: string) => s
 export function composeNudgeEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
   const en = NUDGE.en;
   const native = NUDGE[language];
-  const block = (s: typeof NUDGE["en"], greeting: string) =>
+  const block = (s: (typeof NUDGE)["en"], greeting: string) =>
     [greeting, ``, s.body(order.id), ``, s.sign, COMPANY.agentName].join("\n");
-  const blockHtml = (s: typeof NUDGE["en"], greeting: string) =>
+  const blockHtml = (s: (typeof NUDGE)["en"], greeting: string) =>
     `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.body(order.id))}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
   return assembleBilingual({
     language,
@@ -456,7 +502,8 @@ type FollowupStrings = {
 const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
   en: {
     subject: "Quick follow-up — missing details",
-    intro: (id) => `Thank you for confirming order ${id}. Could you also confirm the following from our original request?`,
+    intro: (id) =>
+      `Thank you for confirming order ${id}. Could you also confirm the following from our original request?`,
     sign: "Thanks,",
     bullets: {
       delivery_date: "Earliest delivery date you can commit to",
@@ -465,7 +512,8 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
   },
   de: {
     subject: "Kurze Rückfrage — fehlende Angaben",
-    intro: (id) => `Vielen Dank für die Bestätigung der Bestellung ${id}. Können Sie zusätzlich folgende Angabe(n) aus unserer ursprünglichen Anfrage bestätigen?`,
+    intro: (id) =>
+      `Vielen Dank für die Bestätigung der Bestellung ${id}. Können Sie zusätzlich folgende Angabe(n) aus unserer ursprünglichen Anfrage bestätigen?`,
     sign: "Vielen Dank,",
     bullets: {
       delivery_date: "Frühestmöglicher Liefertermin, den Sie zusichern können",
@@ -474,7 +522,8 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
   },
   fr: {
     subject: "Petite relance — informations manquantes",
-    intro: (id) => `Merci pour la confirmation de la commande ${id}. Pourriez-vous également nous confirmer le(s) point(s) suivant(s) de notre demande initiale ?`,
+    intro: (id) =>
+      `Merci pour la confirmation de la commande ${id}. Pourriez-vous également nous confirmer le(s) point(s) suivant(s) de notre demande initiale ?`,
     sign: "Merci,",
     bullets: {
       delivery_date: "Date de livraison la plus proche que vous pouvez garantir",
@@ -483,7 +532,8 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
   },
   it: {
     subject: "Breve sollecito — informazioni mancanti",
-    intro: (id) => `Grazie per aver confermato l'ordine ${id}. Potreste confermare anche il/i seguente/i punto/i della nostra richiesta iniziale?`,
+    intro: (id) =>
+      `Grazie per aver confermato l'ordine ${id}. Potreste confermare anche il/i seguente/i punto/i della nostra richiesta iniziale?`,
     sign: "Grazie,",
     bullets: {
       delivery_date: "Data di consegna più rapida che potete garantire",
@@ -492,7 +542,12 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
   },
 };
 
-function renderFollowupText(s: FollowupStrings, greeting: string, orderId: string, missing: ChecklistField[]): string {
+function renderFollowupText(
+  s: FollowupStrings,
+  greeting: string,
+  orderId: string,
+  missing: ChecklistField[],
+): string {
   return [
     greeting,
     ``,
@@ -503,7 +558,12 @@ function renderFollowupText(s: FollowupStrings, greeting: string, orderId: strin
     COMPANY.agentName,
   ].join("\n");
 }
-function renderFollowupHtml(s: FollowupStrings, greeting: string, orderId: string, missing: ChecklistField[]): string {
+function renderFollowupHtml(
+  s: FollowupStrings,
+  greeting: string,
+  orderId: string,
+  missing: ChecklistField[],
+): string {
   const bullets = missing.map((f) => `<li>${escapeHtml(s.bullets[f])}</li>`).join("");
   return `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.intro(orderId))}</p><ul>${bullets}</ul><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
 }
@@ -546,12 +606,14 @@ const CLARIFY: Record<SupplierLanguage, ClarifyStrings> = {
   },
   de: {
     subject: "Klärung benötigt",
-    intro: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Können Sie folgendes bestätigen:`,
+    intro: (id) =>
+      `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Können Sie folgendes bestätigen:`,
     sign: "Vielen Dank,",
   },
   fr: {
     subject: "Clarification nécessaire",
-    intro: (id) => `Merci pour votre réponse concernant la commande ${id}. Pourriez-vous confirmer ce qui suit :`,
+    intro: (id) =>
+      `Merci pour votre réponse concernant la commande ${id}. Pourriez-vous confirmer ce qui suit :`,
     sign: "Merci,",
   },
   it: {
@@ -565,7 +627,12 @@ function checklistBullet(lang: SupplierLanguage, field: ChecklistField): string 
   return ORDER_STRINGS[lang][field === "delivery_date" ? "earliestDelivery" : "shippingCosts"];
 }
 
-function renderClarifyText(s: ClarifyStrings, greeting: string, orderId: string, bullets: string[]): string {
+function renderClarifyText(
+  s: ClarifyStrings,
+  greeting: string,
+  orderId: string,
+  bullets: string[],
+): string {
   return [
     greeting,
     ``,
@@ -576,7 +643,12 @@ function renderClarifyText(s: ClarifyStrings, greeting: string, orderId: string,
     COMPANY.agentName,
   ].join("\n");
 }
-function renderClarifyHtml(s: ClarifyStrings, greeting: string, orderId: string, bullets: string[]): string {
+function renderClarifyHtml(
+  s: ClarifyStrings,
+  greeting: string,
+  orderId: string,
+  bullets: string[],
+): string {
   return `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.intro(orderId))}</p><ul>${bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
 }
 
@@ -627,23 +699,30 @@ function renderSimpleHtml(s: SimpleStrings, greeting: string, sign: string, id: 
 const DECLINE: Record<SupplierLanguage, SimpleStrings> = {
   en: {
     subject: "Order will be sourced elsewhere — thanks",
-    body: (id) => `Thanks for the reply on order ${id}. We will source these items elsewhere this time and keep you on file for future requests.`,
+    body: (id) =>
+      `Thanks for the reply on order ${id}. We will source these items elsewhere this time and keep you on file for future requests.`,
   },
   de: {
     subject: "Bestellung wird anderweitig beschafft — vielen Dank",
-    body: (id) => `Vielen Dank für die Rückmeldung zur Bestellung ${id}. Wir beschaffen die Artikel dieses Mal anderweitig und behalten Sie für künftige Anfragen gerne im Auge.`,
+    body: (id) =>
+      `Vielen Dank für die Rückmeldung zur Bestellung ${id}. Wir beschaffen die Artikel dieses Mal anderweitig und behalten Sie für künftige Anfragen gerne im Auge.`,
   },
   fr: {
     subject: "Commande approvisionnée ailleurs — merci",
-    body: (id) => `Merci pour votre retour concernant la commande ${id}. Nous nous approvisionnerons ailleurs cette fois et garderons votre contact pour de futures demandes.`,
+    body: (id) =>
+      `Merci pour votre retour concernant la commande ${id}. Nous nous approvisionnerons ailleurs cette fois et garderons votre contact pour de futures demandes.`,
   },
   it: {
     subject: "Ordine acquistato altrove — grazie",
-    body: (id) => `Grazie per la risposta sull'ordine ${id}. Per questa volta ci approvvigioneremo altrove e vi terremo a riferimento per future richieste.`,
+    body: (id) =>
+      `Grazie per la risposta sull'ordine ${id}. Per questa volta ci approvvigioneremo altrove e vi terremo a riferimento per future richieste.`,
   },
 };
 
-export function composeDeclineAckEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
+export function composeDeclineAckEmail(
+  order: Order,
+  language: SupplierLanguage = "en",
+): ComposedEmail {
   return assembleBilingual({
     language,
     subjectEn: `Re: [${order.id}] ${DECLINE.en.subject}`,
@@ -663,23 +742,30 @@ export function composeDeclineAckEmail(order: Order, language: SupplierLanguage 
 const ISSUES: Record<SupplierLanguage, SimpleStrings> = {
   en: {
     subject: "Received — reviewing internally",
-    body: (id) => `Thanks for your reply on order ${id}. We have noted the points you raised and will come back to you shortly.`,
+    body: (id) =>
+      `Thanks for your reply on order ${id}. We have noted the points you raised and will come back to you shortly.`,
   },
   de: {
     subject: "Antwort erhalten — interne Prüfung läuft",
-    body: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Wir haben die genannten Punkte notiert und melden uns in Kürze.`,
+    body: (id) =>
+      `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Wir haben die genannten Punkte notiert und melden uns in Kürze.`,
   },
   fr: {
     subject: "Bien reçu — en cours d'examen",
-    body: (id) => `Merci pour votre réponse concernant la commande ${id}. Nous avons noté les points soulevés et reviendrons vers vous très prochainement.`,
+    body: (id) =>
+      `Merci pour votre réponse concernant la commande ${id}. Nous avons noté les points soulevés et reviendrons vers vous très prochainement.`,
   },
   it: {
     subject: "Ricevuto — in valutazione",
-    body: (id) => `Grazie per la risposta sull'ordine ${id}. Abbiamo preso nota dei punti segnalati e vi ricontatteremo a breve.`,
+    body: (id) =>
+      `Grazie per la risposta sull'ordine ${id}. Abbiamo preso nota dei punti segnalati e vi ricontatteremo a breve.`,
   },
 };
 
-export function composeIssuesAckEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
+export function composeIssuesAckEmail(
+  order: Order,
+  language: SupplierLanguage = "en",
+): ComposedEmail {
   return assembleBilingual({
     language,
     subjectEn: `Re: [${order.id}] ${ISSUES.en.subject}`,
@@ -696,10 +782,25 @@ export function composeIssuesAckEmail(order: Order, language: SupplierLanguage =
    ============================================================ */
 
 const ANSWER_HEAD: Record<SupplierLanguage, { subject: string; intro: (id: string) => string }> = {
-  en: { subject: "Answers to your questions", intro: (id) => `Thanks for your reply on order ${id}. Here are the answers to your questions:` },
-  de: { subject: "Antworten auf Ihre Fragen", intro: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Hier die Antworten auf Ihre Fragen:` },
-  fr: { subject: "Réponses à vos questions", intro: (id) => `Merci pour votre réponse concernant la commande ${id}. Voici les réponses à vos questions :` },
-  it: { subject: "Risposte alle vostre domande", intro: (id) => `Grazie per la risposta sull'ordine ${id}. Di seguito le risposte alle vostre domande:` },
+  en: {
+    subject: "Answers to your questions",
+    intro: (id) => `Thanks for your reply on order ${id}. Here are the answers to your questions:`,
+  },
+  de: {
+    subject: "Antworten auf Ihre Fragen",
+    intro: (id) =>
+      `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Hier die Antworten auf Ihre Fragen:`,
+  },
+  fr: {
+    subject: "Réponses à vos questions",
+    intro: (id) =>
+      `Merci pour votre réponse concernant la commande ${id}. Voici les réponses à vos questions :`,
+  },
+  it: {
+    subject: "Risposte alle vostre domande",
+    intro: (id) =>
+      `Grazie per la risposta sull'ordine ${id}. Di seguito le risposte alle vostre domande:`,
+  },
 };
 
 export type QuestionAnswer = { question: string; answer: string };
@@ -709,13 +810,16 @@ export function composeAnswerQuestionsEmail(
   qa: QuestionAnswer[],
   language: SupplierLanguage = "en",
 ): ComposedEmail {
-  const block = (s: typeof ANSWER_HEAD["en"], greeting: string, sign: string) => {
+  const block = (s: (typeof ANSWER_HEAD)["en"], greeting: string, sign: string) => {
     const lines = qa.map((p) => `Q: ${p.question}\nA: ${p.answer}`).join("\n\n");
     return [greeting, ``, s.intro(order.id), ``, lines, ``, sign, COMPANY.agentName].join("\n");
   };
-  const blockHtml = (s: typeof ANSWER_HEAD["en"], greeting: string, sign: string) => {
+  const blockHtml = (s: (typeof ANSWER_HEAD)["en"], greeting: string, sign: string) => {
     const items = qa
-      .map((p) => `<li><div><strong>${escapeHtml(p.question)}</strong></div><div>${escapeHtml(p.answer)}</div></li>`)
+      .map(
+        (p) =>
+          `<li><div><strong>${escapeHtml(p.question)}</strong></div><div>${escapeHtml(p.answer)}</div></li>`,
+      )
       .join("");
     return `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.intro(order.id))}</p><ul>${items}</ul><p>${escapeHtml(sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
   };
@@ -733,16 +837,37 @@ export function composeAnswerQuestionsEmail(
 export function buildAnswersFromOrder(order: Order, questions: string[]): QuestionAnswer[] {
   const lower = (s: string) => s.toLowerCase();
   const facts: Array<{ match: RegExp; answer: string }> = [
-    { match: /vat|tva|mwst|iva|tax id|ust|uid/i, answer: `Buyer: ${COMPANY.name}, ${COMPANY.street}, ${COMPANY.city}. (VAT ID on request — contact ${COMPANY.contact}.)` },
-    { match: /deliver|delivery address|liefer|livraison|consegna|ship to|site address|adresse/i, answer: `Deliver to: ${COMPANY.site}.` },
-    { match: /payment|zahlung|paiement|pagamento|invoice|rechnung|facture|fattura/i, answer: `Standard payment terms: 30 days net. Send invoice to ${COMPANY.contact}.` },
-    { match: /contact|ansprech|téléphone|telefono|phone|email/i, answer: `Contact: ${COMPANY.agentName}, ${COMPANY.contact}, ${COMPANY.phone}.` },
-    { match: /project|projekt|projet|progetto|reference|referenz/i, answer: `Project: ${order.project}. Reference: ${order.id}.` },
-    { match: /items?|positionen|articles?|articoli|line items|skus?|quantit/i, answer: `Items (qty × name @ unit price):\n${order.items.map((i) => `  - ${i.qty} × ${i.name} @ ${i.price}`).join("\n")}\nSubtotal: ${order.subtotal} EUR (excl. VAT, excl. shipping).` },
+    {
+      match: /vat|tva|mwst|iva|tax id|ust|uid/i,
+      answer: `Buyer: ${COMPANY.name}, ${COMPANY.street}, ${COMPANY.city}. (VAT ID on request — contact ${COMPANY.contact}.)`,
+    },
+    {
+      match: /deliver|delivery address|liefer|livraison|consegna|ship to|site address|adresse/i,
+      answer: `Deliver to: ${COMPANY.site}.`,
+    },
+    {
+      match: /payment|zahlung|paiement|pagamento|invoice|rechnung|facture|fattura/i,
+      answer: `Standard payment terms: 30 days net. Send invoice to ${COMPANY.contact}.`,
+    },
+    {
+      match: /contact|ansprech|téléphone|telefono|phone|email/i,
+      answer: `Contact: ${COMPANY.agentName}, ${COMPANY.contact}, ${COMPANY.phone}.`,
+    },
+    {
+      match: /project|projekt|projet|progetto|reference|referenz/i,
+      answer: `Project: ${order.project}. Reference: ${order.id}.`,
+    },
+    {
+      match: /items?|positionen|articles?|articoli|line items|skus?|quantit/i,
+      answer: `Items (qty × name @ unit price):\n${order.items.map((i) => `  - ${i.qty} × ${i.name} @ ${i.price}`).join("\n")}\nSubtotal: ${order.subtotal} EUR (excl. VAT, excl. shipping).`,
+    },
   ];
   return questions.map((q) => {
     const fact = facts.find((f) => f.match.test(lower(q)));
-    return { question: q, answer: fact ? fact.answer : `We are checking this internally and will follow up shortly.` };
+    return {
+      question: q,
+      answer: fact ? fact.answer : `We are checking this internally and will follow up shortly.`,
+    };
   });
 }
 
