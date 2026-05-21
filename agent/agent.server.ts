@@ -485,7 +485,13 @@ export async function classifyReply(args: {
     if (!res.ok) {
       const t = await res.text();
       console.error("classifyReply gateway error", res.status, t);
-      return fallbackClassification("unclear", "AI gateway error", [t.slice(0, 200)]);
+      const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
+      return {
+        ...fallback,
+        issues: fallback.verdict === "unclear" ? [t.slice(0, 200)] : [],
+        summary: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary,
+        summary_en: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary_en,
+      };
     }
     const data = (await res.json()) as {
       choices?: Array<{
