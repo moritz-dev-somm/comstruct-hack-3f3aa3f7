@@ -442,7 +442,18 @@ export const Route = createFileRoute("/api/chat")({
             : lastUserText.trim()
               ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
               : [];
-          const items = await retrieveRelevant(effective);
+          let items = await retrieveRelevant(effective);
+
+          // Phase 2b: if direct retrieval found nothing, ask an LLM to brainstorm
+          // concrete C-material product keywords (e.g. "PPE for new hire" →
+          // ["helmet", "gloves", "safety glasses", ...]) and re-query.
+          if (items.length === 0 && lastUserText.trim()) {
+            const expanded = await expandQueryToKeywords(lastUserText, apiKey);
+            if (expanded.length) {
+              items = await retrieveRelevant(expanded);
+            }
+          }
+
           relevantItemsContext = buildRelevantItemsContext(items, lang);
         } catch (e) {
           console.error("RAG retrieval failed", e);
