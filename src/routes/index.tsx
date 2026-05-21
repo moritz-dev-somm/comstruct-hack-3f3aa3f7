@@ -417,11 +417,37 @@ function Home() {
   function reset() {
     setMessages([]);
     setRecommendedIds([]);
+    setRecommendedQty({});
     setFollowups([]);
     setSelectedCategory(null);
     setSearchResults(null);
     setSearchExtracted(null);
     localStorage.removeItem("comstruct-chat");
+  }
+
+  function addBundleToCart() {
+    let added = 0;
+    for (const sku of recommendedIds) {
+      const p = products.find((x) => x.sku === sku);
+      if (!p) continue;
+      const qty = recommendedQty[sku] ?? 1;
+      cart.add({
+        productId: p.sku,
+        name: p.name,
+        price: p.price,
+        qty,
+        category: p.category,
+        unit: p.unit,
+        supplier: p.supplier,
+      });
+      added++;
+    }
+    if (added > 0) {
+      toast.success(`Added ${added} item${added === 1 ? "" : "s"} to cart`);
+      setCartOpen(true);
+    } else {
+      toast.info("Nothing to add yet — ask for a recommendation first.");
+    }
   }
 
   const searchSeqRef = useRef(0);
