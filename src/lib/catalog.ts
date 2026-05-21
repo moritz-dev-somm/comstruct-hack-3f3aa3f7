@@ -20,6 +20,7 @@ export type Product = {
   description: string | null;
   useCases: UseCase[];
   enrichedAt: string | null;
+  imageUrl: string | null;
 };
 
 export const SITE_CATEGORIES = [
@@ -57,6 +58,7 @@ type Row = {
   use_cases: UseCase[] | null;
   use_cases_en: UseCase[] | null;
   enriched_at: string | null;
+  image_url: string | null;
 };
 
 export function rowToProduct(r: Row): Product {
@@ -77,6 +79,7 @@ export function rowToProduct(r: Row): Product {
     description: r.description_en ?? r.description,
     useCases: (r.use_cases_en && r.use_cases_en.length > 0 ? r.use_cases_en : r.use_cases) ?? [],
     enrichedAt: r.enriched_at,
+    imageUrl: r.image_url ?? null,
   };
 }
 

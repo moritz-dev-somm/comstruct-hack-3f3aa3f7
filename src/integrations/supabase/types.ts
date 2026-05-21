@@ -128,6 +128,7 @@ export type Database = {
           enriched_at: string | null
           hazardous: boolean
           id: string
+          image_url: string | null
           keywords: string[]
           keywords_en: string[]
           name: string
@@ -156,6 +157,7 @@ export type Database = {
           enriched_at?: string | null
           hazardous?: boolean
           id?: string
+          image_url?: string | null
           keywords?: string[]
           keywords_en?: string[]
           name: string
@@ -184,6 +186,7 @@ export type Database = {
           enriched_at?: string | null
           hazardous?: boolean
           id?: string
+          image_url?: string | null
           keywords?: string[]
           keywords_en?: string[]
           name?: string

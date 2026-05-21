@@ -33,6 +33,7 @@ import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
 import { ScanButton } from "@/components/ScanButton";
+import { ProductImage } from "@/components/ProductImage";
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
@@ -1139,9 +1140,12 @@ function InlineProductBubble({
         className="inline-flex align-middle items-center gap-2 my-0.5 mx-0.5 max-w-full rounded-full border border-brand/40 bg-brand/5 hover:bg-brand/10 hover:border-brand transition-colors cursor-pointer pr-1 pl-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         title={`${product.sku} — ${product.name}`}
       >
-        <span className="shrink-0 size-7 rounded-full bg-muted grid place-items-center text-base">
-          📦
-        </span>
+        <ProductImage
+          src={product.imageUrl}
+          alt={product.name}
+          className="shrink-0 size-7 rounded-full overflow-hidden"
+          fallbackClassName="shrink-0 size-7 rounded-full bg-muted text-base"
+        />
         <span className="font-semibold text-[13px] leading-tight truncate max-w-[14rem] sm:max-w-[20rem]">
           {product.name}
         </span>
@@ -1309,9 +1313,12 @@ function ProductCard({
           </div>
         )}
 
-        <div className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-muted/50 rounded grid place-items-center text-4xl">
-          📦
-        </div>
+        <ProductImage
+          src={product.imageUrl}
+          alt={product.name}
+          className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded overflow-hidden"
+          fallbackClassName="shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-muted/50 rounded text-4xl"
+        />
 
 
 
@@ -1421,9 +1428,12 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           <div className="flex gap-4 items-start">
-            <div className="shrink-0 w-32 h-32 bg-muted/50 rounded grid place-items-center text-5xl">
-              📦
-            </div>
+            <ProductImage
+              src={product.imageUrl}
+              alt={product.name}
+              className="shrink-0 w-32 h-32 rounded overflow-hidden"
+              fallbackClassName="shrink-0 w-32 h-32 bg-muted/50 rounded text-5xl"
+            />
 
 
             <div className="flex-1 min-w-0 space-y-3">
