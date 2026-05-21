@@ -400,21 +400,6 @@ function heuristicClassification(
   };
 }
 
-function fallbackClassification(
-  verdict: ReplyClassification["verdict"],
-  summary: string,
-  issues: string[] = [],
-): ReplyClassification {
-  return {
-    verdict,
-    summary,
-    lead_time: null,
-    issues,
-    checklist: { ...EMPTY_CHECKLIST },
-    missing_checklist: ["delivery_date", "shipping_cost"],
-  };
-}
-
 export async function classifyReply(args: {
   orderSummary: string;
   supplierReply: string;
