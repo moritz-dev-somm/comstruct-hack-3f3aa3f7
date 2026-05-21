@@ -382,6 +382,14 @@ function AgentPage() {
         </p>
       </header>
 
+      <NeedsAttentionQueue
+        items={needsAttention}
+        onChanged={() => {
+          negotiationsQ.refetch();
+          messagesQ.refetch();
+        }}
+      />
+
       <section className="rounded-xl border bg-card overflow-hidden">
         <div className="px-5 py-3 border-b flex items-center justify-between">
           <h2 className="font-semibold flex items-center gap-2">
