@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Mic, MicOff, Square, X, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
+
+/** Render `node` into document.body so `position: fixed` escapes any
+ * ancestor with `transform`/`filter`/`backdrop-filter` (which would
+ * otherwise become its containing block — clipping the overlay to a
+ * sliver at the bottom of the screen). SSR-safe. */
+function PortalToBody({ children }: { children: React.ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Minimal types for Web Speech API (not in lib.dom by default for Safari)    */
