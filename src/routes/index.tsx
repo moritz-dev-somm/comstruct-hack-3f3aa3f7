@@ -1106,7 +1106,7 @@ function SuggestionButton({ children, onClick }: { children: React.ReactNode; on
   return (
     <button
       onClick={onClick}
-      className="rounded-full border bg-card hover:bg-accent px-3 h-9 text-sm font-medium"
+      className="rounded-full bg-brand text-brand-foreground hover:opacity-90 px-3 h-9 text-sm font-medium"
     >
       {children}
     </button>
