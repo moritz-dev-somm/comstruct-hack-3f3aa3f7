@@ -100,7 +100,14 @@ export function generatePurchaseOrderPdf(
   /* ----- Address blocks ----- */
   const addrY = metaY + 30;
   drawAddressBlock(doc, "BUYER", BUYER, page.m, addrY);
-  drawAddressBlock(doc, "SUPPLIER", SUPPLIER, page.m + 65, addrY);
+  drawAddressBlock(doc, "SUPPLIER", {
+    name: supplierBlock.name,
+    street: supplierBlock.street ?? "",
+    city: supplierBlock.city ?? "",
+    vat: supplierBlock.vat ?? "",
+    email: supplierBlock.email,
+    phone: supplierBlock.phone,
+  }, page.m + 65, addrY);
   drawAddressBlock(
     doc,
     "DELIVER TO",
