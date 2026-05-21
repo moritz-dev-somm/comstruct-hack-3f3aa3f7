@@ -677,17 +677,15 @@ function HeroView({
           />
         </div>
 
-        <div className="mt-6 flex flex-wrap items-stretch gap-y-2">
-          {SUGGESTED_CHIPS.map((chip, i) => (
-            <Fragment key={chip}>
-              {i > 0 && <div className="self-center mx-2 h-5 w-px bg-border" />}
-              <button
-                onClick={() => send(chip)}
-                className="rounded-full border border-brand text-brand hover:bg-brand/10 px-4 h-10 text-sm font-medium"
-              >
-                {chip}
-              </button>
-            </Fragment>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          {SUGGESTED_CHIPS.map((chip) => (
+            <button
+              key={chip}
+              onClick={() => send(chip)}
+              className="rounded-full border border-brand text-brand hover:bg-brand/10 px-3 h-8 text-xs font-medium"
+            >
+              {chip}
+            </button>
           ))}
         </div>
 
