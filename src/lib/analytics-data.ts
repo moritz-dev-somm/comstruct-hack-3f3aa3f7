@@ -236,12 +236,13 @@ export function computeForemen(rows: NegotiationRow[]): ForemanAgg[] {
 }
 
 export function computeWeekday(rows: NegotiationRow[]) {
-  const labels = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const counts = [0, 0, 0, 0, 0, 0, 0];
   for (const r of rows) counts[new Date(r.sent_at).getDay()] += 1;
-  // Reorder to Mo-So
+  // Reorder to Mon-Sun
   const order = [1, 2, 3, 4, 5, 6, 0];
   return order.map((i) => ({ day: labels[i], value: counts[i], weekend: i === 0 || i === 6 }));
+
 }
 
 export function computeTimeOfDay(rows: NegotiationRow[]) {
