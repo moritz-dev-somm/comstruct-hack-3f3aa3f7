@@ -375,6 +375,7 @@ function Home() {
                 placeholder="Ask a follow-up…"
               />
             </div>
+            <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
             <VoiceButton size="compact" onTranscript={(t) => send(t)} />
           </div>
         </div>
