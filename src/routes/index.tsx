@@ -95,6 +95,8 @@ function Home() {
   const cart = useCart();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { logout } = useRole();
+  const navigate = useNavigate();
 
   const inConversation = messages.length > 0;
   const showCatalog = inConversation || selectedCategory !== null;
