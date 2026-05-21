@@ -211,11 +211,14 @@ export async function verifySvixSignature(args: {
   if (Math.abs(now - ts) > 5 * 60) return false;
 
   const raw = secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret;
-  let keyBytes: Uint8Array;
+  let keyBytes: ArrayBuffer;
   try {
-    keyBytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+    const bin = atob(raw);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    keyBytes = arr.buffer;
   } catch {
-    keyBytes = new TextEncoder().encode(raw);
+    keyBytes = new TextEncoder().encode(raw).buffer as ArrayBuffer;
   }
   const toSign = `${id}.${timestamp}.${body}`;
   const key = await crypto.subtle.importKey(
