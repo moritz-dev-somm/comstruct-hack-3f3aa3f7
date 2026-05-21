@@ -1,8 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, ArrowLeft, ShoppingCart } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
-import { useOrders, STATUS_META, type Order, type OrderStatus } from "@/lib/orders";
+import { useOrders, type Order } from "@/lib/orders";
+import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
+import {
+  DERIVED_STATUS_META,
+  STATUS_TONE_CLASS,
+  deriveOrderStatus,
+  type DerivedStatus,
+} from "@/lib/order-status";
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
@@ -14,6 +21,8 @@ export const Route = createFileRoute("/orders")({
 function OrdersPage() {
   const { orders } = useOrders();
   const [openId, setOpenId] = useState<string | null>(orders[0]?.id ?? null);
+  const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
+  const negotiationsByOrder = useNegotiationsByOrder(orderIds);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
