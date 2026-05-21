@@ -173,6 +173,7 @@ function Home() {
   const [streaming, setStreaming] = useState(false);
   const [thinkingWord, setThinkingWord] = useState(THINKING_WORDS[0]);
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
+  const [recommendedQty, setRecommendedQty] = useState<Record<string, number>>({});
   const [followups, setFollowups] = useState<string[]>([]);
   const { data: products = [] } = useProducts();
   const [aMaterialFlag, setAMaterialFlag] = useState<string | null>(null);
@@ -226,6 +227,7 @@ function Home() {
         const parsed = JSON.parse(saved);
         if (parsed.messages) setMessages(parsed.messages);
         if (parsed.recommendedIds) setRecommendedIds(parsed.recommendedIds);
+        if (parsed.recommendedQty) setRecommendedQty(parsed.recommendedQty);
       }
     } catch {}
   }, []);
@@ -234,9 +236,9 @@ function Home() {
     if (messages.length === 0) return;
     localStorage.setItem(
       "comstruct-chat",
-      JSON.stringify({ messages, recommendedIds }),
+      JSON.stringify({ messages, recommendedIds, recommendedQty }),
     );
-  }, [messages, recommendedIds]);
+  }, [messages, recommendedIds, recommendedQty]);
 
   // focus input on load and after stream ends
   useEffect(() => {
@@ -347,15 +349,22 @@ function Home() {
         });
         // Detect inline product tokens as they stream in so the
         // "Recommended for this job" panel below stays in sync.
-        const re = /\[\[product:([A-Za-z0-9_-]+)(?::\d+)?\]\]/g;
-        const found: string[] = [];
+        const re = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+        const found: { sku: string; qty: number }[] = [];
         let m: RegExpExecArray | null;
-        while ((m = re.exec(chunk)) !== null) found.push(m[1]);
+        while ((m = re.exec(chunk)) !== null) {
+          found.push({ sku: m[1], qty: m[2] ? parseInt(m[2], 10) : 1 });
+        }
         if (found.length) {
           setRecommendedIds((prev) => {
             const set = new Set(prev);
-            const add = found.filter((s) => !set.has(s));
+            const add = found.map((f) => f.sku).filter((s) => !set.has(s));
             return add.length ? [...prev, ...add] : prev;
+          });
+          setRecommendedQty((prev) => {
+            const next = { ...prev };
+            for (const f of found) next[f.sku] = f.qty;
+            return next;
           });
         }
         break;
@@ -408,11 +417,37 @@ function Home() {
   function reset() {
     setMessages([]);
     setRecommendedIds([]);
+    setRecommendedQty({});
     setFollowups([]);
     setSelectedCategory(null);
     setSearchResults(null);
     setSearchExtracted(null);
     localStorage.removeItem("comstruct-chat");
+  }
+
+  function addBundleToCart() {
+    let added = 0;
+    for (const sku of recommendedIds) {
+      const p = products.find((x) => x.sku === sku);
+      if (!p) continue;
+      const qty = recommendedQty[sku] ?? 1;
+      cart.add({
+        productId: p.sku,
+        name: p.name,
+        price: p.price,
+        qty,
+        category: p.category,
+        unit: p.unit,
+        supplier: p.supplier,
+      });
+      added++;
+    }
+    if (added > 0) {
+      toast.success(`Added ${added} item${added === 1 ? "" : "s"} to cart`);
+      setCartOpen(true);
+    } else {
+      toast.info("Nothing to add yet — ask for a recommendation first.");
+    }
   }
 
   const searchSeqRef = useRef(0);
@@ -562,7 +597,8 @@ function Home() {
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
             onClearCategory={() => setSelectedCategory(null)}
-            onResetRecommendations={() => setRecommendedIds([])}
+            onResetRecommendations={() => { setRecommendedIds([]); setRecommendedQty({}); }}
+            onAddBundle={addBundleToCart}
             onSuggestion={(s) => send(s)}
             followups={followups}
             allProducts={products}
@@ -809,6 +845,7 @@ function ConversationView({
   onSelectCategory,
   onClearCategory,
   onResetRecommendations,
+  onAddBundle,
   onSuggestion,
   followups,
   allProducts,
@@ -828,6 +865,7 @@ function ConversationView({
   onSelectCategory: (c: string) => void;
   onClearCategory: () => void;
   onResetRecommendations: () => void;
+  onAddBundle: () => void;
   onSuggestion: (s: string) => void;
   followups: string[];
   allProducts: Product[];
@@ -865,9 +903,11 @@ function ConversationView({
         {/* suggestions */}
         {!streaming && lastAssistant && (
           <div className="flex flex-wrap gap-2 pt-1">
-            <SuggestionButton onClick={() => onSuggestion("Add the bundle to cart")}>
-              Add the bundle to cart
-            </SuggestionButton>
+            {recommendedProducts.length > 0 && (
+              <SuggestionButton onClick={onAddBundle}>
+                Add the bundle to cart
+              </SuggestionButton>
+            )}
             {followups.map((f) => (
               <SuggestionButton key={f} onClick={() => onSuggestion(f)}>
                 {f}

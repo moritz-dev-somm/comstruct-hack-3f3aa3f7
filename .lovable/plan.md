@@ -1,40 +1,35 @@
-## Goal
+## Problem
 
-Replace the static CSS dot field on `body` with an interactive version: dots stay muted by default and brighten in a soft radius around the cursor (and touch points).
+"Add the bundle to cart" sends the literal text `"Add the bundle to cart"` back to the chat model. The model has no reliable notion of "the bundle", so it sometimes apologises, re-searches the catalog, or asks follow-up questions instead of adding anything — exactly the failure seen in the session replay (the AI replied it "cannot find the SKU for the rubber hammer bundle" and re-ran a search).
 
-## Approach
+The recommended items the user sees in "Recommended for this job" are already tracked client-side as `recommendedIds` (populated from inline `[[product:SKU:QTY]]` tokens during streaming). The button should use that state directly instead of round-tripping through the LLM.
 
-Use a fixed full-viewport `<canvas>` overlay that renders the dot grid in JS. Canvas is the right tool here — CSS gradients can't vary opacity per-dot based on cursor distance, and a canvas at this density (~24px grid) is essentially free on modern hardware. The existing CSS body dots are removed so dots don't double up.
+## Fix (`src/routes/index.tsx`)
 
-### 1. New component: `src/components/InteractiveDotField.tsx`
+1. **Add quantities to recommendations state.** Change `recommendedIds: string[]` to a structure that keeps the suggested qty per SKU (e.g. `recommendedItems: { sku: string; qty: number }[]`). Update the two places that populate it:
+   - The inline `[[product:SKU:QTY]]` regex parse during the `delta` stream event (line ~350) — capture group 2 is already the qty; default to 1 when missing.
+   - The `recommend` stream event (line ~363) — keep skus, default qty 1.
+   Persist the new shape in localStorage and keep a thin `recommendedIds` derived array for the existing UI that just needs SKUs (line 274, 561, 826, 840, 848).
 
-- Renders a `<canvas>` fixed to the viewport, `pointer-events: none`, `z-index: 0`, behind app content.
-- On mount: size canvas to `window.innerWidth × innerHeight × devicePixelRatio`, listen for `resize`.
-- Listens to `mousemove`, `mouseleave`, `touchmove`, `touchend` on `window` to track the active point (or `null` when away).
-- Uses `requestAnimationFrame` to redraw. Dots laid out on a fixed grid (~22px spacing). For each dot:
-  - distance `d` from cursor → factor `f = max(0, 1 - d/radius)` with radius ~140px, smoothed (`f * f * (3 - 2f)`).
-  - alpha = `lerp(0.16, 0.95, f)`; radius = `lerp(0.9px, 1.6px, f)`.
-  - color: `rgba(var(--brand-rgb), alpha)` read once from `:root`.
-- When cursor is absent, draws all dots at base alpha (matches current look exactly).
-- Respects `prefers-reduced-motion`: skip the rAF loop and only redraw on actual move events (no idle redraws).
+2. **Replace the button's handler.** In `ChatView` (line 868), instead of `onSuggestion("Add the bundle to cart")`, call a new prop `onAddBundle()` that:
+   - Looks up each recommended item in `allProducts`.
+   - Calls `cart.add({ productId, name, price, qty, category, unit, supplier })` for each (same shape as line 399).
+   - Shows one toast: `Added N items to cart`.
+   - Opens the cart drawer (`setCartOpen(true)`).
+   - No LLM call.
 
-### 2. `src/styles.css`
+3. **Hide the button when there is nothing to add.** Only render the "Add the bundle to cart" suggestion when `recommendedItems.length > 0`. Today it renders after every assistant turn, even when the bundle is empty.
 
-Remove the `background-image: radial-gradient(...)` + `background-size` + `background-attachment` lines from the `body` rule (lines 146–153). Keep `--brand-rgb` and the `.dot-bg` / `.dot-bg-strong` utility classes — those are used on local panels, not the body.
+4. **Wire `onAddBundle` from the parent** (the `Home` component, around line 561) and pass `cart` / `setCartOpen` through.
 
-### 3. `src/routes/__root.tsx`
+## Out of scope
 
-In `RootComponent`, mount `<InteractiveDotField />` as the first child inside `QueryClientProvider` so it lives behind all routes. App content already sits in normal flow above it.
+- No changes to the streaming protocol, backend chat route, or the LLM system prompt — the failure is purely a client-side UX bug.
+- Quantity merging rules in the cart stay as-is (`cart.add` already increments existing line items).
+- The unrelated hydration warning in the runtime logs is not touched.
 
-## Technical notes
+## Verification
 
-- The canvas reads `--brand-rgb` from `getComputedStyle(document.documentElement)` once on mount, so it stays in sync with the token.
-- `pointer-events: none` ensures the overlay never intercepts clicks/scroll.
-- No SSR flash: the canvas is a blank fixed layer until React hydrates, which is visually identical to the dot field appearing — and the page background is already light, so there's nothing jarring.
-- One global instance only — keeps it cheap.
-
-## Files touched
-
-- **Add** `src/components/InteractiveDotField.tsx`
-- **Edit** `src/styles.css` (remove body dot background rules)
-- **Edit** `src/routes/__root.tsx` (mount the component)
+- Trigger a chat that produces `[[product:...]]` recommendations, click "Add the bundle to cart": all recommended items appear in the cart with the suggested quantities, cart drawer opens, toast fires, no new assistant message is generated.
+- Start a fresh chat with no recommendations yet: the "Add the bundle to cart" button is not shown.
+- Refresh the page mid-session: recommendations + quantities are restored from localStorage and the button still works.
