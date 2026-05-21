@@ -20,6 +20,7 @@ export type Product = {
   description: string | null;
   useCases: UseCase[];
   enrichedAt: string | null;
+  imageUrl: string | null;
 };
 
 export const SITE_CATEGORIES = [
