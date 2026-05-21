@@ -62,6 +62,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const adjust: CartCtx["adjust"] = (productId, delta) => {
+    setItems((prev) => {
+      const found = prev.find((p) => p.productId === productId);
+      if (!found) return prev;
+      const next = found.qty + delta;
+      if (next <= 0) return prev.filter((p) => p.productId !== productId);
+      return prev.map((p) => (p.productId === productId ? { ...p, qty: next } : p));
+    });
+  };
+
   const remove: CartCtx["remove"] = (productId) =>
     setItems((prev) => prev.filter((p) => p.productId !== productId));
 
@@ -69,10 +79,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const count = items.reduce((s, i) => s + i.qty, 0);
 
   return (
-    <Ctx.Provider value={{ items, add, setQty, remove, subtotal, count, clear: () => setItems([]) }}>
+    <Ctx.Provider value={{ items, add, setQty, adjust, remove, subtotal, count, clear: () => setItems([]) }}>
       {children}
     </Ctx.Provider>
   );
+
 }
 
 export function useCart() {
