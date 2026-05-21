@@ -1,0 +1,66 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { adminClient } from "@agent/agent.server";
+
+/**
+ * Periodic sweep: any negotiation waiting on the supplier for >24h
+ * with no inbound reply gets flipped to status="needs_user" so it
+ * surfaces in the "Needs your attention" queue.
+ *
+ * Called by pg_cron (no signed payload — public route, idempotent).
+ */
+export const Route = createFileRoute("/api/public/agent-timeouts")({
+  server: {
+    handlers: {
+      POST: async () => {
+        const sb = adminClient();
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        const WAITING = [
+          "sent",
+          "awaiting_reply",
+          "clarifying",
+          "following_up",
+          "answering_questions",
+        ];
+
+        const { data: rows, error } = await sb
+          .from("negotiations")
+          .select("id, status, sent_at, last_reply_at, supplier_name")
+          .in("status", WAITING);
+        if (error) {
+          console.error("agent-timeouts: query failed", error);
+          return new Response(JSON.stringify({ ok: false, error: error.message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const stale = (rows ?? []).filter((r) => {
+          const last = (r as { last_reply_at: string | null }).last_reply_at;
+          const sent = (r as { sent_at: string }).sent_at;
+          const ref = last || sent;
+          return ref && ref < cutoff;
+        });
+
+        let flipped = 0;
+        for (const row of stale) {
+          const r = row as { id: string; supplier_name: string | null };
+          const { error: upErr } = await sb
+            .from("negotiations")
+            .update({
+              status: "needs_user",
+              needs_user_reason: `No reply from ${r.supplier_name ?? "supplier"} for 24h.`,
+            })
+            .eq("id", r.id);
+          if (!upErr) flipped++;
+        }
+
+        return new Response(
+          JSON.stringify({ ok: true, scanned: rows?.length ?? 0, flipped }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+      GET: async () => new Response("ok", { status: 200 }),
+    },
+  },
+});
