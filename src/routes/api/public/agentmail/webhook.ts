@@ -92,7 +92,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         }
 
         const message = payload.message as Record<string, unknown> | undefined;
-        const thread = payload.thread as Record<string, unknown> | undefined;
+        const threadPayload = payload.thread as Record<string, unknown> | undefined;
         if (!message) return new Response("no message", { status: 200 });
 
         const threadId = String(
