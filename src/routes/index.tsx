@@ -1048,6 +1048,7 @@ function ConversationView({
 
 
 function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[] }) {
+  const cart = useCart();
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
@@ -1057,11 +1058,52 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
       </div>
     );
   }
+
+  // Parse product tokens from this specific message so the
+  // "Add all to cart" action sits directly under the response that produced it.
+  const tokens: { sku: string; qty: number }[] = [];
+  const seen = new Set<string>();
+  const re = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+  let mm: RegExpExecArray | null;
+  while ((mm = re.exec(msg.content)) !== null) {
+    const sku = mm[1];
+    if (seen.has(sku)) continue;
+    seen.add(sku);
+    tokens.push({ sku, qty: mm[2] ? parseInt(mm[2], 10) : 1 });
+  }
+  const bundle = tokens
+    .map((t) => ({ p: products.find((x) => x.sku === t.sku), qty: t.qty }))
+    .filter((b): b is { p: Product; qty: number } => !!b.p);
+
+  function addAll() {
+    for (const { p, qty } of bundle) {
+      cart.add({
+        productId: p.sku,
+        name: p.name,
+        price: p.price,
+        qty,
+        category: p.category,
+        unit: p.unit,
+        supplier: p.supplier,
+      });
+    }
+    toast.success(`Added ${bundle.length} item${bundle.length === 1 ? "" : "s"} to cart`);
+  }
+
   return (
     <div className="flex">
-      <div className="text-[15px] leading-relaxed max-w-[90%]">
+      <div className="text-[15px] leading-relaxed max-w-[90%] w-full">
         <AssistantContent content={msg.content} products={products} />
         {msg.content === "" && <span className="inline-block w-1 h-4 bg-foreground/40 animate-pulse" />}
+        {bundle.length > 1 && msg.content !== "" && (
+          <button
+            type="button"
+            onClick={addAll}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 hover:bg-brand/10 text-brand px-3 py-1.5 text-sm font-medium transition-colors"
+          >
+            <Plus className="size-4" /> Add all {bundle.length} to cart
+          </button>
+        )}
       </div>
     </div>
   );
