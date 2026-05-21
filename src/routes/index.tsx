@@ -7,7 +7,7 @@ import {
   Anchor,
   ArrowUp,
   Bolt,
-  Building2,
+  
   Check,
   ClipboardList,
   Clock,
