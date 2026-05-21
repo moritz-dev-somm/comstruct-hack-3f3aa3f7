@@ -260,6 +260,108 @@ function deriveMissing(checklist: ReplyChecklist): ChecklistField[] {
   return missing;
 }
 
+function parseNumberLike(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = parseFloat(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function questionMentionsField(text: string, field: ChecklistField): boolean {
+  const q = text.toLowerCase();
+  if (field === "delivery_date") {
+    return /(delivery|deliver|arrival|arrive|date|lead time|liefer|zustell|ankunft|livraison|consegna)/i.test(q);
+  }
+  return /(shipping|freight|delivery cost|cost|included|versand|porto|frais|expédition|spedizione)/i.test(q);
+}
+
+function inferLocalReplySignals(reply: string, openQuestions: string[] = []): {
+  checklist: ReplyChecklist;
+  lead_time_days: number | null;
+  shipping_cost_eur: number | null;
+  answered_open_questions: string[];
+  answered_fields: ChecklistField[];
+} {
+  const text = reply.trim();
+  const lower = text.toLowerCase();
+  const orderConfirmed = /\b(sounds good|looks good|confirmed?|confirm(?:ed)?|ok(?:ay)?|yes|accepted?|go ahead|passt|einverstanden|bestätigt|ja\b|d'accord|oui\b|va bene|confermiamo)\b/i.test(text);
+
+  let deliveryDate: string | null = null;
+  let leadTimeDays: number | null = null;
+  const leadMatch = text.match(/\b(?:arriv\w*|deliver\w*|delivery|lead time|ships?|ship\w*)?\s*(?:within|inside|in|by)\s+(\d{1,3})\s*(business|working|calendar)?\s*(day|days|week|weeks)\b/i)
+    ?? text.match(/\b(\d{1,3})\s*(business|working|calendar)?\s*(day|days|week|weeks)\b/i);
+  if (leadMatch) {
+    const n = Number(leadMatch[1]);
+    const unit = leadMatch[3]?.toLowerCase() ?? "days";
+    leadTimeDays = unit.startsWith("week") ? n * 7 : n;
+    deliveryDate = leadMatch[0].trim();
+  } else {
+    const dateMatch = text.match(/\b(?:\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i);
+    if (dateMatch && /(arriv|deliver|delivery|ship|liefer|livraison|consegna|date)/i.test(lower)) {
+      deliveryDate = dateMatch[0].trim();
+    }
+  }
+
+  let shippingCost: string | null = null;
+  let shippingCostEur: number | null = null;
+  if (/(no\s+(?:extra\s+)?(?:shipping|delivery|freight)\s+costs?|no\s+cost\s+for\s+shipping|shipping\s+(?:is\s+)?(?:free|included)|free\s+shipping|delivery\s+(?:is\s+)?included|included\s+shipping|versandkostenfrei|versand\s+(?:ist\s+)?(?:inklusive|inbegriffen)|port\s+inclus|frais\s+de\s+port\s+offerts|sans\s+frais\s+de\s+port|spedizione\s+(?:gratuita|inclusa))/i.test(text)) {
+    shippingCost = "included / no shipping cost";
+    shippingCostEur = 0;
+  } else {
+    const shipAmount = text.match(/(?:shipping|delivery|freight|versand|porto|frais\s+de\s+port|spedizione)[^\n.]{0,40}?(€|eur|chf)?\s*(\d+(?:[.,]\d{1,2})?)/i);
+    if (shipAmount) {
+      shippingCost = shipAmount[0].trim();
+      shippingCostEur = parseNumberLike(shipAmount[2]);
+    }
+  }
+
+  const answeredFields: ChecklistField[] = [];
+  if (deliveryDate) answeredFields.push("delivery_date");
+  if (shippingCost) answeredFields.push("shipping_cost");
+  const answeredOpen = openQuestions.filter((q) =>
+    answeredFields.some((field) => questionMentionsField(q, field)),
+  );
+
+  return {
+    checklist: { order_confirmed: orderConfirmed, delivery_date: deliveryDate, shipping_cost: shippingCost },
+    lead_time_days: leadTimeDays,
+    shipping_cost_eur: shippingCostEur,
+    answered_open_questions: answeredOpen,
+    answered_fields: answeredFields,
+  };
+}
+
+function heuristicClassification(reply: string, openQuestions: string[], priorAnswered: ChecklistField[]): ReplyClassification {
+  const local = inferLocalReplySignals(reply, openQuestions);
+  const missing = deriveMissing(local.checklist).filter((f) => !priorAnswered.includes(f));
+  const answeredOpenSet = new Set(local.answered_open_questions);
+  const answeredAnything = local.checklist.order_confirmed || local.answered_fields.length > 0 || local.answered_open_questions.length > 0;
+  return {
+    verdict: answeredAnything ? "fully_confirmed" : "unclear",
+    summary: answeredAnything
+      ? "Supplier reply was parsed locally because the AI classifier was unavailable."
+      : "AI classifier unavailable and no checklist answer could be extracted locally.",
+    summary_en: answeredAnything
+      ? "Supplier reply was parsed locally because the AI classifier was unavailable."
+      : "AI classifier unavailable and no checklist answer could be extracted locally.",
+    reply_language: "en",
+    lead_time: local.checklist.delivery_date,
+    lead_time_days: local.lead_time_days,
+    shipping_cost_eur: local.shipping_cost_eur,
+    wants_human: false,
+    issues: [],
+    checklist: local.checklist,
+    missing_checklist: missing,
+    answerable_questions: [],
+    unanswerable_questions: [],
+    unclear_points: [],
+    unclear_points_en: [],
+    answered_open_questions: local.answered_open_questions,
+    still_open_questions: openQuestions.filter((q) => !answeredOpenSet.has(q)),
+    suggested_outbound: missing.length ? "checklist_followup" : "confirm",
+  };
+}
+
 function fallbackClassification(
   verdict: ReplyClassification["verdict"],
   summary: string,
