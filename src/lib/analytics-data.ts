@@ -196,10 +196,11 @@ export function computeSuppliers(rows: NegotiationRow[]): SupplierAgg[] {
       orders: v.orders,
       spend: Math.round(v.spend),
       compliance,
-      leadTime: v.replied ? `${leadDays.toFixed(1)} Tage` : "—",
+      leadTime: v.replied ? `${leadDays.toFixed(1)} days` : "—",
       status,
       statusLabel:
-        status === "active" ? "✓ Vertrag aktiv" : status === "partial" ? "⚠ Teilkonform" : "✗ Kein Vertrag",
+        status === "active" ? "✓ Contract active" : status === "partial" ? "⚠ Partially compliant" : "✗ No contract",
+
     };
   }).sort((a, b) => b.spend - a.spend);
 }
