@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { Bot, RefreshCw, Mail, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send, Inbox as InboxIcon } from "lucide-react";
 import {
   listInboxMessages,
   getInboxMessage,
@@ -28,15 +28,89 @@ function loadInbox(): StoredInbox | null {
 
 type InboxMessage = {
   id: string;
+  threadId: string | null;
   subject: string;
   from: string;
+  to?: string[];
   receivedAt: string;
   preview: string;
+  labels?: string[];
 };
+
+type Thread = {
+  key: string;
+  subject: string;
+  messages: InboxMessage[];
+  lastAt: string;
+  supplierName: string;
+  hasInbound: boolean;
+  hasOutbound: boolean;
+};
+
+/** Strip Re:/Fwd: prefixes (in several common languages) for fallback grouping. */
+function normalizeSubject(s: string): string {
+  return s
+    .replace(/^(\s*(re|fwd|fw|aw|wg|sv|rv|tr|res)\s*:\s*)+/i, "")
+    .trim()
+    .toLowerCase();
+}
+
+function parseEmail(s: string): { name: string; email: string } {
+  const m = s.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim() || m[2], email: m[2].toLowerCase() };
+  return { name: s.trim(), email: s.trim().toLowerCase() };
+}
+
+function isOutbound(msg: InboxMessage, inboxAddress: string): boolean {
+  const inbox = inboxAddress.toLowerCase();
+  if (parseEmail(msg.from).email === inbox) return true;
+  // AgentMail tags outgoing mail; treat as a hint.
+  return (msg.labels ?? []).some((l) => /^(sent|outbound|outgoing)$/i.test(l));
+}
+
+function buildThreads(messages: InboxMessage[], inboxAddress: string): Thread[] {
+  const byKey = new Map<string, Thread>();
+  for (const m of messages) {
+    const key = m.threadId || `subj:${normalizeSubject(m.subject || "(no subject)")}`;
+    const out = isOutbound(m, inboxAddress);
+    let t = byKey.get(key);
+    if (!t) {
+      t = {
+        key,
+        subject: m.subject || "(no subject)",
+        messages: [],
+        lastAt: m.receivedAt,
+        supplierName: "",
+        hasInbound: false,
+        hasOutbound: false,
+      };
+      byKey.set(key, t);
+    }
+    t.messages.push(m);
+    if (m.receivedAt && (!t.lastAt || m.receivedAt > t.lastAt)) t.lastAt = m.receivedAt;
+    if (!t.subject || normalizeSubject(t.subject) === "") t.subject = m.subject || t.subject;
+    if (out) t.hasOutbound = true;
+    else t.hasInbound = true;
+  }
+
+  for (const t of byKey.values()) {
+    // Sort messages oldest → newest so threads read naturally top-down.
+    t.messages.sort((a, b) => (a.receivedAt > b.receivedAt ? 1 : -1));
+    // Supplier name = the first non-inbox party we see.
+    const supplier = t.messages
+      .map((m) => (isOutbound(m, inboxAddress) ? (m.to?.[0] ?? "") : m.from))
+      .map(parseEmail)
+      .find((p) => p.email && p.email !== inboxAddress.toLowerCase());
+    t.supplierName = supplier?.name || supplier?.email || "Unknown supplier";
+  }
+
+  return Array.from(byKey.values()).sort((a, b) => (a.lastAt > b.lastAt ? -1 : 1));
+}
 
 function AgentPage() {
   const [inbox] = useState<StoredInbox | null>(() => loadInbox());
   const [openId, setOpenId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const listFn = useServerFn(listInboxMessages);
   const getFn = useServerFn(getInboxMessage);
@@ -44,7 +118,7 @@ function AgentPage() {
   const messagesQ = useQuery({
     queryKey: ["agent-inbox", inbox?.inboxId],
     enabled: !!inbox,
-    queryFn: () => listFn({ data: { inboxId: inbox!.inboxId, limit: 25 } }),
+    queryFn: () => listFn({ data: { inboxId: inbox!.inboxId, limit: 50 } }),
     refetchInterval: 15_000,
   });
 
@@ -58,6 +132,15 @@ function AgentPage() {
     messageMut.mutate(id);
   }
 
+  const threads = useMemo<Thread[]>(() => {
+    if (!inbox || messagesQ.data?.ok !== true) return [];
+    return buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address);
+  }, [messagesQ.data, inbox]);
+
+  // Default: most recent thread expanded.
+  const effectiveExpanded = (key: string, idx: number) =>
+    key in expanded ? expanded[key] : idx === 0;
+
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-6">
       <header>
@@ -66,57 +149,125 @@ function AgentPage() {
           Supplier agent
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Tracks supplier replies for outgoing orders.
+          Email exchanges with suppliers, grouped by conversation.
         </p>
       </header>
 
       <section className="rounded-xl border bg-card overflow-hidden">
         <div className="px-5 py-3 border-b flex items-center justify-between">
           <h2 className="font-semibold flex items-center gap-2">
-            <Mail className="size-4" /> Inbox
+            <Mail className="size-4" /> Conversations
           </h2>
-          <button
-            onClick={() => messagesQ.refetch()}
-            disabled={!inbox || messagesQ.isFetching}
-            className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <RefreshCw className={`size-3.5 ${messagesQ.isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            <Legend />
+            <button
+              onClick={() => messagesQ.refetch()}
+              disabled={!inbox || messagesQ.isFetching}
+              className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`size-3.5 ${messagesQ.isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
         </div>
+
         {!inbox ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             No agent inbox configured yet.
           </div>
         ) : messagesQ.data?.ok === false ? (
-          <div className="p-8 text-center text-sm text-red-600">{messagesQ.data.error}</div>
-        ) : !messagesQ.data?.messages?.length ? (
+          <div className="p-8 text-center text-sm text-destructive">{messagesQ.data.error}</div>
+        ) : threads.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            No messages yet. Replies from suppliers will appear here.
+            No conversations yet. Outgoing POs and supplier replies will appear here.
           </div>
         ) : (
           <ul className="divide-y">
-            {messagesQ.data.messages.map((m: InboxMessage) => (
-              <li key={m.id}>
-                <button
-                  onClick={() => openMessage(m.id)}
-                  className="w-full text-left px-5 py-3 text-sm hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <div className="font-medium truncate">{m.subject || "(no subject)"}</div>
-                    <div className="text-xs text-muted-foreground shrink-0">
-                      {m.receivedAt ? new Date(m.receivedAt).toLocaleString() : ""}
+            {threads.map((t, idx) => {
+              const isOpen = effectiveExpanded(t.key, idx);
+              return (
+                <li key={t.key}>
+                  <button
+                    onClick={() => setExpanded((s) => ({ ...s, [t.key]: !isOpen }))}
+                    className="w-full text-left px-5 py-3 hover:bg-muted/40 transition-colors flex items-start gap-3"
+                  >
+                    <span className="mt-0.5 text-muted-foreground">
+                      {isOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="font-semibold text-sm truncate">
+                          {t.subject || "(no subject)"}
+                        </div>
+                        <div className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                          {t.lastAt ? new Date(t.lastAt).toLocaleString() : ""}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <span className="truncate">{t.supplierName}</span>
+                        <span className="text-muted-foreground/60">·</span>
+                        <span className="tabular-nums">{t.messages.length} message{t.messages.length === 1 ? "" : "s"}</span>
+                        {t.hasInbound && (
+                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border border-brand/30 bg-brand/10 text-brand text-[10px] font-medium">
+                            <InboxIcon className="size-3" /> Reply
+                          </span>
+                        )}
+                        {!t.hasInbound && t.hasOutbound && (
+                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 h-5 rounded-full border text-[10px] font-medium text-muted-foreground">
+                            <Send className="size-3" /> Awaiting reply
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">from {m.from}</div>
-                  {m.preview && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">
-                      {m.preview}
-                    </p>
+                  </button>
+
+                  {isOpen && (
+                    <ol className="px-5 pb-4 space-y-2">
+                      {t.messages.map((m) => {
+                        const out = isOutbound(m, inbox.address);
+                        return (
+                          <li key={m.id}>
+                            <button
+                              onClick={() => openMessage(m.id)}
+                              className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                                out
+                                  ? "ml-8 bg-muted/40 border-border hover:bg-muted/60"
+                                  : "mr-8 bg-brand/5 border-brand/30 hover:bg-brand/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-semibold uppercase tracking-wide shrink-0 ${
+                                      out
+                                        ? "bg-foreground/10 text-foreground"
+                                        : "bg-brand text-brand-foreground"
+                                    }`}
+                                  >
+                                    {out ? <><Send className="size-3" /> Agent</> : <><InboxIcon className="size-3" /> Supplier</>}
+                                  </span>
+                                  <span className="text-xs truncate text-muted-foreground">
+                                    {out ? `to ${m.to?.[0] ?? ""}` : `from ${m.from}`}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground shrink-0 tabular-nums">
+                                  {m.receivedAt ? new Date(m.receivedAt).toLocaleString() : ""}
+                                </div>
+                              </div>
+                              {m.preview && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">
+                                  {m.preview}
+                                </p>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
                   )}
-                </button>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -146,11 +297,35 @@ function AgentPage() {
                 <div className="text-muted-foreground">Loading message…</div>
               )}
               {messageMut.data?.ok === false && (
-                <div className="text-red-600">{messageMut.data.error}</div>
+                <div className="text-destructive">{messageMut.data.error}</div>
               )}
               {messageMut.data?.ok && (
                 <>
                   <div className="text-xs text-muted-foreground space-y-0.5 mb-4 pb-4 border-b">
+                    {inbox && (
+                      <div className="mb-2">
+                        {isOutbound(
+                          {
+                            id: messageMut.data.message.id,
+                            threadId: messageMut.data.message.threadId,
+                            subject: messageMut.data.message.subject,
+                            from: messageMut.data.message.from,
+                            to: messageMut.data.message.to,
+                            receivedAt: messageMut.data.message.receivedAt,
+                            preview: "",
+                          },
+                          inbox.address,
+                        ) ? (
+                          <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-foreground/10 text-foreground text-[10px] font-semibold uppercase tracking-wide">
+                            <Send className="size-3" /> Sent by agent
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-brand text-brand-foreground text-[10px] font-semibold uppercase tracking-wide">
+                            <InboxIcon className="size-3" /> Supplier reply
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div><span className="font-medium text-foreground">From:</span> {messageMut.data.message.from}</div>
                     {messageMut.data.message.to.length > 0 && (
                       <div><span className="font-medium text-foreground">To:</span> {messageMut.data.message.to.join(", ")}</div>
@@ -175,6 +350,21 @@ function AgentPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="hidden sm:flex items-center gap-3 text-[11px] text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block size-2.5 rounded-sm bg-brand/40 border border-brand/40" />
+        Supplier
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block size-2.5 rounded-sm bg-muted border" />
+        Agent
+      </span>
     </div>
   );
 }
