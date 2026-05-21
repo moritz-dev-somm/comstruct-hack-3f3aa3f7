@@ -506,6 +506,8 @@ function Home() {
       <main className="flex-1 flex flex-col">
         {!showCatalog ? (
           <HeroView
+            categoryTiles={categoryTiles}
+            input={input}
             input={input}
             setInput={setInput}
             send={send}
