@@ -250,9 +250,21 @@ function drawTotalRow(doc: jsPDF, label: string, value: string, x: number, y: nu
   doc.text(value, x + 70, y, { align: "right" });
 }
 
-export function purchaseOrderFilename(order: Order): string {
+export function purchaseOrderFilename(order: Order, supplierName?: string): string {
   const safeProject = order.project.replace(/[^a-z0-9]+/gi, "-");
-  return `PO-${order.id}-${safeProject}.pdf`;
+  const safeSupplier = supplierName ? `-${supplierName.replace(/[^a-z0-9]+/gi, "-")}` : "";
+  return `PO-${order.id}${safeSupplier}-${safeProject}.pdf`;
+}
+
+/** Returns just the base64 payload (no data: prefix), suitable for AgentMail attachments. */
+export function purchaseOrderPdfBase64(
+  order: Order,
+  opts?: { supplier?: SupplierBlock; itemsOverride?: Order["items"]; subtotalOverride?: number },
+): string {
+  const doc = generatePurchaseOrderPdf(order, opts);
+  const dataUri = doc.output("datauristring");
+  const comma = dataUri.indexOf(",");
+  return comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
 }
 
 export function downloadPurchaseOrderPdf(order: Order): void {
