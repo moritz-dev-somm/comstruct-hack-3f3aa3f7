@@ -70,8 +70,11 @@ export async function ensureAgentInfra(): Promise<{
     // If already exists, find it and read the secret.
     const list = await am.webhooks.list();
     const items =
-      (list as { webhooks?: Array<{ webhookId: string; clientId?: string; secret: string; url: string }> }).webhooks ??
-      [];
+      (
+        list as {
+          webhooks?: Array<{ webhookId: string; clientId?: string; secret: string; url: string }>;
+        }
+      ).webhooks ?? [];
     const found = items.find((w) => w.clientId === AGENT_WEBHOOK_CLIENT_ID || w.url === url);
     if (!found) throw err;
     webhookId = found.webhookId;
@@ -260,18 +263,140 @@ function deriveMissing(checklist: ReplyChecklist): ChecklistField[] {
   return missing;
 }
 
-function fallbackClassification(
-  verdict: ReplyClassification["verdict"],
-  summary: string,
-  issues: string[] = [],
-): ReplyClassification {
+function parseNumberLike(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = parseFloat(
+    String(v)
+      .replace(/[^0-9.,-]/g, "")
+      .replace(",", "."),
+  );
+  return Number.isFinite(n) ? n : null;
+}
+
+function questionMentionsField(text: string, field: ChecklistField): boolean {
+  const q = text.toLowerCase();
+  if (field === "delivery_date") {
+    return /(delivery|deliver|arrival|arrive|date|lead time|liefer|zustell|ankunft|livraison|consegna)/i.test(
+      q,
+    );
+  }
+  return /(shipping|freight|delivery cost|cost|included|versand|porto|frais|expédition|spedizione)/i.test(
+    q,
+  );
+}
+
+function inferLocalReplySignals(
+  reply: string,
+  openQuestions: string[] = [],
+): {
+  checklist: ReplyChecklist;
+  lead_time_days: number | null;
+  shipping_cost_eur: number | null;
+  answered_open_questions: string[];
+  answered_fields: ChecklistField[];
+} {
+  const text = reply.trim();
+  const lower = text.toLowerCase();
+  const orderConfirmed =
+    /\b(sounds good|looks good|confirmed?|confirm(?:ed)?|ok(?:ay)?|yes|accepted?|go ahead|passt|einverstanden|bestätigt|ja\b|d'accord|oui\b|va bene|confermiamo)\b/i.test(
+      text,
+    );
+
+  let deliveryDate: string | null = null;
+  let leadTimeDays: number | null = null;
+  const leadMatch =
+    text.match(
+      /\b(?:arriv\w*|deliver\w*|delivery|lead time|ships?|ship\w*)?\s*(?:within|inside|in|by)\s+(\d{1,3})\s*(business|working|calendar)?\s*(day|days|week|weeks)\b/i,
+    ) ?? text.match(/\b(\d{1,3})\s*(business|working|calendar)?\s*(day|days|week|weeks)\b/i);
+  if (leadMatch) {
+    const n = Number(leadMatch[1]);
+    const unit = leadMatch[3]?.toLowerCase() ?? "days";
+    leadTimeDays = unit.startsWith("week") ? n * 7 : n;
+    deliveryDate = leadMatch[0].trim();
+  } else {
+    const dateMatch = text.match(
+      /\b(?:\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i,
+    );
+    if (dateMatch && /(arriv|deliver|delivery|ship|liefer|livraison|consegna|date)/i.test(lower)) {
+      deliveryDate = dateMatch[0].trim();
+    }
+  }
+
+  let shippingCost: string | null = null;
+  let shippingCostEur: number | null = null;
+  if (
+    /(no\s+(?:extra\s+)?(?:shipping|delivery|freight)\s+costs?|no\s+cost\s+for\s+shipping|shipping\s+(?:is\s+)?(?:free|included)|free\s+shipping|delivery\s+(?:is\s+)?included|included\s+shipping|versandkostenfrei|versand\s+(?:ist\s+)?(?:inklusive|inbegriffen)|port\s+inclus|frais\s+de\s+port\s+offerts|sans\s+frais\s+de\s+port|spedizione\s+(?:gratuita|inclusa))/i.test(
+      text,
+    )
+  ) {
+    shippingCost = "included / no shipping cost";
+    shippingCostEur = 0;
+  } else {
+    const shipAmount = text.match(
+      /(?:shipping|delivery|freight|versand|porto|frais\s+de\s+port|spedizione)[^\n.]{0,40}?(€|eur|chf)?\s*(\d+(?:[.,]\d{1,2})?)/i,
+    );
+    if (shipAmount) {
+      shippingCost = shipAmount[0].trim();
+      shippingCostEur = parseNumberLike(shipAmount[2]);
+    }
+  }
+
+  const answeredFields: ChecklistField[] = [];
+  if (deliveryDate) answeredFields.push("delivery_date");
+  if (shippingCost) answeredFields.push("shipping_cost");
+  const answeredOpen = openQuestions.filter((q) =>
+    answeredFields.some((field) => questionMentionsField(q, field)),
+  );
+
   return {
-    verdict,
-    summary,
-    lead_time: null,
-    issues,
-    checklist: { ...EMPTY_CHECKLIST },
-    missing_checklist: ["delivery_date", "shipping_cost"],
+    checklist: {
+      order_confirmed: orderConfirmed,
+      delivery_date: deliveryDate,
+      shipping_cost: shippingCost,
+    },
+    lead_time_days: leadTimeDays,
+    shipping_cost_eur: shippingCostEur,
+    answered_open_questions: answeredOpen,
+    answered_fields: answeredFields,
+  };
+}
+
+function heuristicClassification(
+  reply: string,
+  openQuestions: string[],
+  priorAnswered: ChecklistField[],
+): ReplyClassification {
+  const local = inferLocalReplySignals(reply, openQuestions);
+  const missing = deriveMissing(local.checklist).filter((f) => !priorAnswered.includes(f));
+  const answeredOpenSet = new Set(local.answered_open_questions);
+  const answeredAnything =
+    local.checklist.order_confirmed ||
+    local.answered_fields.length > 0 ||
+    local.answered_open_questions.length > 0;
+  return {
+    verdict: answeredAnything ? "fully_confirmed" : "unclear",
+    summary: answeredAnything
+      ? "Supplier reply was parsed locally because the AI classifier was unavailable."
+      : "AI classifier unavailable and no checklist answer could be extracted locally.",
+    summary_en: answeredAnything
+      ? "Supplier reply was parsed locally because the AI classifier was unavailable."
+      : "AI classifier unavailable and no checklist answer could be extracted locally.",
+    reply_language: "en",
+    lead_time: local.checklist.delivery_date,
+    lead_time_days: local.lead_time_days,
+    shipping_cost_eur: local.shipping_cost_eur,
+    wants_human: false,
+    issues: [],
+    checklist: local.checklist,
+    missing_checklist: missing,
+    answerable_questions: [],
+    unanswerable_questions: [],
+    unclear_points: [],
+    unclear_points_en: [],
+    answered_open_questions: local.answered_open_questions,
+    still_open_questions: openQuestions.filter((q) => !answeredOpenSet.has(q)),
+    suggested_outbound: missing.length ? "checklist_followup" : "confirm",
   };
 }
 
@@ -280,19 +405,15 @@ export async function classifyReply(args: {
   supplierReply: string;
   thread?: ThreadContext;
 }): Promise<ReplyClassification> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    return fallbackClassification(
-      "unclear",
-      "LOVABLE_API_KEY missing — cannot classify reply.",
-      ["AI classifier unavailable"],
-    );
-  }
-
   const openQs = args.thread?.priorOpenQuestions ?? [];
   const answeredChk = args.thread?.priorAnsweredChecklist ?? [];
   const priorAnswers = args.thread?.priorAnswersSummary ?? [];
   const transcript = args.thread?.transcript ?? [];
+  const localSignals = inferLocalReplySignals(args.supplierReply, openQs);
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) {
+    return heuristicClassification(args.supplierReply, openQs, answeredChk);
+  }
 
   const transcriptBlock = transcript.length
     ? `FULL CONVERSATION TRANSCRIPT (oldest → newest, excluding the LATEST reply below):\n` +
@@ -311,9 +432,7 @@ export async function classifyReply(args: {
     `OPEN QUESTION FROM AGENT (the supplier is expected to address these — copy verbatim into answered_open_questions / still_open_questions):\n` +
     (openQs.length ? openQs.map((q, i) => `  ${i + 1}. ${q}`).join("\n") : "  (none)") +
     `\nALREADY ANSWERED IN PRIOR TURNS (do NOT re-flag these as missing or unclear):\n` +
-    (answeredChk.length
-      ? answeredChk.map((f) => `  - ${f}`).join("\n")
-      : "  (none)") +
+    (answeredChk.length ? answeredChk.map((f) => `  - ${f}`).join("\n") : "  (none)") +
     (priorAnswers.length
       ? `\nFACTS ALREADY GIVEN BY SUPPLIER:\n` + priorAnswers.map((a) => `  - ${a}`).join("\n")
       : "") +
@@ -327,7 +446,16 @@ export async function classifyReply(args: {
       parameters: {
         type: "object",
         properties: {
-          verdict: { type: "string", enum: ["fully_confirmed", "confirmed_with_issue", "declined", "needs_clarification", "unclear"] },
+          verdict: {
+            type: "string",
+            enum: [
+              "fully_confirmed",
+              "confirmed_with_issue",
+              "declined",
+              "needs_clarification",
+              "unclear",
+            ],
+          },
           summary: { type: "string" },
           summary_en: { type: "string" },
           reply_language: { type: "string" },
@@ -345,7 +473,10 @@ export async function classifyReply(args: {
             },
             required: ["order_confirmed", "delivery_date", "shipping_cost"],
           },
-          missing_checklist: { type: "array", items: { type: "string", enum: ["delivery_date", "shipping_cost"] } },
+          missing_checklist: {
+            type: "array",
+            items: { type: "string", enum: ["delivery_date", "shipping_cost"] },
+          },
           answerable_questions: { type: "array", items: { type: "string" } },
           unanswerable_questions: { type: "array", items: { type: "string" } },
           unclear_points: { type: "array", items: { type: "string" } },
@@ -354,7 +485,15 @@ export async function classifyReply(args: {
           still_open_questions: { type: "array", items: { type: "string" } },
           suggested_outbound: { type: "string" },
         },
-        required: ["verdict", "summary", "summary_en", "checklist", "missing_checklist", "answered_open_questions", "still_open_questions"],
+        required: [
+          "verdict",
+          "summary",
+          "summary_en",
+          "checklist",
+          "missing_checklist",
+          "answered_open_questions",
+          "still_open_questions",
+        ],
       },
     },
   };
@@ -387,7 +526,13 @@ export async function classifyReply(args: {
     if (!res.ok) {
       const t = await res.text();
       console.error("classifyReply gateway error", res.status, t);
-      return fallbackClassification("unclear", "AI gateway error", [t.slice(0, 200)]);
+      const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
+      return {
+        ...fallback,
+        issues: fallback.verdict === "unclear" ? [t.slice(0, 200)] : [],
+        summary: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary,
+        summary_en: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary_en,
+      };
     }
     const data = (await res.json()) as {
       choices?: Array<{
@@ -398,37 +543,38 @@ export async function classifyReply(args: {
       }>;
     };
     const msg = data.choices?.[0]?.message;
-    const argsStr =
-      msg?.tool_calls?.[0]?.function?.arguments ??
-      msg?.content ??
-      "{}";
-    const parsed = JSON.parse(argsStr) as Partial<ReplyClassification> & { unclear_points_en?: string[] };
-    const checklist = normalizeChecklist(parsed.checklist);
+    const argsStr = msg?.tool_calls?.[0]?.function?.arguments ?? msg?.content ?? "{}";
+    const parsed = JSON.parse(argsStr) as Partial<ReplyClassification> & {
+      unclear_points_en?: string[];
+    };
+    const modelChecklist = normalizeChecklist(parsed.checklist);
+    const checklist: ReplyChecklist = {
+      order_confirmed: modelChecklist.order_confirmed || localSignals.checklist.order_confirmed,
+      delivery_date: modelChecklist.delivery_date ?? localSignals.checklist.delivery_date,
+      shipping_cost: modelChecklist.shipping_cost ?? localSignals.checklist.shipping_cost,
+    };
     // Anything the supplier already answered in prior turns stays answered, even
     // if the model's missing_checklist regresses it.
     const stillMissingByPriorAnswers = (f: ChecklistField) => !answeredChk.includes(f);
     const missing =
       Array.isArray(parsed.missing_checklist) && parsed.missing_checklist.length >= 0
-        ? (parsed.missing_checklist.filter((f) =>
-            f === "delivery_date" || f === "shipping_cost",
+        ? (parsed.missing_checklist.filter(
+            (f) => f === "delivery_date" || f === "shipping_cost",
           ) as ChecklistField[])
         : deriveMissing(checklist);
     const reconciled = missing
       .filter((f) => checklist[f] == null)
       .filter(stillMissingByPriorAnswers);
     const summary = parsed.summary ?? "";
-    const parseNum = (v: unknown): number | null => {
-      if (v == null) return null;
-      if (typeof v === "number" && Number.isFinite(v)) return v;
-      const n = parseFloat(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
-      return Number.isFinite(n) ? n : null;
-    };
 
     // Sanitise answered/still open: must be a subset of priorOpenQuestions.
     const openSet = new Set(openQs);
-    const answeredOpen = Array.isArray(parsed.answered_open_questions)
+    const modelAnsweredOpen = Array.isArray(parsed.answered_open_questions)
       ? parsed.answered_open_questions.map(String).filter((q) => openSet.has(q))
       : [];
+    const answeredOpen = Array.from(
+      new Set([...modelAnsweredOpen, ...localSignals.answered_open_questions]),
+    );
     const answeredOpenSet = new Set(answeredOpen);
     const stillOpenModel = Array.isArray(parsed.still_open_questions)
       ? parsed.still_open_questions.map(String).filter((q) => openSet.has(q))
@@ -443,14 +589,16 @@ export async function classifyReply(args: {
       : [];
     const unclearPoints = unclearPointsRaw
       .filter((p) => !answeredOpenSet.has(p))
+      .filter((p) => !localSignals.answered_fields.some((field) => questionMentionsField(p, field)))
       .slice(0, 6);
     const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
       ? parsed.unclear_points_en.map(String).filter(Boolean)
       : [];
     // Align EN array to native array length when model returns mismatched arrays.
-    const unclearPointsEn = unclearPointsEnRaw.length === unclearPoints.length
-      ? unclearPointsEnRaw
-      : unclearPoints.map((p, i) => unclearPointsEnRaw[i] ?? p);
+    const unclearPointsEn =
+      unclearPointsEnRaw.length === unclearPoints.length
+        ? unclearPointsEnRaw
+        : unclearPoints.map((p, i) => unclearPointsEnRaw[i] ?? p);
 
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
@@ -458,8 +606,12 @@ export async function classifyReply(args: {
       summary_en: parsed.summary_en?.toString().trim() || summary,
       reply_language: parsed.reply_language?.toString().toLowerCase().slice(0, 5) || null,
       lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
-      lead_time_days: parseNum((parsed as { lead_time_days?: unknown }).lead_time_days),
-      shipping_cost_eur: parseNum((parsed as { shipping_cost_eur?: unknown }).shipping_cost_eur),
+      lead_time_days:
+        parseNumberLike((parsed as { lead_time_days?: unknown }).lead_time_days) ??
+        localSignals.lead_time_days,
+      shipping_cost_eur:
+        parseNumberLike((parsed as { shipping_cost_eur?: unknown }).shipping_cost_eur) ??
+        localSignals.shipping_cost_eur,
       wants_human: Boolean((parsed as { wants_human?: unknown }).wants_human),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       checklist,
@@ -479,7 +631,15 @@ export async function classifyReply(args: {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("classifyReply failed", message);
-    return fallbackClassification("unclear", "Classifier exception", [message]);
+    const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
+    return fallback.verdict === "unclear"
+      ? {
+          ...fallback,
+          summary: "Classifier exception",
+          summary_en: "Classifier exception",
+          issues: [message],
+        }
+      : fallback;
   }
 }
 
@@ -513,7 +673,13 @@ export async function verifySvixSignature(args: {
     keyBytes = new TextEncoder().encode(raw).buffer as ArrayBuffer;
   }
   const toSign = `${id}.${timestamp}.${body}`;
-  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
   const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(toSign));
   const expected = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
 
@@ -634,7 +800,8 @@ export async function verifyAnsweredQuestions(args: {
     type: "function" as const,
     function: {
       name: "report_answers",
-      description: "Report which open questions are answered, with evidence quoted from the supplier.",
+      description:
+        "Report which open questions are answered, with evidence quoted from the supplier.",
       parameters: {
         type: "object",
         properties: {
@@ -643,8 +810,14 @@ export async function verifyAnsweredQuestions(args: {
             items: {
               type: "object",
               properties: {
-                question: { type: "string", description: "Exact verbatim copy of the open question (English)." },
-                evidence: { type: "string", description: "Short phrase quoted from the supplier that answers it." },
+                question: {
+                  type: "string",
+                  description: "Exact verbatim copy of the open question (English).",
+                },
+                evidence: {
+                  type: "string",
+                  description: "Short phrase quoted from the supplier that answers it.",
+                },
                 confidence: { type: "number", description: "0..1" },
               },
               required: ["question", "evidence", "confidence"],
