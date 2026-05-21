@@ -646,11 +646,13 @@ function HeroView({
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-2xl">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-center">
-
-          What do you need on site?
+          Do you need site supplies?
         </h1>
         <p className="mt-3 text-center text-muted-foreground">
-          Speak it, snap a photo, or type — we'll figure out what you need.
+          Order PPE, gloves, masks, batteries, drill bits, screws, sealants and other small tools — fast.
+        </p>
+        <p className="mt-2 text-center text-xs text-muted-foreground/80">
+          C-materials only. For concrete, doors, windows or other A-materials, talk to your PM.
         </p>
 
 
