@@ -1793,5 +1793,5 @@ function SearchResultCard({ result }: { result: HybridSearchResult }) {
   );
 }
 
-export type {};
+
 
