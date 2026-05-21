@@ -323,7 +323,7 @@ function Home() {
       const p = products.find((x) => x.sku === sku);
       if (!p) return;
       const qty = (args.quantity as number) || 1;
-      cart.add({ productId: p.sku, name: p.name, price: p.price, qty, category: p.category, unit: p.unit });
+      cart.add({ productId: p.sku, name: p.name, price: p.price, qty, category: p.category, unit: p.unit, supplier: p.supplier });
       toast.success(`Added ${qty}× ${p.name} to cart`);
     } else if (name === "flag_as_a_material") {
       setAMaterialFlag((args.what_they_asked_for as string) || "this item");
