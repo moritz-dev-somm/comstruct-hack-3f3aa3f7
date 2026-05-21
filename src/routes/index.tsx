@@ -1020,9 +1020,14 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     const created = orders.createFromCart(cart.items);
     cart.clear();
     onClose();
-    if (created.tier === "auto") toast.success(`${created.id} sent to supplier`);
-    else if (created.tier === "pm") toast.success(`${created.id} sent to ${PM.name} for approval`);
-    else toast.success(`${created.id} sent to ${CENTRAL.name} for approval`);
+    // Generate the EU-standard PO PDF and trigger a download for the foreman.
+    // The supervisor can re-download it from /procurement/orders later.
+    import("@/lib/po-pdf").then(({ downloadPurchaseOrderPdf }) => {
+      downloadPurchaseOrderPdf(created);
+    });
+    if (created.tier === "auto") toast.success(`${created.id} sent to supplier · PO PDF downloaded`);
+    else if (created.tier === "pm") toast.success(`${created.id} sent to ${PM.name} for approval · PO PDF downloaded`);
+    else toast.success(`${created.id} sent to ${CENTRAL.name} for approval · PO PDF downloaded`);
     navigate({ to: "/orders" });
   }
 

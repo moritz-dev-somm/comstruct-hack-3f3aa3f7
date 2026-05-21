@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { FileText, Download } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, STATUS_META, type OrderStatus } from "@/lib/orders";
+import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from "@/lib/po-pdf";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/orders")({
@@ -73,14 +75,30 @@ function OrdersOverview() {
                 <td className="px-4 py-2.5"><StatusPill status={o.status} /></td>
                 <td className="px-4 py-2.5 text-muted-foreground text-xs">{new Date(o.createdAt).toLocaleString()}</td>
                 <td className="px-4 py-2.5 text-right">
-                  {o.status === "ordered" && (
+                  <div className="inline-flex items-center gap-3 justify-end">
                     <button
-                      onClick={() => advanceToDelivered(o.id)}
-                      className="text-xs font-medium text-brand hover:underline"
+                      onClick={() => openPurchaseOrderPdf(o)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      title="View PO PDF"
                     >
-                      Mark delivered
+                      <FileText className="size-3.5" /> PDF
                     </button>
-                  )}
+                    <button
+                      onClick={() => downloadPurchaseOrderPdf(o)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      title="Download PO PDF"
+                    >
+                      <Download className="size-3.5" />
+                    </button>
+                    {o.status === "ordered" && (
+                      <button
+                        onClick={() => advanceToDelivered(o.id)}
+                        className="text-xs font-medium text-brand hover:underline"
+                      >
+                        Mark delivered
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
