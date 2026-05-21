@@ -98,8 +98,8 @@ function buildThreads(messages: InboxMessage[], inboxAddress: string): Thread[] 
   }
 
   for (const t of byKey.values()) {
-    // Sort messages oldest → newest so threads read naturally top-down.
-    t.messages.sort((a, b) => (a.receivedAt > b.receivedAt ? 1 : -1));
+    // Sort messages newest → oldest so the latest reply is always on top.
+    t.messages.sort((a, b) => (a.receivedAt > b.receivedAt ? -1 : 1));
     // Supplier name = the first non-inbox party we see.
     const supplier = t.messages
       .map((m) => (isOutbound(m, inboxAddress) ? (m.to?.[0] ?? "") : m.from))
