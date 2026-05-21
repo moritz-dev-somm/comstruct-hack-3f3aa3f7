@@ -778,7 +778,10 @@ function ProductCard({
           </div>
         )}
 
-        <ProductImage sku={product.sku} name={product.name} className="shrink-0 w-28 h-28 sm:w-32 sm:h-32" />
+        <div className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-muted/50 rounded grid place-items-center text-4xl">
+          📦
+        </div>
+
 
 
         <div className="flex-1 min-w-0 flex flex-col">
