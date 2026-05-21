@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { FileText, Download } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, STATUS_META, type OrderStatus } from "@/lib/orders";
+import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from "@/lib/po-pdf";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/orders")({
