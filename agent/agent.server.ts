@@ -126,38 +126,30 @@ export type SuggestedOutbound =
   | "escalate_silent";
 
 export type ReplyClassification = {
-  /** Overall verdict on the reply. */
   verdict:
     | "fully_confirmed"
     | "confirmed_with_issue"
     | "declined"
     | "needs_clarification"
     | "unclear";
-  /** Short summary in the supplier's language (mirrors summary_en for legacy). */
   summary: string;
-  /** Always-English 1–2 sentence summary, used in procurement UI. */
   summary_en?: string;
-  /** ISO 639-1 of the supplier reply (de, fr, it, en, …). null if unknown. */
   reply_language?: string | null;
-  /** Extracted delivery time / lead time string if mentioned. */
   lead_time: string | null;
-  /** Concrete list of issues that require user attention. */
+  /** Lead time normalised to days (best effort). */
+  lead_time_days?: number | null;
+  /** Shipping cost normalised to EUR (best effort). 0 means included/free. */
+  shipping_cost_eur?: number | null;
+  /** True if the supplier explicitly asks to talk to a human / sales rep. */
+  wants_human?: boolean;
   issues: string[];
-  /** Structured extraction of the fields we asked for in the initial PO. */
   checklist: ReplyChecklist;
-  /** Fields from the initial PO request that the supplier has not answered yet. */
   missing_checklist: ChecklistField[];
-  /** Questions we can confidently answer from order / company context. */
   answerable_questions?: string[];
-  /** Questions that require a human to answer. */
   unanswerable_questions?: string[];
-  /** Specific vague points / unanswered items we should re-ask the supplier about. */
   unclear_points?: string[];
-  /** Hint from the classifier as to which outbound action fits. Policy may override. */
   suggested_outbound?: SuggestedOutbound;
-  /** Number of automated targeted follow-ups already sent for the missing fields. */
   followup_count?: number;
-  /** Number of clarification requests already sent for unclear replies. */
   clarification_count?: number;
 };
 
