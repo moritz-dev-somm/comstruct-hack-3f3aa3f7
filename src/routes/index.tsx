@@ -678,11 +678,13 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
 }
 
 /* -------------------------------------------------------------------------- */
-/* Assistant content: splits prose around [[product:SKU]] tokens and renders  */
-/* an inline product bubble in place of each token.                           */
+/* Assistant content: renders markdown, with [[product:SKU:QTY]] tokens       */
+/* replaced by inline product pills.                                          */
 /* -------------------------------------------------------------------------- */
 
-const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+// Marker we inject as inline `code` so markdown parsing preserves it.
+const TOKEN_PREFIX = "§§PROD§§";
 
 function AssistantContent({
   content,
@@ -691,47 +693,45 @@ function AssistantContent({
   content: string;
   products: Product[];
 }) {
-  const nodes = useMemo(() => {
-    const out: React.ReactNode[] = [];
-    let last = 0;
-    let m: RegExpExecArray | null;
-    PRODUCT_TOKEN_RE.lastIndex = 0;
-    while ((m = PRODUCT_TOKEN_RE.exec(content)) !== null) {
-      if (m.index > last) {
-        out.push(
-          <span key={`t-${last}`} className="whitespace-pre-wrap">
-            {content.slice(last, m.index)}
-          </span>,
-        );
-      }
-      const sku = m[1];
-      const p = products.find((x) => x.sku === sku);
-      if (p) {
-        out.push(<InlineProductBubble key={`p-${m.index}-${sku}`} product={p} />);
-      } else {
-        // Token streamed but product not loaded yet — fall back to the SKU.
-        out.push(
-          <span
-            key={`u-${m.index}-${sku}`}
-            className="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-          >
-            {sku}
-          </span>,
-        );
-      }
-      last = m.index + m[0].length;
-    }
-    if (last < content.length) {
-      out.push(
-        <span key={`t-end-${last}`} className="whitespace-pre-wrap">
-          {content.slice(last)}
-        </span>,
-      );
-    }
-    return out;
-  }, [content, products]);
+  const prepared = useMemo(
+    () =>
+      content.replace(PRODUCT_TOKEN_RE, (_m, sku, qty) =>
+        `\`${TOKEN_PREFIX}${sku}:${qty ?? ""}\``,
+      ),
+    [content],
+  );
 
-  return <>{nodes}</>;
+  return (
+    <div className="prose prose-sm max-w-none prose-headings:font-bold prose-headings:text-foreground prose-p:my-2 prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-em:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:marker:text-brand prose-h1:text-lg prose-h2:text-base prose-h3:text-[15px] prose-a:text-brand">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ children, className, ...rest }) {
+            const raw = String(children ?? "");
+            if (raw.startsWith(TOKEN_PREFIX)) {
+              const body = raw.slice(TOKEN_PREFIX.length);
+              const [sku, qtyStr] = body.split(":");
+              const qty = qtyStr ? parseInt(qtyStr, 10) : undefined;
+              const p = products.find((x) => x.sku === sku);
+              if (p) return <InlineProductBubble product={p} suggestedQty={qty} />;
+              return (
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {sku}
+                </span>
+              );
+            }
+            return (
+              <code className={className} {...rest}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {prepared}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function InlineProductBubble({ product }: { product: Product }) {
