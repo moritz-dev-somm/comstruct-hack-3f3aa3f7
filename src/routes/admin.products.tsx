@@ -31,21 +31,67 @@ const EMPTY: Draft = {
   source_category: "",
 };
 
+type SortKey = "sku" | "name" | "category" | "price";
+type SortDir = "asc" | "desc";
+
 function AdminProducts() {
   const { data: products = [], isLoading } = useProducts();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Product | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [filter, setFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("sku");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const filtered = products.filter(
-    (p) =>
-      !filter ||
-      p.name.toLowerCase().includes(filter.toLowerCase()) ||
-      p.sku.toLowerCase().includes(filter.toLowerCase()) ||
-      p.category.toLowerCase().includes(filter.toLowerCase()),
-  );
+  const suppliers = useMemo(() => {
+    const s = new Set<string>();
+    products.forEach((p) => p.supplier && s.add(p.supplier));
+    return Array.from(s).sort();
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    const min = parseFloat(priceMin);
+    const max = parseFloat(priceMax);
+    const q = filter.toLowerCase();
+    const rows = products.filter((p) => {
+      if (q && !p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q) && !p.category.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (supplierFilter !== "all" && (p.supplier ?? "") !== supplierFilter) return false;
+      if (!isNaN(min) && p.price < min) return false;
+      if (!isNaN(max) && p.price > max) return false;
+      return true;
+    });
+    rows.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "price": cmp = a.price - b.price; break;
+        case "category": cmp = a.category.localeCompare(b.category); break;
+        case "name": cmp = a.name.localeCompare(b.name); break;
+        default: cmp = a.sku.localeCompare(b.sku);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [products, filter, categoryFilter, supplierFilter, priceMin, priceMax, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  }
+
+  function clearFilters() {
+    setFilter(""); setCategoryFilter("all"); setSupplierFilter("all");
+    setPriceMin(""); setPriceMax("");
+  }
+
+  const hasActiveFilters = filter || categoryFilter !== "all" || supplierFilter !== "all" || priceMin || priceMax;
 
   function openNew() {
     setEditing(null);
@@ -131,12 +177,57 @@ function AdminProducts() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
-        <input
-          placeholder="Search SKU, name, category…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="w-full h-10 rounded-md border bg-card px-3 text-sm mb-3"
-        />
+        <div className="rounded-lg border bg-card p-3 mb-3 space-y-2">
+          <input
+            placeholder="Search SKU, name, category…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+          />
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="all">All categories</option>
+              {SITE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="all">All suppliers</option>
+              {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <input
+              type="number"
+              placeholder="Min €"
+              value={priceMin}
+              onChange={(e) => setPriceMin(e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Max €"
+              value={priceMax}
+              onChange={(e) => setPriceMax(e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            />
+            <button
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="h-9 rounded-md border text-sm font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Clear filters
+            </button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Showing {filtered.length} of {products.length}
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : (
@@ -144,14 +235,17 @@ function AdminProducts() {
             <table className="w-full text-sm">
               <thead className="bg-muted text-muted-foreground text-xs uppercase">
                 <tr>
-                  <th className="text-left px-3 py-2">SKU</th>
-                  <th className="text-left px-3 py-2">Name</th>
-                  <th className="text-left px-3 py-2">Category</th>
-                  <th className="text-right px-3 py-2">€</th>
+                  <SortableTh label="SKU" active={sortKey === "sku"} dir={sortDir} onClick={() => toggleSort("sku")} />
+                  <SortableTh label="Name" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} />
+                  <SortableTh label="Category" active={sortKey === "category"} dir={sortDir} onClick={() => toggleSort("category")} />
+                  <SortableTh label="€" align="right" active={sortKey === "price"} dir={sortDir} onClick={() => toggleSort("price")} />
                   <th className="px-3 py-2"></th>
                 </tr>
               </thead>
               <tbody>
+                {filtered.length === 0 && (
+                  <tr><td colSpan={5} className="text-center text-muted-foreground py-10">No products match these filters.</td></tr>
+                )}
                 {filtered.map((p) => (
                   <tr key={p.sku} className="border-t hover:bg-accent/50">
                     <td className="px-3 py-2 font-mono text-xs">{p.sku}</td>
@@ -170,13 +264,22 @@ function AdminProducts() {
                     </td>
                     <td className="px-3 py-2 text-right font-semibold">{p.price.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => remove(p)}
-                        className="size-7 grid place-items-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+                      <div className="inline-flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="inline-flex items-center gap-1 h-7 px-2 rounded text-xs font-medium border hover:bg-accent"
+                          aria-label="Update"
+                        >
+                          <Pencil className="size-3.5" /> Update
+                        </button>
+                        <button
+                          onClick={() => remove(p)}
+                          className="size-7 grid place-items-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
