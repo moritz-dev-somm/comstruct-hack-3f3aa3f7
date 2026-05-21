@@ -51,7 +51,17 @@ function CatalogAdmin() {
             {products.slice(0, 50).map((p) => (
               <tr key={p.sku} className="border-t hover:bg-accent/30">
                 <td className="px-4 py-2 font-mono text-xs">{p.sku}</td>
-                <td className="px-4 py-2">{p.name}</td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-2.5">
+                    <ProductImage
+                      src={p.imageUrl}
+                      alt={p.name}
+                      className="size-9 rounded overflow-hidden border"
+                      fallbackClassName="size-9 rounded bg-muted/50 text-sm border"
+                    />
+                    <span>{p.name}</span>
+                  </div>
+                </td>
                 <td className="px-4 py-2 text-muted-foreground">{p.category}</td>
                 <td className="px-4 py-2 text-muted-foreground">{p.supplier ?? "—"}</td>
                 <td className="px-4 py-2 text-muted-foreground">{p.unit}</td>
