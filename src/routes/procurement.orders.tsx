@@ -33,6 +33,8 @@ function OrdersOverview() {
   const navigate = useNavigate();
   const { data: suppliers } = useSuppliers();
   const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
+  const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
+  const negotiationsByOrder = useNegotiationsByOrder(orderIds);
 
   const filtered = useMemo(
     () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
