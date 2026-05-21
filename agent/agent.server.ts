@@ -24,8 +24,8 @@ export const HARDCODED_SUPPLIER_EMAIL = "nicholas.r.kessler@gmail.com";
 export const HARDCODED_SUPPLIER_NAME = "Kessler Bauhandel (test)";
 
 function publicBaseUrl(): string {
-  // Stable Lovable URLs (prefer published; preview also works).
-  return "https://comstruct-hack.lovable.app";
+  // PUBLIC_APP_URL allows non-Lovable deploys to register the correct webhook.
+  return process.env.PUBLIC_APP_URL ?? "https://comstruct-hack.lovable.app";
 }
 
 export function webhookUrl(): string {
@@ -116,16 +116,29 @@ export type ReplyChecklist = {
   shipping_cost: string | null;
 };
 
+export type SuggestedOutbound =
+  | "confirm"
+  | "checklist_followup"
+  | "answer_questions"
+  | "request_clarification"
+  | "acknowledge_decline"
+  | "acknowledge_issues"
+  | "escalate_silent";
+
 export type ReplyClassification = {
   /** Overall verdict on the reply. */
   verdict:
-    | "fully_confirmed" // accepted, no caveats → auto-confirm
-    | "confirmed_with_issue" // accepted but with delay/price-change/partial → needs human
-    | "declined" // refused → needs human
-    | "needs_clarification" // asked us a question → needs human
-    | "unclear"; // couldn't tell → needs human
-  /** Short human summary of the supplier's reply. */
+    | "fully_confirmed"
+    | "confirmed_with_issue"
+    | "declined"
+    | "needs_clarification"
+    | "unclear";
+  /** Short summary in the supplier's language (mirrors summary_en for legacy). */
   summary: string;
+  /** Always-English 1–2 sentence summary, used in procurement UI. */
+  summary_en?: string;
+  /** ISO 639-1 of the supplier reply (de, fr, it, en, …). null if unknown. */
+  reply_language?: string | null;
   /** Extracted delivery time / lead time string if mentioned. */
   lead_time: string | null;
   /** Concrete list of issues that require user attention. */
@@ -134,26 +147,52 @@ export type ReplyClassification = {
   checklist: ReplyChecklist;
   /** Fields from the initial PO request that the supplier has not answered yet. */
   missing_checklist: ChecklistField[];
+  /** Questions we can confidently answer from order / company context. */
+  answerable_questions?: string[];
+  /** Questions that require a human to answer. */
+  unanswerable_questions?: string[];
+  /** Hint from the classifier as to which outbound action fits. Policy may override. */
+  suggested_outbound?: SuggestedOutbound;
   /** Number of automated targeted follow-ups already sent for the missing fields. */
   followup_count?: number;
+  /** Number of clarification requests already sent for unclear replies. */
+  clarification_count?: number;
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
+The reply may be in any language (commonly en, de, fr, it). Do NOT require English.
 
 Decide the verdict strictly:
 - "fully_confirmed": supplier accepts ALL items at the proposed prices AND raises NO issues, NO delays, NO price changes, NO partial availability, NO questions. The delivery date or shipping cost MAY be missing — that is handled separately via the checklist.
 - "confirmed_with_issue": supplier accepts but mentions ANY of: delay, longer lead time, partial availability, price change, substitution, shipping surcharge that exceeds expectations, stock issue, anything that procurement should review.
 - "declined": supplier refuses or cannot fulfil.
-- "needs_clarification": supplier asks us a question or requests info from us (e.g. asks for our VAT ID or delivery address).
+- "needs_clarification": supplier asks us a question or requests info from us (e.g. asks for our VAT ID, delivery address, payment terms, line-item details).
 - "unclear": you cannot tell.
 Be conservative: if in doubt between fully_confirmed and confirmed_with_issue, choose confirmed_with_issue.
 
-In addition, extract a structured checklist of the two fields our initial PO explicitly asked for:
-- delivery_date: the earliest committed delivery date or lead time the supplier states. Normalize to a short string like "2026-06-04" or "2 weeks". Null if not stated.
-- shipping_cost: how the supplier expressed shipping. Use "included" if they say shipping is included or free, "€0" if explicitly zero, or the literal stated amount (e.g. "CHF 45"). Null if not mentioned at all.
-- order_confirmed: true if the supplier accepts the order in some form (fully_confirmed or confirmed_with_issue), false otherwise.
+Extract the checklist:
+- delivery_date: earliest committed delivery date or lead time, normalised to "YYYY-MM-DD" or e.g. "2 weeks". Null if not stated.
+- shipping_cost: "included", "€0", or the literal amount (e.g. "CHF 45"). Null if not mentioned.
+- order_confirmed: true if the supplier accepts the order in some form, false otherwise.
+List any of ["delivery_date","shipping_cost"] still null in missing_checklist.
 
-Then list any of ["delivery_date", "shipping_cost"] that are still null/missing in missing_checklist.
+Always provide:
+- reply_language: ISO 639-1 of the supplier reply (e.g. "de", "fr", "it", "en"). Best guess.
+- summary: 1–2 sentences in the SUPPLIER'S language (or English if unknown).
+- summary_en: ALWAYS English, 1–2 sentences, for the procurement UI.
+
+If the supplier asks us questions, split them:
+- answerable_questions: questions we can answer from purchase-order data (delivery address, VAT ID, payment terms, line items, contact, project reference). Use the supplier's own wording, translated to English.
+- unanswerable_questions: questions that need a human (custom discounts, off-PO terms, anything we don't know).
+
+Finally pick suggested_outbound (the policy layer may still override):
+- "confirm" when fully_confirmed AND missing_checklist is empty AND no issues
+- "checklist_followup" when fully_confirmed but missing_checklist has fields
+- "answer_questions" when needs_clarification AND answerable_questions is non-empty
+- "request_clarification" when verdict is "unclear"
+- "acknowledge_decline" when declined
+- "acknowledge_issues" when confirmed_with_issue
+- "escalate_silent" otherwise
 
 Always reply with strict JSON matching the schema. No prose.`;
 
@@ -214,9 +253,7 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, lead_time, issues, checklist, missing_checklist.\n` +
-          `checklist must be an object with keys order_confirmed (boolean), delivery_date (string|null), shipping_cost (string|null).\n` +
-          `missing_checklist must be an array containing any of "delivery_date" or "shipping_cost" that are still null.`,
+          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, suggested_outbound.`,
       },
     ],
     response_format: { type: "json_object" },
@@ -241,22 +278,30 @@ export async function classifyReply(args: {
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as Partial<ReplyClassification>;
     const checklist = normalizeChecklist(parsed.checklist);
-    // Trust the model's missing_checklist when present, else derive from checklist.
     const missing =
       Array.isArray(parsed.missing_checklist) && parsed.missing_checklist.length >= 0
         ? (parsed.missing_checklist.filter((f) =>
             f === "delivery_date" || f === "shipping_cost",
           ) as ChecklistField[])
         : deriveMissing(checklist);
-    // Reconcile: if checklist has a value but model claims it's missing, drop it.
     const reconciled = missing.filter((f) => checklist[f] == null);
+    const summary = parsed.summary ?? "";
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
-      summary: parsed.summary ?? "",
+      summary,
+      summary_en: parsed.summary_en?.toString().trim() || summary,
+      reply_language: parsed.reply_language?.toString().toLowerCase().slice(0, 5) || null,
       lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       checklist,
       missing_checklist: reconciled,
+      answerable_questions: Array.isArray(parsed.answerable_questions)
+        ? parsed.answerable_questions.map(String).filter(Boolean)
+        : [],
+      unanswerable_questions: Array.isArray(parsed.unanswerable_questions)
+        ? parsed.unanswerable_questions.map(String).filter(Boolean)
+        : [],
+      suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

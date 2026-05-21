@@ -487,3 +487,216 @@ export function composeFollowupEmail(
 
   return { subject, text, html };
 }
+
+/* ============================================================
+   Additional outbound composers used by the inbound policy layer.
+   All bilingual when supplier language is not English.
+   ============================================================ */
+
+type SimpleStrings = {
+  subject: string;
+  greeting: string;
+  body: (orderId: string) => string;
+  sign: string;
+};
+
+function renderSimple(s: SimpleStrings, orderId: string): string {
+  return [s.greeting, ``, s.body(orderId), ``, s.sign, COMPANY.agentName, `${COMPANY.contact} · ${COMPANY.phone}`].join("\n");
+}
+function renderSimpleHtml(s: SimpleStrings, orderId: string): string {
+  return `<p>${escapeHtml(s.greeting)}</p><p>${escapeHtml(s.body(orderId))}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+}
+
+function bilingual(
+  order: Order,
+  language: SupplierLanguage,
+  subjectFor: (s: SimpleStrings) => string,
+  byLang: Record<SupplierLanguage, SimpleStrings>,
+): ComposedEmail {
+  const primary = byLang[language];
+  const english = byLang.en;
+  const isBi = language !== "en";
+  const subject = isBi
+    ? `Re: [${order.id}] ${subjectFor(primary)} / ${subjectFor(english)}`
+    : `Re: [${order.id}] ${subjectFor(primary)}`;
+  const sep = "\n\n-------------------- English --------------------\n\n";
+  const text =
+    renderSimple(primary, order.id) +
+    (isBi ? sep + renderSimple(english, order.id) : "") +
+    `\n\n--\n${AGENT_DISCLOSURE_TEXT}`;
+  const htmlSep = isBi
+    ? `<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb"/><p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em">English</p>`
+    : "";
+  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">${renderSimpleHtml(primary, order.id)}${htmlSep}${isBi ? renderSimpleHtml(english, order.id) : ""}${AGENT_DISCLOSURE_HTML}</div>`;
+  return { subject, text, html };
+}
+
+/* ---------- Clarification request ---------- */
+const CLARIFY: Record<SupplierLanguage, SimpleStrings> = {
+  en: {
+    subject: "Clarification needed",
+    greeting: "Hello,",
+    body: (id) =>
+      `Thank you for your reply on order ${id}. We were not able to determine clearly whether you can fulfil the order, or what changes you propose. Could you confirm in one short line whether you accept the order as sent, and flag any delays, price changes, or unavailable items?`,
+    sign: "Thanks,",
+  },
+  de: {
+    subject: "Klärung benötigt",
+    greeting: "Guten Tag,",
+    body: (id) =>
+      `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Wir konnten nicht eindeutig erkennen, ob Sie die Bestellung wie versendet annehmen oder welche Änderungen Sie vorschlagen. Könnten Sie uns kurz bestätigen, ob die Bestellung angenommen wird, und allfällige Verzögerungen, Preisänderungen oder nicht verfügbare Artikel angeben?`,
+    sign: "Vielen Dank,",
+  },
+  fr: {
+    subject: "Clarification nécessaire",
+    greeting: "Bonjour,",
+    body: (id) =>
+      `Merci pour votre réponse concernant la commande ${id}. Nous n'avons pas pu déterminer clairement si vous pouvez l'honorer telle quelle ou quelles modifications vous proposez. Pourriez-vous nous confirmer en une ligne si la commande est acceptée et signaler tout retard, changement de prix ou article indisponible ?`,
+    sign: "Merci,",
+  },
+  it: {
+    subject: "Chiarimento necessario",
+    greeting: "Salve,",
+    body: (id) =>
+      `Grazie per la risposta sull'ordine ${id}. Non siamo riusciti a capire chiaramente se potete evadere l'ordine così come inviato o quali modifiche proponete. Potreste confermarci in una riga se l'ordine è accettato e segnalare eventuali ritardi, variazioni di prezzo o articoli non disponibili?`,
+    sign: "Grazie,",
+  },
+};
+export function composeClarificationRequestEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
+  return bilingual(order, language, (s) => s.subject, CLARIFY);
+}
+
+/* ---------- Decline acknowledgment ---------- */
+const DECLINE: Record<SupplierLanguage, SimpleStrings> = {
+  en: {
+    subject: "Order will be sourced elsewhere — thanks",
+    greeting: "Hello,",
+    body: (id) =>
+      `Thank you for letting us know about order ${id}. We will source these items elsewhere this time and will keep you on file for future requests. We appreciate the quick reply.`,
+    sign: "Best regards,",
+  },
+  de: {
+    subject: "Bestellung wird anderweitig beschafft — vielen Dank",
+    greeting: "Guten Tag,",
+    body: (id) =>
+      `Vielen Dank für die Rückmeldung zur Bestellung ${id}. Wir werden die Artikel dieses Mal anderweitig beschaffen und behalten Sie für künftige Anfragen gerne im Auge. Besten Dank für die schnelle Antwort.`,
+    sign: "Mit freundlichen Grüssen,",
+  },
+  fr: {
+    subject: "Commande approvisionnée ailleurs — merci",
+    greeting: "Bonjour,",
+    body: (id) =>
+      `Merci pour votre retour concernant la commande ${id}. Nous nous approvisionnerons ailleurs cette fois et garderons votre contact pour de futures demandes. Merci pour votre réponse rapide.`,
+    sign: "Cordialement,",
+  },
+  it: {
+    subject: "Ordine acquistato altrove — grazie",
+    greeting: "Salve,",
+    body: (id) =>
+      `Grazie per la risposta sull'ordine ${id}. Per questa volta ci approvvigioneremo altrove e vi terremo a riferimento per future richieste. Grazie per la risposta rapida.`,
+    sign: "Cordiali saluti,",
+  },
+};
+export function composeDeclineAckEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
+  return bilingual(order, language, (s) => s.subject, DECLINE);
+}
+
+/* ---------- Issues acknowledgment (routing to procurement) ---------- */
+const ISSUES: Record<SupplierLanguage, SimpleStrings> = {
+  en: {
+    subject: "Received — routing to procurement",
+    greeting: "Hello,",
+    body: (id) =>
+      `Thank you for your reply on order ${id}. We have noted the points you raised and are routing them to our procurement team for review. We will follow up shortly with a decision.`,
+    sign: "Best regards,",
+  },
+  de: {
+    subject: "Antwort erhalten — wird an den Einkauf weitergeleitet",
+    greeting: "Guten Tag,",
+    body: (id) =>
+      `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Wir haben die genannten Punkte notiert und leiten sie zur Prüfung an unseren Einkauf weiter. Eine Rückmeldung folgt in Kürze.`,
+    sign: "Mit freundlichen Grüssen,",
+  },
+  fr: {
+    subject: "Bien reçu — transmis aux achats",
+    greeting: "Bonjour,",
+    body: (id) =>
+      `Merci pour votre réponse concernant la commande ${id}. Nous avons noté les points soulevés et les transmettons à notre service achats pour examen. Nous reviendrons vers vous très prochainement.`,
+    sign: "Cordialement,",
+  },
+  it: {
+    subject: "Ricevuto — inoltrato all'ufficio acquisti",
+    greeting: "Salve,",
+    body: (id) =>
+      `Grazie per la risposta sull'ordine ${id}. Abbiamo preso nota dei punti segnalati e li stiamo inoltrando al nostro ufficio acquisti per valutazione. Vi ricontatteremo a breve.`,
+    sign: "Cordiali saluti,",
+  },
+};
+export function composeIssuesAckEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
+  return bilingual(order, language, (s) => s.subject, ISSUES);
+}
+
+/* ---------- Answer supplier's questions from PO data ---------- */
+const ANSWER_HEAD: Record<SupplierLanguage, { subject: string; greeting: string; intro: (id: string) => string; sign: string }> = {
+  en: { subject: "Answers to your questions", greeting: "Hello,", intro: (id) => `Thanks for your reply on order ${id}. Here are the answers to your questions:`, sign: "Best regards," },
+  de: { subject: "Antworten auf Ihre Fragen", greeting: "Guten Tag,", intro: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Hier die Antworten auf Ihre Fragen:`, sign: "Mit freundlichen Grüssen," },
+  fr: { subject: "Réponses à vos questions", greeting: "Bonjour,", intro: (id) => `Merci pour votre réponse concernant la commande ${id}. Voici les réponses à vos questions :`, sign: "Cordialement," },
+  it: { subject: "Risposte alle vostre domande", greeting: "Salve,", intro: (id) => `Grazie per la risposta sull'ordine ${id}. Di seguito le risposte alle vostre domande:`, sign: "Cordiali saluti," },
+};
+
+export type QuestionAnswer = { question: string; answer: string };
+
+export function composeAnswerQuestionsEmail(
+  order: Order,
+  qa: QuestionAnswer[],
+  language: SupplierLanguage = "en",
+): ComposedEmail {
+  const primary = ANSWER_HEAD[language];
+  const english = ANSWER_HEAD.en;
+  const isBi = language !== "en";
+
+  const subject = isBi
+    ? `Re: [${order.id}] ${primary.subject} / ${english.subject}`
+    : `Re: [${order.id}] ${primary.subject}`;
+
+  const block = (s: typeof primary) => {
+    const lines = qa.map((p) => `Q: ${p.question}\nA: ${p.answer}`).join("\n\n");
+    return [s.greeting, ``, s.intro(order.id), ``, lines, ``, s.sign, COMPANY.agentName, `${COMPANY.contact} · ${COMPANY.phone}`].join("\n");
+  };
+  const blockHtml = (s: typeof primary) => {
+    const items = qa
+      .map((p) => `<li><div><strong>${escapeHtml(p.question)}</strong></div><div>${escapeHtml(p.answer)}</div></li>`)
+      .join("");
+    return `<p>${escapeHtml(s.greeting)}</p><p>${escapeHtml(s.intro(order.id))}</p><ul>${items}</ul><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+  };
+
+  const sep = "\n\n-------------------- English --------------------\n\n";
+  const text = block(primary) + (isBi ? sep + block(english) : "") + `\n\n--\n${AGENT_DISCLOSURE_TEXT}`;
+  const htmlSep = isBi
+    ? `<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb"/><p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em">English</p>`
+    : "";
+  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">${blockHtml(primary)}${htmlSep}${isBi ? blockHtml(english) : ""}${AGENT_DISCLOSURE_HTML}</div>`;
+
+  return { subject, text, html };
+}
+
+/**
+ * Build factual answers from order + company context for the LLM-classified
+ * answerable_questions. We keep this template-based to avoid hallucinated
+ * prices or dates — the LLM only picked the questions; we picked the facts.
+ */
+export function buildAnswersFromOrder(order: Order, questions: string[]): QuestionAnswer[] {
+  const lower = (s: string) => s.toLowerCase();
+  const facts: Array<{ match: RegExp; answer: string }> = [
+    { match: /vat|tva|mwst|iva|tax id|ust|uid/i, answer: `Buyer: ${COMPANY.name}, ${COMPANY.street}, ${COMPANY.city}. (VAT ID on request — contact ${COMPANY.contact}.)` },
+    { match: /deliver|delivery address|liefer|livraison|consegna|ship to|site address|adresse/i, answer: `Deliver to: ${COMPANY.site}.` },
+    { match: /payment|zahlung|paiement|pagamento|invoice|rechnung|facture|fattura/i, answer: `Standard payment terms: 30 days net. Send invoice to ${COMPANY.contact}.` },
+    { match: /contact|ansprech|téléphone|telefono|phone|email/i, answer: `Contact: ${COMPANY.agentName}, ${COMPANY.contact}, ${COMPANY.phone}.` },
+    { match: /project|projekt|projet|progetto|reference|referenz/i, answer: `Project: ${order.project}. Reference: ${order.id}.` },
+    { match: /items?|positionen|articles?|articoli|line items|skus?|quantit/i, answer: `Items (qty × name @ unit price):\n${order.items.map((i) => `  - ${i.qty} × ${i.name} @ ${i.price}`).join("\n")}\nSubtotal: ${order.subtotal} EUR (excl. VAT, excl. shipping).` },
+  ];
+  return questions.map((q) => {
+    const fact = facts.find((f) => f.match.test(lower(q)));
+    return { question: q, answer: fact ? fact.answer : `We are checking this internally and will follow up shortly.` };
+  });
+}

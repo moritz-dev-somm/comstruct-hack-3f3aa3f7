@@ -49,11 +49,15 @@ export type Database = {
       }
       negotiations: {
         Row: {
+          clarification_count: number
           classification: Json | null
           confirmed_at: string | null
           created_at: string
+          followup_count: number
           id: string
           inbox_id: string
+          last_inbound_from: string | null
+          last_processed_message_id: string | null
           last_reply_at: string | null
           message_id: string | null
           needs_user_reason: string | null
@@ -62,20 +66,26 @@ export type Database = {
           project: string | null
           reply_excerpt: string | null
           reply_message_id: string | null
+          security_reject_reason: string | null
           sent_at: string
           status: string
           subject: string | null
           supplier_email: string
+          supplier_language: string | null
           supplier_name: string
           thread_id: string | null
           updated_at: string
         }
         Insert: {
+          clarification_count?: number
           classification?: Json | null
           confirmed_at?: string | null
           created_at?: string
+          followup_count?: number
           id?: string
           inbox_id: string
+          last_inbound_from?: string | null
+          last_processed_message_id?: string | null
           last_reply_at?: string | null
           message_id?: string | null
           needs_user_reason?: string | null
@@ -84,20 +94,26 @@ export type Database = {
           project?: string | null
           reply_excerpt?: string | null
           reply_message_id?: string | null
+          security_reject_reason?: string | null
           sent_at?: string
           status?: string
           subject?: string | null
           supplier_email: string
+          supplier_language?: string | null
           supplier_name: string
           thread_id?: string | null
           updated_at?: string
         }
         Update: {
+          clarification_count?: number
           classification?: Json | null
           confirmed_at?: string | null
           created_at?: string
+          followup_count?: number
           id?: string
           inbox_id?: string
+          last_inbound_from?: string | null
+          last_processed_message_id?: string | null
           last_reply_at?: string | null
           message_id?: string | null
           needs_user_reason?: string | null
@@ -106,10 +122,12 @@ export type Database = {
           project?: string | null
           reply_excerpt?: string | null
           reply_message_id?: string | null
+          security_reject_reason?: string | null
           sent_at?: string
           status?: string
           subject?: string | null
           supplier_email?: string
+          supplier_language?: string | null
           supplier_name?: string
           thread_id?: string | null
           updated_at?: string
