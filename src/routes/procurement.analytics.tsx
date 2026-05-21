@@ -338,12 +338,13 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
 
         {/* §6 Approval Performance */}
         <section ref={approvalRef} className={`${CARD} p-5`}>
-          <SectionHeader title="Genehmigungsperformance" subtitle="Durchlaufzeiten und Entscheidungsverhalten" />
+          <SectionHeader title="Approval performance" subtitle="Cycle times and decision behaviour" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
             {/* Chart A */}
             <div>
-              <div className="text-[13px] font-semibold text-[#111827] mb-1">Genehmigungszeiten</div>
-              <div className="text-[12px] text-[#6B7280] mb-2">Wie schnell werden Bestellungen genehmigt?</div>
+              <div className="text-[13px] font-semibold text-[#111827] mb-1">Approval times</div>
+              <div className="text-[12px] text-[#6B7280] mb-2">How quickly are orders approved?</div>
+
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={APPROVAL_TIMES} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
