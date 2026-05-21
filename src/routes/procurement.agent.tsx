@@ -10,6 +10,7 @@ import {
   listInboxMessages,
   getInboxMessage,
   listNegotiationsForInbox,
+  ensureAgentInbox,
 } from "@/lib/supplier-agent.functions";
 
 export const Route = createFileRoute("/procurement/agent")({
@@ -27,6 +28,15 @@ function loadInbox(): StoredInbox | null {
     return raw ? (JSON.parse(raw) as StoredInbox) : null;
   } catch {
     return null;
+  }
+}
+
+function saveInbox(v: StoredInbox) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(INBOX_KEY, JSON.stringify(v));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -173,13 +183,36 @@ function VerdictPill({ verdict, size = "sm" }: { verdict: Verdict; size?: "sm" |
 
 
 function AgentPage() {
-  const [inbox] = useState<StoredInbox | null>(() => loadInbox());
   const [openId, setOpenId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const listFn = useServerFn(listInboxMessages);
   const getFn = useServerFn(getInboxMessage);
   const negFn = useServerFn(listNegotiationsForInbox);
+  const ensureFn = useServerFn(ensureAgentInbox);
+
+  // Hydrate from server (source of truth). Warm-start from localStorage
+  // so a returning browser shows data instantly while the server revalidates.
+  const inboxQ = useQuery({
+    queryKey: ["agent-inbox-config"],
+    queryFn: async () => {
+      const r = await ensureFn({ data: {} });
+      if (r.ok) saveInbox({ inboxId: r.inboxId, address: r.address });
+      return r;
+    },
+    initialData: () => {
+      const cached = loadInbox();
+      return cached
+        ? ({ ok: true as const, inboxId: cached.inboxId, address: cached.address })
+        : undefined;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const inbox: StoredInbox | null =
+    inboxQ.data?.ok === true
+      ? { inboxId: inboxQ.data.inboxId, address: inboxQ.data.address }
+      : null;
 
   const messagesQ = useQuery({
     queryKey: ["agent-inbox", inbox?.inboxId],
@@ -271,9 +304,15 @@ function AgentPage() {
           </div>
         </div>
 
-        {!inbox ? (
+        {!inbox && inboxQ.isLoading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            No agent inbox configured yet.
+            Loading agent inbox…
+          </div>
+        ) : !inbox ? (
+          <div className="p-8 text-center text-sm text-destructive">
+            {inboxQ.data?.ok === false
+              ? `Agent inbox unavailable: ${inboxQ.data.error}`
+              : "No agent inbox configured yet."}
           </div>
         ) : messagesQ.data?.ok === false ? (
           <div className="p-8 text-center text-sm text-destructive">{messagesQ.data.error}</div>
