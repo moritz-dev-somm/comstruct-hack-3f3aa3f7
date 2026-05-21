@@ -187,41 +187,63 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   }, [orders]);
 
   const createFromCart = useCallback<OrdersCtx["createFromCart"]>((items) => {
-    const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
-    const tier = tierFor(subtotal);
-    const now = new Date().toISOString();
-    let status: OrderStatus = "ordered";
-    const history: OrderEvent[] = [
-      { at: now, label: "Submitted", actor: FOREMAN.name },
-    ];
-    if (tier === "auto") {
-      history.push({ at: now, label: "Auto-approved" });
-      history.push({ at: now, label: "PO sent to supplier" });
-      status = "ordered";
-    } else if (tier === "pm") {
-      history.push({ at: now, label: `Routed to ${PM.name} for approval` });
-      status = "pending_pm";
-    } else {
-      history.push({ at: now, label: `Routed to ${CENTRAL.name} for approval` });
-      status = "pending_central";
+    // Group items by supplier (case-insensitive, trimmed). Items without
+    // a supplier land in a single "Unassigned" bucket so they still get
+    // routed somewhere visible.
+    const groups = new Map<string, { display: string; items: CartItem[] }>();
+    for (const it of items) {
+      const display = (it.supplier && it.supplier.trim()) || "Unassigned";
+      const key = display.toLowerCase();
+      const g = groups.get(key) ?? { display, items: [] };
+      g.items.push(it);
+      groups.set(key, g);
     }
-    let created!: Order;
+
+    const now = new Date().toISOString();
+    let created: Order[] = [];
     setOrders((prev) => {
-      created = {
-        id: nextOrderId(prev),
-        createdAt: now,
-        foreman: FOREMAN.name,
-        project: FOREMAN.project,
-        items: items.map((i) => ({ ...i })),
-        subtotal,
-        tier,
-        status,
-        approver: tierApprover(tier),
-        history,
-      };
-      return [created, ...prev];
+      let running = prev;
+      const newOnes: Order[] = [];
+      // Sort by supplier display for stable IDs across a single submission.
+      const sortedGroups = Array.from(groups.values()).sort((a, b) =>
+        a.display.localeCompare(b.display),
+      );
+      for (const g of sortedGroups) {
+        const subtotal = g.items.reduce((s, i) => s + i.qty * i.price, 0);
+        const tier = tierFor(subtotal);
+        const history: OrderEvent[] = [
+          { at: now, label: "Submitted", actor: FOREMAN.name },
+        ];
+        let status: OrderStatus;
+        if (tier === "auto") {
+          history.push({ at: now, label: "Auto-approved" });
+          history.push({ at: now, label: `PO sent to ${g.display}` });
+          status = "ordered";
+        } else if (tier === "pm") {
+          history.push({ at: now, label: `Routed to ${PM.name} for approval` });
+          status = "pending_pm";
+        } else {
+          history.push({ at: now, label: `Routed to ${CENTRAL.name} for approval` });
+          status = "pending_central";
+        }
+        const order: Order = {
+          id: nextOrderId(running),
+          createdAt: now,
+          foreman: FOREMAN.name,
+          project: FOREMAN.project,
+          items: g.items.map((i) => ({ ...i })),
+          subtotal,
+          tier,
+          status,
+          approver: tierApprover(tier),
+          history,
+        };
+        running = [order, ...running];
+        newOnes.push(order);
+      }
+      created = newOnes;
+      return running;
     });
-    // setState is synchronous enough for this synthetic id capture
     return created;
   }, []);
 
