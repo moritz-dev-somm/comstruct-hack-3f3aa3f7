@@ -183,13 +183,36 @@ function VerdictPill({ verdict, size = "sm" }: { verdict: Verdict; size?: "sm" |
 
 
 function AgentPage() {
-  const [inbox] = useState<StoredInbox | null>(() => loadInbox());
   const [openId, setOpenId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const listFn = useServerFn(listInboxMessages);
   const getFn = useServerFn(getInboxMessage);
   const negFn = useServerFn(listNegotiationsForInbox);
+  const ensureFn = useServerFn(ensureAgentInbox);
+
+  // Hydrate from server (source of truth). Warm-start from localStorage
+  // so a returning browser shows data instantly while the server revalidates.
+  const inboxQ = useQuery({
+    queryKey: ["agent-inbox-config"],
+    queryFn: async () => {
+      const r = await ensureFn({ data: {} });
+      if (r.ok) saveInbox({ inboxId: r.inboxId, address: r.address });
+      return r;
+    },
+    initialData: () => {
+      const cached = loadInbox();
+      return cached
+        ? ({ ok: true as const, inboxId: cached.inboxId, address: cached.address })
+        : undefined;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const inbox: StoredInbox | null =
+    inboxQ.data?.ok === true
+      ? { inboxId: inboxQ.data.inboxId, address: inboxQ.data.address }
+      : null;
 
   const messagesQ = useQuery({
     queryKey: ["agent-inbox", inbox?.inboxId],
