@@ -296,9 +296,22 @@ function Home() {
         handleTool(evt.name as string, evt.args as Record<string, unknown>);
         break;
       case "done":
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.role === "assistant") {
+            const m = last.content.match(FOLLOWUPS_RE);
+            if (m) {
+              const parts = m[1].split("|").map((s) => s.trim()).filter(Boolean).slice(0, 2);
+              setFollowups(parts);
+              next[next.length - 1] = { ...last, content: last.content.replace(FOLLOWUPS_RE, "").trimEnd() };
+            } else {
+              setFollowups([]);
+            }
+          }
+          return next;
+        });
         break;
-    }
-  }
 
   function handleTool(name: string, args: Record<string, unknown>) {
     if (name === "add_to_cart") {
