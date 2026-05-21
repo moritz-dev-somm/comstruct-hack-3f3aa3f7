@@ -179,6 +179,11 @@ If the supplier asks us questions, split them:
 - answerable_questions: questions we can answer from purchase-order data (delivery address, VAT ID, payment terms, line items, contact, project reference). Use the supplier's own wording, translated to English.
 - unanswerable_questions: questions that need a human (custom discounts, off-PO terms, anything we don't know).
 
+Also extract:
+- lead_time_days: integer best estimate of the lead time in days (e.g. "2 weeks" → 14, "next Tuesday" → relative days from today, "in stock, ships tomorrow" → 1). Null if the supplier did not state a lead time.
+- shipping_cost_eur: numeric shipping cost in EUR. Use 0 if shipping is "included" / "free". Null if not mentioned. Convert CHF → EUR roughly 1:1 if no rate hint is available.
+- wants_human: true ONLY if the supplier explicitly asks to talk to / be contacted by a real person, sales rep, account manager, or similar. False otherwise.
+
 If the verdict is "unclear" OR the supplier replied but left specific points vague or unanswered, populate unclear_points with ONLY the items the supplier actually left vague or unanswered in THIS reply — do not list anything the supplier already answered clearly, and do not add generic boilerplate about availability/price/delivery if those were addressed. Be minimal: if only delivery time is unclear, return exactly ONE bullet about delivery time. If two items are unclear, return two bullets (or a single combined bullet when they naturally belong together, e.g. unit price + total). Max 4 bullets, but prefer 1. Phrase each bullet in the SUPPLIER'S language as a direct, specific question referencing the exact item/SKU/phrase the supplier used — e.g. "Confirm earliest delivery date for the steel beams (you mentioned 'soon')", "Confirm unit price for SKU Y after the discount you mentioned". Never write generic prose. If nothing is unclear, return [].
 
 Finally pick suggested_outbound (the policy layer may still override):
