@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, ChevronRight } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
-import { useOrders, STATUS_META, type OrderStatus } from "@/lib/orders";
+import { useOrders, type OrderStatus } from "@/lib/orders";
 import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from "@/lib/po-pdf";
 import { StatusPill } from "./orders";
 
@@ -22,6 +22,7 @@ const STATUS_FILTERS: { value: "all" | OrderStatus; label: string }[] = [
 function OrdersOverview() {
   const { orders, advanceToDelivered } = useOrders();
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const navigate = useNavigate();
 
   const filtered = useMemo(
     () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
@@ -66,15 +67,19 @@ function OrdersOverview() {
               <tr><td colSpan={8} className="text-center text-muted-foreground py-10">No orders match this filter.</td></tr>
             )}
             {filtered.map((o) => (
-              <tr key={o.id} className="border-t hover:bg-accent/30">
-                <td className="px-4 py-2.5 font-mono font-semibold">{o.id}</td>
+              <tr
+                key={o.id}
+                className="border-t hover:bg-accent/40 cursor-pointer group"
+                onClick={() => navigate({ to: "/procurement/orders/$orderId", params: { orderId: o.id } })}
+              >
+                <td className="px-4 py-2.5 font-mono font-semibold text-brand group-hover:underline">{o.id}</td>
                 <td className="px-4 py-2.5">{o.foreman}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{o.project}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{o.items.reduce((s, i) => s + i.qty, 0)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatEUR(o.subtotal)}</td>
                 <td className="px-4 py-2.5"><StatusPill status={o.status} /></td>
                 <td className="px-4 py-2.5 text-muted-foreground text-xs">{new Date(o.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right">
+                <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-3 justify-end">
                     <button
                       onClick={() => openPurchaseOrderPdf(o)}
@@ -98,6 +103,7 @@ function OrdersOverview() {
                         Mark delivered
                       </button>
                     )}
+                    <ChevronRight className="size-4 text-muted-foreground" />
                   </div>
                 </td>
               </tr>

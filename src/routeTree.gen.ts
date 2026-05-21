@@ -20,6 +20,7 @@ import { Route as ProcurementCatalogRouteImport } from './routes/procurement.cat
 import { Route as ProcurementAnalyticsRouteImport } from './routes/procurement.analytics'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
+import { Route as ProcurementOrdersOrderIdRouteImport } from './routes/procurement.orders.$orderId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -76,6 +77,12 @@ const AdminProductsRoute = AdminProductsRouteImport.update({
   path: '/admin/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProcurementOrdersOrderIdRoute =
+  ProcurementOrdersOrderIdRouteImport.update({
+    id: '/$orderId',
+    path: '/$orderId',
+    getParentRoute: () => ProcurementOrdersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -87,8 +94,9 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRoute
-  '/procurement/orders': typeof ProcurementOrdersRoute
+  '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement/': typeof ProcurementIndexRoute
+  '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -99,8 +107,9 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRoute
-  '/procurement/orders': typeof ProcurementOrdersRoute
+  '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement': typeof ProcurementIndexRoute
+  '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,8 +122,9 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRoute
-  '/procurement/orders': typeof ProcurementOrdersRoute
+  '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
   '/procurement/': typeof ProcurementIndexRoute
+  '/procurement/orders/$orderId': typeof ProcurementOrdersOrderIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement/'
+    | '/procurement/orders/$orderId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement'
+    | '/procurement/orders/$orderId'
   id:
     | '__root__'
     | '/'
@@ -155,6 +167,7 @@ export interface FileRouteTypes {
     | '/procurement/catalog'
     | '/procurement/orders'
     | '/procurement/'
+    | '/procurement/orders/$orderId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -246,20 +259,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/procurement/orders/$orderId': {
+      id: '/procurement/orders/$orderId'
+      path: '/$orderId'
+      fullPath: '/procurement/orders/$orderId'
+      preLoaderRoute: typeof ProcurementOrdersOrderIdRouteImport
+      parentRoute: typeof ProcurementOrdersRoute
+    }
   }
 }
+
+interface ProcurementOrdersRouteChildren {
+  ProcurementOrdersOrderIdRoute: typeof ProcurementOrdersOrderIdRoute
+}
+
+const ProcurementOrdersRouteChildren: ProcurementOrdersRouteChildren = {
+  ProcurementOrdersOrderIdRoute: ProcurementOrdersOrderIdRoute,
+}
+
+const ProcurementOrdersRouteWithChildren =
+  ProcurementOrdersRoute._addFileChildren(ProcurementOrdersRouteChildren)
 
 interface ProcurementRouteChildren {
   ProcurementAnalyticsRoute: typeof ProcurementAnalyticsRoute
   ProcurementCatalogRoute: typeof ProcurementCatalogRoute
-  ProcurementOrdersRoute: typeof ProcurementOrdersRoute
+  ProcurementOrdersRoute: typeof ProcurementOrdersRouteWithChildren
   ProcurementIndexRoute: typeof ProcurementIndexRoute
 }
 
 const ProcurementRouteChildren: ProcurementRouteChildren = {
   ProcurementAnalyticsRoute: ProcurementAnalyticsRoute,
   ProcurementCatalogRoute: ProcurementCatalogRoute,
-  ProcurementOrdersRoute: ProcurementOrdersRoute,
+  ProcurementOrdersRoute: ProcurementOrdersRouteWithChildren,
   ProcurementIndexRoute: ProcurementIndexRoute,
 }
 
