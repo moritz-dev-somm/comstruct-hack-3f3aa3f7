@@ -597,7 +597,8 @@ function Home() {
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
             onClearCategory={() => setSelectedCategory(null)}
-            onResetRecommendations={() => setRecommendedIds([])}
+            onResetRecommendations={() => { setRecommendedIds([]); setRecommendedQty({}); }}
+            onAddBundle={addBundleToCart}
             onSuggestion={(s) => send(s)}
             followups={followups}
             allProducts={products}
