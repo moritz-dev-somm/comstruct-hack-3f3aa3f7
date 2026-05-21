@@ -594,3 +594,119 @@ export async function translateForSupplier(
     return { en: trimmed, native: trimmed };
   }
 }
+
+/**
+ * Second-pass recall check. After the main classifier reports `stillOpen`
+ * questions, we re-check each one against the FULL transcript with a stronger
+ * model. The first pass over-flags; this pass catches answers that were
+ * actually given (possibly in an earlier turn).
+ */
+export async function verifyAnsweredQuestions(args: {
+  stillOpen: string[]; // ENGLISH canonical strings
+  transcript: ThreadMessage[];
+  latestReply: string;
+}): Promise<{
+  confirmedStillOpen: string[];
+  newlyAnswered: Array<{ question: string; evidence: string }>;
+}> {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  const stillOpen = (args.stillOpen ?? []).map((s) => s.trim()).filter(Boolean);
+  if (!apiKey || stillOpen.length === 0) {
+    return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+  }
+
+  const transcriptText = (args.transcript ?? [])
+    .map((m, i) => {
+      const who = m.role === "agent" ? "AGENT" : "SUPPLIER";
+      return `--- [${i + 1}] ${who} ---\n${(m.text || "").slice(0, 3500)}`;
+    })
+    .join("\n");
+
+  const system =
+    "You are a strict recall checker for a procurement agent. " +
+    "Given a list of open questions the agent has asked, decide which ones the supplier HAS actually answered " +
+    "somewhere in the conversation (including the latest reply). Be generous about implicit, partial, or short answers " +
+    "('included', 'next Tuesday', 'yes', 'in stock', a single number or date). " +
+    "An answer in ANY language counts. You MUST quote the exact supplier phrase as evidence — if you cannot quote " +
+    "a phrase, the question is NOT answered. Return via the report_answers tool.";
+
+  const tool = {
+    type: "function" as const,
+    function: {
+      name: "report_answers",
+      description: "Report which open questions are answered, with evidence quoted from the supplier.",
+      parameters: {
+        type: "object",
+        properties: {
+          answered: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                question: { type: "string", description: "Exact verbatim copy of the open question (English)." },
+                evidence: { type: "string", description: "Short phrase quoted from the supplier that answers it." },
+                confidence: { type: "number", description: "0..1" },
+              },
+              required: ["question", "evidence", "confidence"],
+            },
+          },
+        },
+        required: ["answered"],
+      },
+    },
+  };
+
+  const userMsg =
+    `OPEN QUESTIONS (English, copy verbatim into "question"):\n` +
+    stillOpen.map((q, i) => `  ${i + 1}. ${q}`).join("\n") +
+    `\n\nCONVERSATION TRANSCRIPT:\n${transcriptText}\n\n` +
+    `LATEST SUPPLIER REPLY:\n${args.latestReply}\n`;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-5",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userMsg },
+        ],
+        tools: [tool],
+        tool_choice: { type: "function" as const, function: { name: "report_answers" } },
+        reasoning: { effort: "low" },
+      }),
+    });
+    if (!res.ok) {
+      console.error("verifyAnsweredQuestions gateway error", res.status, await res.text());
+      return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{
+        message?: { tool_calls?: Array<{ function?: { arguments?: string } }> };
+      }>;
+    };
+    const argsStr = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
+    const parsed = JSON.parse(argsStr) as {
+      answered?: Array<{ question?: string; evidence?: string; confidence?: number }>;
+    };
+    const openSet = new Set(stillOpen);
+    const newlyAnswered: Array<{ question: string; evidence: string }> = [];
+    for (const a of parsed.answered ?? []) {
+      const q = String(a.question ?? "").trim();
+      const ev = String(a.evidence ?? "").trim();
+      const conf = typeof a.confidence === "number" ? a.confidence : 0;
+      if (q && ev && conf >= 0.6 && openSet.has(q)) {
+        newlyAnswered.push({ question: q, evidence: ev.slice(0, 240) });
+      }
+    }
+    const answeredSet = new Set(newlyAnswered.map((a) => a.question));
+    return {
+      confirmedStillOpen: stillOpen.filter((q) => !answeredSet.has(q)),
+      newlyAnswered,
+    };
+  } catch (err) {
+    console.error("verifyAnsweredQuestions failed:", err);
+    return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+  }
+}
