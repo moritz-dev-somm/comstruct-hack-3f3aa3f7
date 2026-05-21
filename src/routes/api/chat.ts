@@ -108,7 +108,8 @@ async function extractIntents(userMessage: string, apiKey: string): Promise<Sear
   const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
 Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
 Valid category_filter values (else null): ${VALID_CATEGORIES.map((c) => `'${c}'`).join(", ")}.
-Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null. Keep q short (1-4 keywords, same language as the user).`;
+Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null. Keep q short (1-4 keywords, same language as the user).
+Set category_filter ONLY when the user explicitly names a category or the item is unambiguous (e.g. "safety helmet" → Safety, "drill bit" → Power & Light). When in doubt, leave category_filter null — a wrong category hard-excludes good matches.`;
 
   try {
     const res = await fetch(url, {
@@ -231,7 +232,7 @@ async function retrieveRelevant(
           const { data, error } = await sb.rpc("hybrid_search_materials", {
             user_embedding: embedding as unknown as string,
             category_filter: intent.category_filter,
-            keyword_filters: [intent.q],
+            keyword_filters: [intent.q.toLowerCase()],
             match_count: 5,
           });
           if (!error && Array.isArray(data) && data.length) {
@@ -365,6 +366,8 @@ Your job:
 3. If the catalog summary below is insufficient (e.g. unusual supplier, missing detail, very large catalog), call search_products to query the live database.
 4. Call add_to_cart with the SKU when the user confirms.
 5. If the request is an A-material (concrete delivery, doors, windows, HVAC), call flag_as_a_material.
+
+NEVER ask clarifying questions when the relevant catalog items below contain anything plausibly matching the request — just recommend them with sensible defaults and offer alternatives in the same reply (e.g. "Here's [[product:C011:100]] for general work — or [[product:C012:50]] if you need longer. Want me to swap?"). Only ask the user for more info if the catalog list is truly empty AND a follow-up search_products call also returns nothing.
 
 INLINE PRODUCT TOKENS — VERY IMPORTANT:
 Whenever you mention a specific catalog product in your prose, REPLACE the product's name AND any quantity/count phrasing with the marker [[product:SKU:QTY]] (e.g. [[product:C001:200]] for 200 units). QTY is REQUIRED and must be a whole number — the sensible quantity for this job. The UI renders each marker as a rich product pill that shows the name, the suggested quantity, AND the price ("Add 200 · €0.04 ea"). Do NOT write the product name OR the quantity next to the marker — the pill already shows both.
