@@ -369,13 +369,15 @@ export function VoiceButton({
         <Mic className="size-6" strokeWidth={2.5} />
       </button>
       {listening && (
-        <ListeningOverlay
-          interim={interim}
-          finalText={finalText}
-          level={level}
-          onCancel={cancel}
-          onSend={sendNow}
-        />
+        <PortalToBody>
+          <ListeningOverlay
+            interim={interim}
+            finalText={finalText}
+            level={level}
+            onCancel={cancel}
+            onSend={sendNow}
+          />
+        </PortalToBody>
       )}
     </>
   );
