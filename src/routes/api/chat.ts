@@ -361,11 +361,22 @@ export const Route = createFileRoute("/api/chat")({
         const lastUser = [...messages].reverse().find((m) => m.role === "user");
         const lang = detectLang(typeof lastUser?.content === "string" ? lastUser.content : "");
 
-        let summary = "(catalog unavailable)";
+        const lastUserText = typeof lastUser?.content === "string" ? lastUser.content : "";
+
+        // Phase 2 + 3 + 4: extract intents, retrieve in parallel, build turn context.
+        let relevantItemsContext = "(no catalog items matched this turn — call search_products if you need to look something up)";
         try {
-          summary = await categorySummary(lang);
+          const intents = await extractIntents(lastUserText, apiKey);
+          // Fallback: if intent extraction returned nothing, use the raw message as a single query.
+          const effective: SearchIntent[] = intents.length
+            ? intents
+            : lastUserText.trim()
+              ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
+              : [];
+          const items = await retrieveRelevant(effective);
+          relevantItemsContext = buildRelevantItemsContext(items, lang);
         } catch (e) {
-          console.error("Catalog summary failed", e);
+          console.error("RAG retrieval failed", e);
         }
 
         const cartLine = cart.length
@@ -374,7 +385,7 @@ export const Route = createFileRoute("/api/chat")({
 
         const systemMsg: ChatMsg = {
           role: "system",
-          content: SYSTEM_PROMPT_BASE + summary + cartLine,
+          content: SYSTEM_PROMPT_BASE + relevantItemsContext + SYSTEM_PROMPT_SUFFIX + cartLine,
         };
 
         const stream = new ReadableStream({
