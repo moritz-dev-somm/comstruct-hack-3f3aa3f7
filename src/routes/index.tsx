@@ -566,9 +566,9 @@ function Home() {
         )}
       </main>
 
-      {/* Sticky bottom bar in conversation mode: chat input + separate, distinct voice button */}
+      {/* Fixed bottom bar in conversation mode: chat input + separate, distinct voice button */}
       {inConversation && (
-        <div className="sticky bottom-0 z-30 border-t bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto max-w-3xl px-4 py-3 flex items-end gap-3">
             <div className="flex-1">
               <ChatInput
