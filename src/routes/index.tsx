@@ -318,7 +318,44 @@ function Home() {
     setMessages([]);
     setRecommendedIds([]);
     setSelectedCategory(null);
+    setSearchResults(null);
+    setSearchExtracted(null);
     localStorage.removeItem("comstruct-chat");
+  }
+
+  async function runHybridSearch() {
+    if (searching || messages.length === 0) return;
+    setSearching(true);
+    setSearchResults(null);
+    setSearchExtracted(null);
+    try {
+      const res = await fetch("/api/hybrid-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || "Search failed");
+        return;
+      }
+      setSearchExtracted(json.extracted ?? null);
+      setSearchResults(Array.isArray(json.results) ? json.results : []);
+      // bring results into view
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 50);
+    } catch (e) {
+      console.error("hybrid-search failed", e);
+      toast.error("Search failed");
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
