@@ -462,10 +462,7 @@ export async function classifyReply(args: {
   const priorAnswers = args.thread?.priorAnswersSummary ?? [];
   const transcript = args.thread?.transcript ?? [];
   const localSignals = inferLocalReplySignals(args.supplierReply, openQs);
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    return heuristicClassification(args.supplierReply, openQs, answeredChk);
-  }
+
 
   const transcriptBlock = transcript.length
     ? `FULL CONVERSATION TRANSCRIPT (oldest → newest, excluding the LATEST reply below):\n` +
