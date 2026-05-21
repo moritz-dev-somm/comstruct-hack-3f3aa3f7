@@ -523,22 +523,34 @@ export const Route = createFileRoute("/api/chat")({
         // Phase 2 + 3 + 4: extract intents, retrieve in parallel, build turn context.
         let relevantItemsContext = "(no catalog items matched this turn — call search_products if you need to look something up)";
         try {
-          const intents = await extractIntents(lastUserText, apiKey);
-          // Fallback: if intent extraction returned nothing, use the raw message as a single query.
-          const effective: SearchIntent[] = intents.length
-            ? intents
-            : lastUserText.trim()
-              ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
-              : [];
-          let items = await retrieveRelevant(effective, apiKey);
+          const preset = PRESET_CHIPS[lastUserText.trim().toLowerCase()];
+          let items: RetrievedItem[];
+          if (preset) {
+            // Curated answer for hard-coded suggestion chip — skip retrieval entirely.
+            const rows = await fetchProductsBySkus(preset.map((p) => p.sku));
+            const qtyBySku = new Map(preset.map((p) => [p.sku, p.qty]));
+            const orderBySku = new Map(preset.map((p, i) => [p.sku, i]));
+            items = rows
+              .sort((a, b) => (orderBySku.get(a.sku) ?? 0) - (orderBySku.get(b.sku) ?? 0))
+              .map((r) => ({ ...r, requested_quantity: qtyBySku.get(r.sku) ?? null }));
+          } else {
+            const intents = await extractIntents(lastUserText, apiKey);
+            // Fallback: if intent extraction returned nothing, use the raw message as a single query.
+            const effective: SearchIntent[] = intents.length
+              ? intents
+              : lastUserText.trim()
+                ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
+                : [];
+            items = await retrieveRelevant(effective, apiKey);
 
-          // Phase 2b: if direct retrieval found nothing, ask an LLM to brainstorm
-          // concrete C-material product keywords (e.g. "PPE for new hire" →
-          // ["helmet", "gloves", "safety glasses", ...]) and re-query.
-          if (items.length === 0 && lastUserText.trim()) {
-            const expanded = await expandQueryToKeywords(lastUserText, apiKey);
-            if (expanded.length) {
-              items = await retrieveRelevant(expanded, apiKey);
+            // Phase 2b: if direct retrieval found nothing, ask an LLM to brainstorm
+            // concrete C-material product keywords (e.g. "PPE for new hire" →
+            // ["helmet", "gloves", "safety glasses", ...]) and re-query.
+            if (items.length === 0 && lastUserText.trim()) {
+              const expanded = await expandQueryToKeywords(lastUserText, apiKey);
+              if (expanded.length) {
+                items = await retrieveRelevant(expanded, apiKey);
+              }
             }
           }
 
@@ -546,6 +558,7 @@ export const Route = createFileRoute("/api/chat")({
         } catch (e) {
           console.error("RAG retrieval failed", e);
         }
+
 
         const cartLine = cart.length
           ? `\n\nCURRENT CART: ${cart.map((c: { name: string; qty: number }) => `${c.qty}× ${c.name}`).join(", ")}`
