@@ -643,14 +643,16 @@ function HeroView({
   inputRef,
   onAddQuickOrder,
   categoryTiles,
+  products,
 }: {
   input: string;
   setInput: (v: string) => void;
   send: (v: string) => void;
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  onAddQuickOrder: (items: string[]) => void;
+  onAddQuickOrder: (skus: string[]) => void;
   categoryTiles: CategoryTileData[];
+  products: Product[];
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
