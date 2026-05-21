@@ -99,19 +99,33 @@ type CategoryTileData = {
   category: string;
 };
 
-// Tiles mirror the canonical `category` values in the products table.
-// Keep this list in sync with the DB — if a new category is added, add a
-// tile here (and vice versa) so the filter never shows an empty result.
-const CATEGORY_TILES: CategoryTileData[] = [
-  { label: "Fasteners",     icon: Bolt,     category: "Fasteners" },
-  { label: "Safety / PPE",  icon: HardHat,  category: "Safety" },
-  { label: "Hand Tools",    icon: Hammer,   category: "Hand Tools" },
-  { label: "Power & Light", icon: Zap,      category: "Power & Light" },
-  { label: "Sealing",       icon: Droplets, category: "Sealing" },
-  { label: "Measuring",     icon: Ruler,    category: "Measuring" },
-  { label: "Anchors",       icon: Anchor,   category: "Anchors" },
-  { label: "Other",         icon: Package,  category: "Other" },
-];
+// Icon mapping by canonical category name. Unknown categories fall back to
+// `Package`. Add new entries here when a category should get a custom glyph,
+// but the tile list itself is derived from the products table at runtime.
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Fasteners: Bolt,
+  Safety: HardHat,
+  "Safety / PPE": HardHat,
+  PPE: HardHat,
+  "Hand Tools": Hammer,
+  "Power & Light": Zap,
+  Power: Zap,
+  Lighting: Zap,
+  Sealing: Droplets,
+  Adhesives: Droplets,
+  Measuring: Ruler,
+  Anchors: Anchor,
+  Other: Package,
+};
+
+function iconForCategory(category: string): LucideIcon {
+  return CATEGORY_ICONS[category] ?? Package;
+}
+
+function labelForCategory(category: string): string {
+  return category === "Safety" ? "Safety / PPE" : category;
+}
+
 
 type QuickOrder = {
   id: string;
@@ -171,6 +185,25 @@ function Home() {
 
   const inConversation = messages.length > 0;
   const showCatalog = inConversation || selectedCategory !== null;
+
+  // Tiles derived from the live products table — every distinct `category`
+  // value becomes a tile, with a sensible icon fallback. Adding a product
+  // with a new category in the DB makes a new tile appear automatically.
+  const categoryTiles = useMemo<CategoryTileData[]>(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      if (!p.category) continue;
+      counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([category]) => ({
+        category,
+        label: labelForCategory(category),
+        icon: iconForCategory(category),
+      }));
+  }, [products]);
+
 
   // restore localStorage thread
   useEffect(() => {
@@ -473,6 +506,7 @@ function Home() {
       <main className="flex-1 flex flex-col">
         {!showCatalog ? (
           <HeroView
+            categoryTiles={categoryTiles}
             input={input}
             setInput={setInput}
             send={send}
@@ -521,6 +555,7 @@ function Home() {
             onSuggestion={(s) => send(s)}
             followups={followups}
             allProducts={products}
+            categoryTiles={categoryTiles}
             onRunSearch={runHybridSearch}
             searching={searching}
             searchResults={searchResults}
@@ -596,6 +631,7 @@ function HeroView({
   onSelectCategory,
   inputRef,
   onAddQuickOrder,
+  categoryTiles,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -603,6 +639,7 @@ function HeroView({
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onAddQuickOrder: (items: string[]) => void;
+  categoryTiles: CategoryTileData[];
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
@@ -669,8 +706,8 @@ function HeroView({
             <div className="flex-1 h-px bg-border" />
           </div>
           <div className="mt-4 grid grid-cols-3 gap-3">
-            {CATEGORY_TILES.map((c) => (
-              <CategoryTile key={c.label} tile={c} onSelect={() => onSelectCategory(c.category)} />
+            {categoryTiles.map((c) => (
+              <CategoryTile key={c.category} tile={c} onSelect={() => onSelectCategory(c.category)} />
             ))}
           </div>
         </div>
@@ -776,6 +813,7 @@ function ConversationView({
   searching,
   searchResults,
   searchExtracted,
+  categoryTiles,
 }: {
   messages: ChatMessage[];
   streaming: boolean;
@@ -794,6 +832,7 @@ function ConversationView({
   searching: boolean;
   searchResults: HybridSearchResult[] | null;
   searchExtracted: HybridExtracted | null;
+  categoryTiles: CategoryTileData[];
 }) {
   const recSet = new Set(recommendedIds);
   const lastAssistant = messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1] : null;
@@ -915,8 +954,8 @@ function ConversationView({
                 <div className="flex-1 h-px bg-border" />
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                {CATEGORY_TILES.map((c) => (
-                  <CategoryTile key={c.label} tile={c} onSelect={() => onSelectCategory(c.category)} />
+                {categoryTiles.map((c) => (
+                  <CategoryTile key={c.category} tile={c} onSelect={() => onSelectCategory(c.category)} />
                 ))}
               </div>
             </div>
