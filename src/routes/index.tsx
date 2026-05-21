@@ -722,6 +722,7 @@ function ConversationView({
   onClearCategory: () => void;
   onResetRecommendations: () => void;
   onSuggestion: (s: string) => void;
+  followups: string[];
   allProducts: Product[];
   onRunSearch: () => void;
   searching: boolean;
