@@ -558,7 +558,7 @@ function HeroView({
           What do you need on site?
         </h1>
         <p className="mt-3 text-center text-muted-foreground">
-          Describe the job in your own words — speak it or type it.
+          Speak it, snap a photo, or type — we'll figure out what you need.
         </p>
 
         {/* Primary action CTAs — voice (brand) + scan (grey), visually distinct */}
