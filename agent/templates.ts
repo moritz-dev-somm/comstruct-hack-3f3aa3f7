@@ -347,3 +347,143 @@ export function composeNudgeEmail(order: Order): ComposedEmail {
   ].join("\n");
   return { subject, text, html: `<p>${text.replace(/\n/g, "<br/>")}</p>` };
 }
+
+/* ----- Targeted follow-up for missing PO checklist fields ----- */
+
+export type ChecklistField = "delivery_date" | "shipping_cost";
+
+type FollowupStrings = {
+  subject: string;
+  greeting: string;
+  intro: (orderId: string) => string;
+  outro: string;
+  sign: string;
+  bullets: Record<ChecklistField, string>;
+};
+
+const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
+  en: {
+    subject: "Quick follow-up — missing details",
+    greeting: "Hello,",
+    intro: (id) =>
+      `Thank you for confirming order ${id}. To finalise it on our side, could you confirm the following point${"s"} we asked about in the original request:`,
+    outro:
+      "A one-line reply is enough — no need to repeat the rest of the order.",
+    sign: "Thanks,",
+    bullets: {
+      delivery_date: "Earliest delivery date you can commit to",
+      shipping_cost: "Shipping costs (or confirm shipping is included)",
+    },
+  },
+  de: {
+    subject: "Kurze Rückfrage — fehlende Angaben",
+    greeting: "Guten Tag,",
+    intro: (id) =>
+      `Vielen Dank für die Bestätigung der Bestellung ${id}. Für den finalen Abschluss benötigen wir noch folgende Angabe(n) aus unserer ursprünglichen Anfrage:`,
+    outro: "Eine kurze Rückmeldung genügt — die übrigen Punkte müssen nicht wiederholt werden.",
+    sign: "Vielen Dank,",
+    bullets: {
+      delivery_date: "Frühestmöglicher Liefertermin, den Sie zusichern können",
+      shipping_cost: "Versandkosten (oder Bestätigung, dass der Versand inbegriffen ist)",
+    },
+  },
+  fr: {
+    subject: "Petite relance — informations manquantes",
+    greeting: "Bonjour,",
+    intro: (id) =>
+      `Merci pour la confirmation de la commande ${id}. Pour finaliser de notre côté, pourriez-vous nous confirmer le(s) point(s) suivant(s) demandés dans la requête initiale :`,
+    outro: "Une réponse en une ligne suffit — inutile de répéter le reste de la commande.",
+    sign: "Merci,",
+    bullets: {
+      delivery_date: "Date de livraison la plus proche que vous pouvez garantir",
+      shipping_cost: "Frais de port (ou confirmation que le port est inclus)",
+    },
+  },
+  it: {
+    subject: "Breve sollecito — informazioni mancanti",
+    greeting: "Salve,",
+    intro: (id) =>
+      `Grazie per aver confermato l'ordine ${id}. Per finalizzarlo dalla nostra parte, potreste confermare il/i seguente/i punto/i richiesto/i nella richiesta iniziale:`,
+    outro: "È sufficiente una breve risposta — non serve ripetere il resto dell'ordine.",
+    sign: "Grazie,",
+    bullets: {
+      delivery_date: "Data di consegna più rapida che potete garantire",
+      shipping_cost: "Costi di spedizione (oppure conferma che la spedizione è inclusa)",
+    },
+  },
+};
+
+function renderFollowupBlock(
+  s: FollowupStrings,
+  orderId: string,
+  missing: ChecklistField[],
+): string {
+  const bullets = missing.map((f) => `- ${s.bullets[f]}`).join("\n");
+  return [
+    s.greeting,
+    ``,
+    s.intro(orderId),
+    bullets,
+    ``,
+    s.outro,
+    ``,
+    s.sign,
+    `${COMPANY.agentName}`,
+    `${COMPANY.contact} · ${COMPANY.phone}`,
+  ].join("\n");
+}
+
+function renderFollowupHtml(
+  s: FollowupStrings,
+  orderId: string,
+  missing: ChecklistField[],
+): string {
+  const bullets = missing.map((f) => `<li>${escapeHtml(s.bullets[f])}</li>`).join("");
+  return `
+    <p>${escapeHtml(s.greeting)}</p>
+    <p>${escapeHtml(s.intro(orderId))}</p>
+    <ul>${bullets}</ul>
+    <p>${escapeHtml(s.outro)}</p>
+    <p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+}
+
+/**
+ * Targeted follow-up reply asking only for the specific PO fields that the
+ * supplier did not answer (delivery date / shipping cost). Bilingual when the
+ * supplier language is not English.
+ */
+export function composeFollowupEmail(
+  order: Order,
+  missing: ChecklistField[],
+  language: SupplierLanguage = "en",
+): ComposedEmail {
+  const safeMissing = missing.filter(
+    (f) => f === "delivery_date" || f === "shipping_cost",
+  );
+  const primary = FOLLOWUP_STRINGS[language];
+  const english = FOLLOWUP_STRINGS.en;
+  const isBilingual = language !== "en";
+
+  const subject = isBilingual
+    ? `Re: [${order.id}] ${primary.subject} / ${english.subject}`
+    : `Re: [${order.id}] ${primary.subject}`;
+
+  const separator = "\n\n-------------------- English --------------------\n\n";
+  const text =
+    renderFollowupBlock(primary, order.id, safeMissing) +
+    (isBilingual ? separator + renderFollowupBlock(english, order.id, safeMissing) : "") +
+    `\n\n--\n${AGENT_DISCLOSURE_TEXT}`;
+
+  const htmlSeparator = isBilingual
+    ? `<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb"/><p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em">English</p>`
+    : "";
+  const html = `
+<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">
+  ${renderFollowupHtml(primary, order.id, safeMissing)}
+  ${htmlSeparator}
+  ${isBilingual ? renderFollowupHtml(english, order.id, safeMissing) : ""}
+  ${AGENT_DISCLOSURE_HTML}
+</div>`;
+
+  return { subject, text, html };
+}
