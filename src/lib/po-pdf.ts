@@ -165,7 +165,7 @@ export function generatePurchaseOrderPdf(
   /* ----- Totals ----- */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const afterTableY: number = (doc as any).lastAutoTable.finalY + 6;
-  const net = order.subtotal;
+  const net = subtotal;
   const vat = net * VAT_RATE;
   const gross = net + vat;
   const totalsX = page.w - page.m - 70;
