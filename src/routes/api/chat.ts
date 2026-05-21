@@ -240,7 +240,7 @@ async function retrieveRelevant(
           // Attempt 1: hybrid (embedding + keyword)
           const { data, error } = await sb.rpc("hybrid_search_materials", {
             user_embedding: embedding as unknown as string,
-            category_filter: intent.category_filter,
+            category_filter: null,
             keyword_filters: [intent.q.toLowerCase()],
             match_count: 5,
           });
@@ -254,7 +254,7 @@ async function retrieveRelevant(
           // Attempt 2: pure semantic — drop keyword filter so embedding alone ranks
           const sem = await sb.rpc("hybrid_search_materials", {
             user_embedding: embedding as unknown as string,
-            category_filter: intent.category_filter,
+            category_filter: null,
             keyword_filters: null,
             match_count: 5,
           });

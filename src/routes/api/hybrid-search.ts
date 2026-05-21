@@ -193,7 +193,7 @@ export const Route = createFileRoute("/api/hybrid-search")({
           const sb = sbClient();
           const { data, error } = await sb.rpc("hybrid_search_materials_cheap_first", {
             user_embedding: embedding as unknown as string,
-            category_filter: extracted.extracted_category,
+            category_filter: null,
             keyword_filters:
               extracted.extracted_keywords.length > 0 ? extracted.extracted_keywords : null,
             match_count: 10,
