@@ -1,5 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { Inbox, ListChecks, BarChart3, Package, ArrowLeft, HardHat, LogOut, Bot } from "lucide-react";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrders } from "@/lib/orders";
 import { useRole } from "@/lib/role";
 
@@ -16,6 +18,15 @@ function ProcurementLayout() {
     (o) => o.status === "pending_pm" || o.status === "pending_central",
   ).length;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [project, setProject] = useState("ramistrasse-101");
+
+  const projects = [
+    { id: "ramistrasse-101", label: "Rämistrasse 101" },
+    { id: "bahnhofstrasse-42", label: "Bahnhofstrasse 42" },
+    { id: "langstrasse-77", label: "Langstrasse 77" },
+    { id: "sechselautenplatz-1", label: "Sechseläutenplatz 1" },
+    { id: "limmatquai-150", label: "Limmatquai 150" },
+  ];
 
   const nav = [
     { to: "/procurement", label: "Approvals", icon: Inbox, badge: pendingCount },
@@ -28,14 +39,28 @@ function ProcurementLayout() {
   return (
     <div className="min-h-screen flex bg-muted/30 text-foreground">
       <aside className="w-60 shrink-0 border-r bg-card hidden md:flex flex-col">
-        <div className="h-14 border-b px-4 flex items-center gap-2">
-          <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
-            <HardHat className="size-5" />
+        <div className="border-b px-3 py-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
+              <HardHat className="size-5" />
+            </div>
+            <div className="leading-tight">
+              <div className="font-semibold text-sm">comstruct</div>
+              <div className="text-[11px] text-muted-foreground">Procurement</div>
+            </div>
           </div>
-          <div className="leading-tight">
-            <div className="font-semibold text-sm">comstruct</div>
-            <div className="text-[11px] text-muted-foreground">Procurement</div>
-          </div>
+          <Select value={project} onValueChange={setProject}>
+            <SelectTrigger className="h-9 w-full text-xs">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {nav.map((n) => {
