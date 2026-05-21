@@ -1243,14 +1243,14 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           },
         },
       })
-        .then((res) => {
-          if (res?.ok) {
+        .then((res: { ok: true; supplier: string } | { ok: false; error: string } | undefined) => {
+          if (res && res.ok) {
             toast.success(`Email agent contacted ${res.supplier}`);
           } else {
-            toast.error(`Email agent failed: ${res?.error ?? "unknown error"}`);
+            toast.error(`Email agent failed: ${res && !res.ok ? res.error : "unknown error"}`);
           }
         })
-        .catch((e) => {
+        .catch((e: unknown) => {
           console.error("startNegotiationForOrder error:", e);
           toast.error("Email agent failed to start");
         });
