@@ -404,11 +404,13 @@ function Home() {
     localStorage.removeItem("comstruct-chat");
   }
 
-  async function runHybridSearch() {
-    if (searching || messages.length === 0) return;
+  const searchSeqRef = useRef(0);
+  async function runHybridSearch(): Promise<boolean> {
+    if (messages.length === 0) return false;
+    const mySeq = ++searchSeqRef.current;
     setSearching(true);
-    setSearchResults(null);
-    setSearchExtracted(null);
+    // Don't clear existing results — we want to keep showing the previous turn's
+    // products until the new ones arrive (avoids the "panel disappears" flash).
     try {
       const res = await fetch("/api/hybrid-search", {
         method: "POST",
@@ -418,24 +420,26 @@ function Home() {
         }),
       });
       const json = await res.json();
+      // Ignore stale responses
+      if (mySeq !== searchSeqRef.current) return false;
       if (!res.ok) {
-        toast.error(json.error || "Search failed");
-        return;
+        console.error("hybrid-search returned error", res.status, json);
+        return false;
       }
       setSearchExtracted(json.extracted ?? null);
       setSearchResults(Array.isArray(json.results) ? json.results : []);
-      // bring results into view
       setTimeout(() => {
         scrollRef.current?.scrollTo({
           top: scrollRef.current.scrollHeight,
           behavior: "smooth",
         });
       }, 50);
+      return true;
     } catch (e) {
       console.error("hybrid-search failed", e);
-      toast.error("Search failed");
+      return false;
     } finally {
-      setSearching(false);
+      if (mySeq === searchSeqRef.current) setSearching(false);
     }
   }
 
