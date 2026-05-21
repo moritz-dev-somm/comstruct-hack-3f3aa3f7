@@ -85,11 +85,12 @@ export type HybridSearchResult = {
 };
 
 const SUGGESTED_CHIPS = [
-  "I need screws to fix gypsum board to a metal stud",
-  "PPE pack for a new worker starting tomorrow",
-  "I need to seal around a window — what do I need?",
-  "Standard drywall kit for ~50 m² wall",
-  "Concrete drilling — bits, plugs, dust mask",
+  "PPE pack for a new worker",
+  "Drywall screws for metal studs",
+  "Window sealing kit",
+  "Concrete drilling set",
+  "Refill: gloves, masks, blades",
+  "SDS bits + plugs for anchors",
 ];
 
 type CategoryTileData = {
