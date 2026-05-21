@@ -99,19 +99,33 @@ type CategoryTileData = {
   category: string;
 };
 
-// Tiles mirror the canonical `category` values in the products table.
-// Keep this list in sync with the DB — if a new category is added, add a
-// tile here (and vice versa) so the filter never shows an empty result.
-const CATEGORY_TILES: CategoryTileData[] = [
-  { label: "Fasteners",     icon: Bolt,     category: "Fasteners" },
-  { label: "Safety / PPE",  icon: HardHat,  category: "Safety" },
-  { label: "Hand Tools",    icon: Hammer,   category: "Hand Tools" },
-  { label: "Power & Light", icon: Zap,      category: "Power & Light" },
-  { label: "Sealing",       icon: Droplets, category: "Sealing" },
-  { label: "Measuring",     icon: Ruler,    category: "Measuring" },
-  { label: "Anchors",       icon: Anchor,   category: "Anchors" },
-  { label: "Other",         icon: Package,  category: "Other" },
-];
+// Icon mapping by canonical category name. Unknown categories fall back to
+// `Package`. Add new entries here when a category should get a custom glyph,
+// but the tile list itself is derived from the products table at runtime.
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Fasteners: Bolt,
+  Safety: HardHat,
+  "Safety / PPE": HardHat,
+  PPE: HardHat,
+  "Hand Tools": Hammer,
+  "Power & Light": Zap,
+  Power: Zap,
+  Lighting: Zap,
+  Sealing: Droplets,
+  Adhesives: Droplets,
+  Measuring: Ruler,
+  Anchors: Anchor,
+  Other: Package,
+};
+
+function iconForCategory(category: string): LucideIcon {
+  return CATEGORY_ICONS[category] ?? Package;
+}
+
+function labelForCategory(category: string): string {
+  return category === "Safety" ? "Safety / PPE" : category;
+}
+
 
 type QuickOrder = {
   id: string;
