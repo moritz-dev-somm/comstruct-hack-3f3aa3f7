@@ -164,6 +164,29 @@ function ApprovalsInbox() {
                         approve(orderToSend.id, approver);
                         const t = toast.loading(`${orderToSend.id}: contacting supplier…`);
                         try {
+                          const { purchaseOrderFilename, purchaseOrderPdfBase64 } = await import(
+                            "@/lib/po-pdf"
+                          );
+                          const FALLBACK = "Generisch";
+                          const groups = new Map<string, typeof orderToSend.items>();
+                          for (const it of orderToSend.items) {
+                            const key = (it.supplier && it.supplier.trim()) || FALLBACK;
+                            const arr = groups.get(key) ?? [];
+                            arr.push(it);
+                            groups.set(key, arr);
+                          }
+                          const attachments = Array.from(groups.entries()).map(([supplierName, items]) => {
+                            const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
+                            return {
+                              supplierName,
+                              filename: purchaseOrderFilename(orderToSend, supplierName),
+                              pdfBase64: purchaseOrderPdfBase64(orderToSend, {
+                                supplier: { name: supplierName },
+                                itemsOverride: items,
+                                subtotalOverride: subtotal,
+                              }),
+                            };
+                          });
                           const res = (await startNegotiation({
                             data: {
                               order: {
@@ -177,12 +200,17 @@ function ApprovalsInbox() {
                                   price: i.price,
                                   unit: i.unit,
                                   category: i.category,
+                                  supplier: i.supplier ?? null,
                                 })),
                               },
+                              attachments,
                             },
-                          })) as { ok: true; supplier: string } | { ok: false; error: string };
+                          })) as
+                            | { ok: true; results: Array<{ supplier: string }> }
+                            | { ok: false; error: string };
                           if (res?.ok) {
-                            toast.success(`${orderToSend.id} approved · email sent to ${res.supplier}`, { id: t });
+                            const labels = res.results.map((r) => r.supplier).join(", ");
+                            toast.success(`${orderToSend.id} approved · email sent to ${labels}`, { id: t });
                           } else {
                             toast.error(`${orderToSend.id} approved but email failed: ${res?.error ?? "unknown error"}`, { id: t });
                           }
