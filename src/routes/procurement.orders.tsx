@@ -134,7 +134,9 @@ function PdfPreviewModal({ order, onClose }: { order: Order; onClose: () => void
   useEffect(() => {
     let objectUrl: string | null = null;
     try {
-      const doc = generatePurchaseOrderPdf(order);
+      const pdfs = generatePurchaseOrdersBySupplier(order, contacts);
+      const doc = pdfs[0]?.doc;
+      if (!doc) throw new Error("No PO to render");
       const blob = doc.output("blob");
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
