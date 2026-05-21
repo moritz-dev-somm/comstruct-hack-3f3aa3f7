@@ -87,10 +87,6 @@ function OrderRow({
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
           </div>
         </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
-          </div>
-        </div>
         <div className="text-right">
           <div className="font-bold tabular-nums">{formatEUR(order.subtotal)}</div>
         </div>
