@@ -227,21 +227,39 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           order.items.map((i) => `- ${i.qty} × ${i.name} @ ${i.price} EUR`).join("\n") +
           `\nSubtotal: ${order.subtotal} EUR`;
 
-        const cls = await classifyReply({ orderSummary, supplierReply: replyText });
+        const prevClassification = (neg.classification ?? {}) as NegotiationClassification;
+        const prevAnswered = Array.isArray(prevClassification.answered_checklist)
+          ? (prevClassification.answered_checklist as ChecklistField[])
+          : [];
+        const prevOpenQuestions = Array.isArray(prevClassification.open_questions)
+          ? (prevClassification.open_questions as string[]).filter(Boolean)
+          : [];
+        const prevAnswers = Array.isArray(prevClassification.prior_answers)
+          ? (prevClassification.prior_answers as string[]).filter(Boolean)
+          : [];
+
+        const thread: ThreadContext = {
+          priorOpenQuestions: prevOpenQuestions,
+          priorAnsweredChecklist: prevAnswered,
+          priorAnswersSummary: prevAnswers,
+        };
+
+        const cls = await classifyReply({ orderSummary, supplierReply: replyText, thread });
 
         const followupCount = Number(neg.followup_count ?? 0);
         const clarificationCount = Number(neg.clarification_count ?? 0);
-        const prevAnswered = Array.isArray(
-          (neg.classification as { answered_checklist?: ChecklistField[] } | null)?.answered_checklist,
-        )
-          ? ((neg.classification as { answered_checklist: ChecklistField[] }).answered_checklist as ChecklistField[])
-          : [];
         const answeredChecklist = mergeAnsweredChecklist(prevAnswered, cls);
-        const prevReplyCount = Number(
-          (neg.classification as { reply_count?: number } | null)?.reply_count ?? 0,
-        );
+        const prevReplyCount = Number(prevClassification.reply_count ?? 0);
         const replyCount = prevReplyCount + 1;
         const lang = pickLang(cls.reply_language, (neg.order_snapshot as { supplier_language?: string })?.supplier_language);
+
+        // Accumulate concise "facts already given" so future classifications
+        // never re-flag them. Cap at 20 to keep prompt bounded.
+        const newAnswers: string[] = [];
+        if (cls.checklist?.delivery_date) newAnswers.push(`delivery_date: ${cls.checklist.delivery_date}`);
+        if (cls.checklist?.shipping_cost) newAnswers.push(`shipping_cost: ${cls.checklist.shipping_cost}`);
+        for (const ans of cls.answered_open_questions ?? []) newAnswers.push(`answered: ${ans}`);
+        const mergedAnswers = Array.from(new Set([...prevAnswers, ...newAnswers])).slice(-20);
 
         /* -------- 5. Decide + execute -------- */
         const state: CounterState = {
