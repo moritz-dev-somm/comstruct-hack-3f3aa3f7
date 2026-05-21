@@ -290,22 +290,29 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           }
         };
 
+        // Track the exact open questions this outbound asks. After a confirm/
+        // escalate/no_op we leave it as still_open (model carries forward).
+        let nextOpenQuestions: string[] = cls.still_open_questions ?? [];
+
         switch (action.kind) {
           case "send_confirmation": {
             await reply(composeConfirmationEmail(order, { leadTime: cls.lead_time }, lang));
             nextStatus = "confirmed";
+            nextOpenQuestions = [];
             break;
           }
           case "send_checklist_followup": {
             await reply(composeFollowupEmail(order, action.fields, lang));
             nextStatus = "following_up";
             nextFollowup = followupCount + 1;
+            nextOpenQuestions = action.fields.map((f) => CHECKLIST_LABEL_EN[f]);
             break;
           }
           case "send_answer_questions": {
             const qa = buildAnswersFromOrder(order, action.questions);
             await reply(composeAnswerQuestionsEmail(order, qa, lang));
             nextStatus = "answering_questions";
+            // We answered them; carry forward anything still open from the supplier-facing side.
             break;
           }
           case "send_clarification_request": {
@@ -313,6 +320,10 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             await reply(composeClarificationRequestEmail(order, lang, points, action.pendingChecklist));
             nextStatus = "clarifying";
             nextClarification = clarificationCount + 1;
+            // The exact bullets we just sent ARE the next open questions.
+            nextOpenQuestions = points.length
+              ? points
+              : action.pendingChecklist.map((f) => CHECKLIST_LABEL_EN[f]);
             break;
           }
           case "escalate_silent": {
@@ -332,7 +343,17 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           .from("negotiations")
           .update({
             status: nextStatus,
-            classification: { ...cls, followup_count: nextFollowup, clarification_count: nextClarification, reply_count: replyCount, answered_checklist: answeredChecklist, last_action: action.kind, last_action_reason: (action as { reason?: string }).reason ?? null },
+            classification: {
+              ...cls,
+              followup_count: nextFollowup,
+              clarification_count: nextClarification,
+              reply_count: replyCount,
+              answered_checklist: answeredChecklist,
+              open_questions: nextOpenQuestions,
+              prior_answers: mergedAnswers,
+              last_action: action.kind,
+              last_action_reason: (action as { reason?: string }).reason ?? null,
+            },
             reply_excerpt: replyText.slice(0, 1000),
             reply_message_id: replyMessageId,
             needs_user_reason: needsUserReason,
