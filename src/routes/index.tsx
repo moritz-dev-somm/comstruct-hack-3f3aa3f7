@@ -474,14 +474,6 @@ function Home() {
               Orders
             </Link>
             <Link
-              to="/procurement"
-              aria-label="Procurement view"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border px-3 h-10 text-xs font-medium hover:bg-accent"
-            >
-              <Building2 className="size-4" />
-              Procurement
-            </Link>
-            <Link
               to="/settings"
               aria-label="Approval rules"
               className="grid size-10 place-items-center rounded-full border hover:bg-accent"
@@ -493,10 +485,11 @@ function Home() {
                 logout();
                 navigate({ to: "/login" });
               }}
-              aria-label="Switch role"
-              className="grid size-10 place-items-center rounded-full border hover:bg-accent"
+              aria-label="Switch user"
+              className="inline-flex items-center gap-1.5 rounded-full border px-3 h-10 text-xs font-medium hover:bg-accent"
             >
               <LogOut className="size-4" />
+              <span className="hidden sm:inline">Switch user</span>
             </button>
             <button
               onClick={() => setCartOpen(true)}
