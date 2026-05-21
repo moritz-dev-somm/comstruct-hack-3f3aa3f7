@@ -584,7 +584,10 @@ export async function classifyReply(args: {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("classifyReply failed", message);
-    return fallbackClassification("unclear", "Classifier exception", [message]);
+    const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
+    return fallback.verdict === "unclear"
+      ? { ...fallback, summary: "Classifier exception", summary_en: "Classifier exception", issues: [message] }
+      : fallback;
   }
 }
 
