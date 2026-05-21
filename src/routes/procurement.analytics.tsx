@@ -241,11 +241,12 @@ Umbau Postgebäude,Thomas Meier,6,604,Fischer,Kunststoff,Mai 2026`;
                   </Pie>
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
-                    formatter={(v: number, _n: string, p: { payload: { name: string; pct: number; top: string } }) => [
-                      `${formatCHF(v)} (${p.payload.pct}%) — Top: ${p.payload.top}`,
-                      p.payload.name,
-                    ]}
+                    formatter={(v: number, _n, p) => {
+                      const payload = p?.payload as { name: string; pct: number; top: string } | undefined;
+                      return [`${formatCHF(v)} (${payload?.pct ?? 0}%) — Top: ${payload?.top ?? ""}`, payload?.name ?? ""];
+                    }}
                   />
+
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
