@@ -143,12 +143,13 @@ export const startNegotiationForOrder = createServerFn({ method: "POST" })
               project: data.order.project,
               supplier_name: contact.name,
               supplier_email: contact.email,
+              supplier_language: contact.language,
               inbox_id: infra.inboxId,
               thread_id: threadId,
               message_id: messageId,
               subject: email.subject,
               status: "awaiting_reply",
-              order_snapshot: { ...data.order, items, subtotal, supplier: contact.name },
+              order_snapshot: { ...data.order, items, subtotal, supplier: contact.name, supplier_language: contact.language },
             })
             .select("id")
             .single();
