@@ -315,7 +315,9 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           // not send another clarification email.
           verdict:
             cls.verdict === "unclear" &&
+            (cls.still_open_questions?.length ?? 0) > 0 &&
             verifiedStillOpen.length === 0 &&
+            (cls.missing_checklist?.length ?? 0) === 0 &&
             (cls.unclear_points?.length ?? 0) === 0
               ? "fully_confirmed"
               : cls.verdict,
