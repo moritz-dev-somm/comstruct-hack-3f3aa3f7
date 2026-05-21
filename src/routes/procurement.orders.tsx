@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, Download, ChevronRight, X, Eye } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type OrderStatus, type Order } from "@/lib/orders";
+import { useNegotiationsByOrder } from "@/lib/negotiations";
+import { deriveOrderStatus } from "@/lib/order-status";
 import {
   downloadPurchaseOrdersBySupplier,
   generatePurchaseOrdersBySupplier,
@@ -31,6 +33,8 @@ function OrdersOverview() {
   const navigate = useNavigate();
   const { data: suppliers } = useSuppliers();
   const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
+  const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
+  const negotiationsByOrder = useNegotiationsByOrder(orderIds);
 
   const filtered = useMemo(
     () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
@@ -85,7 +89,7 @@ function OrdersOverview() {
                 <td className="px-4 py-2.5 text-muted-foreground">{o.project}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{o.items.reduce((s, i) => s + i.qty, 0)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatEUR(o.subtotal)}</td>
-                <td className="px-4 py-2.5"><StatusPill status={o.status} /></td>
+                <td className="px-4 py-2.5"><StatusPill status={deriveOrderStatus(o, negotiationsByOrder[o.id])} /></td>
                 <td className="px-4 py-2.5 text-muted-foreground text-xs">{new Date(o.createdAt).toLocaleString()}</td>
                 <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-3 justify-end">

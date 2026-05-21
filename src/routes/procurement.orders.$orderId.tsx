@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, FileText, Download, Package, Truck, CreditCard, MapPin, CheckCircle2 } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, STATUS_META, tierLabel, type Order } from "@/lib/orders";
+import { useNegotiationsByOrder } from "@/lib/negotiations";
+import { deriveOrderStatus } from "@/lib/order-status";
 import { downloadPurchaseOrdersBySupplier, openFirstPurchaseOrderPdf } from "@/lib/po-pdf";
 import { useSuppliers, supplierContactMap } from "@/lib/suppliers";
 import { useMemo } from "react";
@@ -23,6 +25,9 @@ function OrderDetail() {
   const order = orders.find((o) => o.id === orderId);
   const { data: suppliers } = useSuppliers();
   const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
+  const orderIds = useMemo(() => (order ? [order.id] : []), [order]);
+  const negotiationsByOrder = useNegotiationsByOrder(orderIds);
+
 
   if (!order) {
     return (
@@ -53,7 +58,7 @@ function OrderDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold font-mono">{order.id}</h1>
-            <StatusPill status={order.status} />
+            <StatusPill status={deriveOrderStatus(order, negotiationsByOrder[order.id])} />
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             Placed {new Date(order.createdAt).toLocaleString()} · {tierLabel(order.tier)}
