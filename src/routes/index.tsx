@@ -813,6 +813,7 @@ function ConversationView({
   searching,
   searchResults,
   searchExtracted,
+  categoryTiles,
 }: {
   messages: ChatMessage[];
   streaming: boolean;
@@ -831,6 +832,7 @@ function ConversationView({
   searching: boolean;
   searchResults: HybridSearchResult[] | null;
   searchExtracted: HybridExtracted | null;
+  categoryTiles: CategoryTileData[];
 }) {
   const recSet = new Set(recommendedIds);
   const lastAssistant = messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1] : null;
