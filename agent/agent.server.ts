@@ -287,12 +287,21 @@ export async function classifyReply(args: {
         : deriveMissing(checklist);
     const reconciled = missing.filter((f) => checklist[f] == null);
     const summary = parsed.summary ?? "";
+    const parseNum = (v: unknown): number | null => {
+      if (v == null) return null;
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      const n = parseFloat(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
       summary,
       summary_en: parsed.summary_en?.toString().trim() || summary,
       reply_language: parsed.reply_language?.toString().toLowerCase().slice(0, 5) || null,
       lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
+      lead_time_days: parseNum((parsed as { lead_time_days?: unknown }).lead_time_days),
+      shipping_cost_eur: parseNum((parsed as { shipping_cost_eur?: unknown }).shipping_cost_eur),
+      wants_human: Boolean((parsed as { wants_human?: unknown }).wants_human),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       checklist,
       missing_checklist: reconciled,
