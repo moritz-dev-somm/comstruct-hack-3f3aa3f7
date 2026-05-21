@@ -80,48 +80,75 @@ function localized(row: ProductRow & {
 const SELECT_COLS =
   "sku,name,name_en,category,source_category,unit,unit_en,price_eur,supplier,hazardous,consumable,storage_location,typical_site,keywords,keywords_en,description,description_en,attributes,use_cases,use_cases_en";
 
-async function categorySummary(lang: "de" | "en"): Promise<string> {
-  const sb = sbClient();
-  const { data, error } = await sb
-    .from("products")
-    .select(SELECT_COLS)
-    .order("category")
-    .order("sku")
-    .limit(5000);
-  if (error || !data) return "(catalog unavailable)";
-  const byCat: Record<string, ProductRow[]> = {};
-  for (const r of data as ProductRow[]) (byCat[r.category] ??= []).push(r);
-  const usesLabel = lang === "en" ? "Use cases" : "Einsatz";
-  return Object.entries(byCat)
-    .map(([cat, items]) => {
-      const lines = items
-        .map((p) => {
-          const loc = localized(p as never, lang);
-          const attrs = attrLine(p.attributes);
-          const uses = (loc.use_cases ?? [])
-            .map((u) => `        - ${u.scenario} — ${u.why}`)
-            .join("\n");
-          const meta: string[] = [];
-          if (p.supplier) meta.push(p.supplier);
-          if (p.source_category) meta.push(`src: ${p.source_category}`);
-          if (p.hazardous) meta.push("HAZARDOUS");
-          if (p.consumable) meta.push(`consumable: ${p.consumable}`);
-          if (p.storage_location) meta.push(`storage: ${p.storage_location}`);
-          if (p.typical_site) meta.push(`site: ${p.typical_site}`);
-          const metaStr = meta.length ? ` (${meta.join(" · ")})` : "";
-          const parts = [
-            `  • ${p.sku} ${loc.name} — €${Number(p.price_eur).toFixed(2)}/${loc.unit}${metaStr}`,
-          ];
-          if (loc.description) parts.push(`      ${loc.description}`);
-          if (attrs) parts.push(`      [${attrs}]`);
-          if (loc.keywords && loc.keywords.length) parts.push(`      keywords: ${loc.keywords.join(", ")}`);
-          if (uses) parts.push(`      ${usesLabel}:\n${uses}`);
-          return parts.join("\n");
-        })
-        .join("\n");
-      return `## ${cat} (${items.length})\n${lines}`;
-    })
-    .join("\n\n");
+const VALID_CATEGORIES = [
+  "Power & Light",
+  "Sealing",
+  "Fasteners",
+  "Other",
+  "Safety",
+  "Anchors",
+  "Hand Tools",
+  "Measuring",
+] as const;
+
+type SearchIntent = {
+  q: string;
+  category_filter: string | null;
+  requested_quantity: number | null;
+};
+
+async function extractIntents(userMessage: string, apiKey: string): Promise<SearchIntent[]> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const useOpenAI = !!openaiKey;
+  const url = useOpenAI
+    ? "https://api.openai.com/v1/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const model = useOpenAI ? "gpt-4o-mini" : "google/gemini-2.5-flash-lite";
+
+  const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
+Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
+Valid category_filter values (else null): ${VALID_CATEGORIES.map((c) => `'${c}'`).join(", ")}.
+Break the request into one entry per distinct item type. Extract explicit numeric quantities into requested_quantity; if the user did not specify a number, use null. Keep q short (1-4 keywords, same language as the user).`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: userMessage },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content);
+    const arr = Array.isArray(parsed.search_queries) ? parsed.search_queries : [];
+    return arr
+      .filter((x: { q?: unknown }) => x && typeof x.q === "string" && x.q.trim())
+      .map((x: { q: string; category_filter?: unknown; requested_quantity?: unknown }) => ({
+        q: x.q.trim(),
+        category_filter:
+          typeof x.category_filter === "string" &&
+          (VALID_CATEGORIES as readonly string[]).includes(x.category_filter)
+            ? x.category_filter
+            : null,
+        requested_quantity:
+          typeof x.requested_quantity === "number" && Number.isFinite(x.requested_quantity)
+            ? Math.max(1, Math.round(x.requested_quantity))
+            : null,
+      }));
+  } catch (e) {
+    console.error("extractIntents failed", e);
+    return [];
+  }
 }
 
 async function searchProducts(args: {
@@ -135,14 +162,65 @@ async function searchProducts(args: {
   if (args.category) q = q.eq("category", args.category);
   if (args.supplier) q = q.ilike("supplier", `%${args.supplier}%`);
   if (args.query) {
-    const term = args.query.trim();
-    q = q.or(
-      `name.ilike.%${term}%,name_en.ilike.%${term}%,sku.ilike.%${term}%,source_category.ilike.%${term}%,description.ilike.%${term}%,description_en.ilike.%${term}%`,
-    );
+    const term = args.query.trim().replace(/[,()]/g, " ").replace(/[{}]/g, "");
+    if (term) {
+      q = q.or(
+        `name.ilike.%${term}%,name_en.ilike.%${term}%,sku.ilike.%${term}%,source_category.ilike.%${term}%,description.ilike.%${term}%,description_en.ilike.%${term}%`,
+      );
+    }
   }
   const { data, error } = await q.limit(Math.min(args.limit ?? 20, 50));
   if (error) throw error;
   return (data ?? []) as ProductRow[];
+}
+
+type RetrievedItem = ProductRow & { requested_quantity: number | null };
+
+async function retrieveRelevant(intents: SearchIntent[]): Promise<RetrievedItem[]> {
+  if (!intents.length) return [];
+  const results = await Promise.all(
+    intents.map(async (intent) => {
+      try {
+        const rows = await searchProducts({
+          query: intent.q,
+          category: intent.category_filter ?? undefined,
+          limit: 5,
+        });
+        return rows.map((r) => ({ ...r, requested_quantity: intent.requested_quantity }));
+      } catch (e) {
+        console.error("retrieval failed for", intent.q, e);
+        return [] as RetrievedItem[];
+      }
+    }),
+  );
+  const merged: RetrievedItem[] = [];
+  const seen = new Set<string>();
+  for (const list of results) {
+    for (const r of list) {
+      if (seen.has(r.sku)) continue;
+      seen.add(r.sku);
+      merged.push(r);
+      if (merged.length >= 20) return merged;
+    }
+  }
+  return merged;
+}
+
+function buildRelevantItemsContext(items: RetrievedItem[], lang: "de" | "en"): string {
+  if (!items.length) {
+    return "(no catalog items matched this turn — call search_products if you need to look something up)";
+  }
+  return items
+    .map((r) => {
+      const loc = localized(r as never, lang);
+      const desc = loc.description ? loc.description.replace(/\s+/g, " ").slice(0, 140) : "";
+      const qty =
+        r.requested_quantity != null
+          ? String(r.requested_quantity)
+          : "None specified, use standard default scaling";
+      return `SKU: ${r.sku} | Name: ${loc.name} | Price: €${Number(r.price_eur).toFixed(2)}/${loc.unit} | Cat: ${r.category} | Desc: ${desc} | USER REQUESTED QUANTITY: ${qty}`;
+    })
+    .join("\n");
 }
 
 
@@ -181,8 +259,13 @@ At the very end of EVERY assistant reply, on its own final line, emit exactly th
 - Keep them in the same language as the user (German if they wrote German, English otherwise).
 - Never mention this marker in your prose. The UI parses and hides it.
 
-CATALOG SUMMARY (compact view of what's in stock; use search_products for filtered detail):
+RELEVANT CATALOG ITEMS FOR THIS TURN (USE THE REQUESTED QUANTITIES PROVIDED IF THE USER SPECIFIED THEM):
+
 `;
+
+const SYSTEM_PROMPT_SUFFIX = `
+
+If none of the items above fit the request, call search_products to query the live database for more options.`;
 
 const TOOLS = [
   {
@@ -278,11 +361,22 @@ export const Route = createFileRoute("/api/chat")({
         const lastUser = [...messages].reverse().find((m) => m.role === "user");
         const lang = detectLang(typeof lastUser?.content === "string" ? lastUser.content : "");
 
-        let summary = "(catalog unavailable)";
+        const lastUserText = typeof lastUser?.content === "string" ? lastUser.content : "";
+
+        // Phase 2 + 3 + 4: extract intents, retrieve in parallel, build turn context.
+        let relevantItemsContext = "(no catalog items matched this turn — call search_products if you need to look something up)";
         try {
-          summary = await categorySummary(lang);
+          const intents = await extractIntents(lastUserText, apiKey);
+          // Fallback: if intent extraction returned nothing, use the raw message as a single query.
+          const effective: SearchIntent[] = intents.length
+            ? intents
+            : lastUserText.trim()
+              ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
+              : [];
+          const items = await retrieveRelevant(effective);
+          relevantItemsContext = buildRelevantItemsContext(items, lang);
         } catch (e) {
-          console.error("Catalog summary failed", e);
+          console.error("RAG retrieval failed", e);
         }
 
         const cartLine = cart.length
@@ -291,7 +385,7 @@ export const Route = createFileRoute("/api/chat")({
 
         const systemMsg: ChatMsg = {
           role: "system",
-          content: SYSTEM_PROMPT_BASE + summary + cartLine,
+          content: SYSTEM_PROMPT_BASE + relevantItemsContext + SYSTEM_PROMPT_SUFFIX + cartLine,
         };
 
         const stream = new ReadableStream({
