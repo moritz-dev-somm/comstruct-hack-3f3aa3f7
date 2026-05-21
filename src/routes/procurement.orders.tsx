@@ -1,9 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { FileText, Download, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { FileText, Download, ChevronRight, X, Eye } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
-import { useOrders, type OrderStatus } from "@/lib/orders";
-import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from "@/lib/po-pdf";
+import { useOrders, type OrderStatus, type Order } from "@/lib/orders";
+import {
+  downloadPurchaseOrderPdf,
+  generatePurchaseOrderPdf,
+  purchaseOrderFilename,
+} from "@/lib/po-pdf";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/orders")({
@@ -22,6 +26,7 @@ const STATUS_FILTERS: { value: "all" | OrderStatus; label: string }[] = [
 function OrdersOverview() {
   const { orders, advanceToDelivered } = useOrders();
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const navigate = useNavigate();
 
   const filtered = useMemo(
@@ -82,11 +87,11 @@ function OrdersOverview() {
                 <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-3 justify-end">
                     <button
-                      onClick={() => openPurchaseOrderPdf(o)}
+                      onClick={() => setPreviewOrder(o)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                      title="View PO PDF"
+                      title="Preview PO PDF"
                     >
-                      <FileText className="size-3.5" /> PDF
+                      <Eye className="size-3.5" /> Preview
                     </button>
                     <button
                       onClick={() => downloadPurchaseOrderPdf(o)}
@@ -110,6 +115,93 @@ function OrdersOverview() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {previewOrder && (
+        <PdfPreviewModal order={previewOrder} onClose={() => setPreviewOrder(null)} />
+      )}
+    </div>
+  );
+}
+
+function PdfPreviewModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    try {
+      const doc = generatePurchaseOrderPdf(order);
+      const blob = doc.output("blob");
+      objectUrl = URL.createObjectURL(blob);
+      setUrl(objectUrl);
+    } catch (e) {
+      console.error("PDF generation failed", e);
+      setError(e instanceof Error ? e.message : "Failed to generate PDF");
+    }
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [order]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <FileText className="size-4 text-brand" />
+            <div>
+              <div className="text-sm font-semibold">{purchaseOrderFilename(order)}</div>
+              <div className="text-xs text-muted-foreground">
+                {order.id} · {order.project} · {formatEUR(order.subtotal)}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadPurchaseOrderPdf(order)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-md border hover:bg-accent"
+            >
+              <Download className="size-3.5" /> Download
+            </button>
+            <button
+              onClick={onClose}
+              className="size-8 grid place-items-center rounded-md hover:bg-accent"
+              aria-label="Close"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 bg-muted/40">
+          {error ? (
+            <div className="h-full grid place-items-center text-sm text-destructive p-6 text-center">
+              PDF generation failed: {error}
+            </div>
+          ) : url ? (
+            <iframe
+              src={url}
+              title={purchaseOrderFilename(order)}
+              className="w-full h-full border-0"
+            />
+          ) : (
+            <div className="h-full grid place-items-center text-sm text-muted-foreground">
+              Generating PDF…
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
