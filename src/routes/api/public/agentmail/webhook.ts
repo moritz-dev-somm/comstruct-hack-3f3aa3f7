@@ -30,7 +30,7 @@ import type { Order } from "@/lib/orders";
 // in the classifier's "OPEN QUESTION FROM AGENT" list.
 const CHECKLIST_LABEL_EN: Record<ChecklistField, string> = {
   delivery_date: "Earliest delivery date you can commit to",
-  shipping_cost: "Shipping costs (or confirm shipping is included)",
+  shipping_cost: "Shipping costs",
 };
 
 const MAX_TRANSCRIPT_TURNS = 10;
