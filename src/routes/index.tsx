@@ -227,6 +227,7 @@ function Home() {
         const parsed = JSON.parse(saved);
         if (parsed.messages) setMessages(parsed.messages);
         if (parsed.recommendedIds) setRecommendedIds(parsed.recommendedIds);
+        if (parsed.recommendedQty) setRecommendedQty(parsed.recommendedQty);
       }
     } catch {}
   }, []);
@@ -235,9 +236,9 @@ function Home() {
     if (messages.length === 0) return;
     localStorage.setItem(
       "comstruct-chat",
-      JSON.stringify({ messages, recommendedIds }),
+      JSON.stringify({ messages, recommendedIds, recommendedQty }),
     );
-  }, [messages, recommendedIds]);
+  }, [messages, recommendedIds, recommendedQty]);
 
   // focus input on load and after stream ends
   useEffect(() => {
