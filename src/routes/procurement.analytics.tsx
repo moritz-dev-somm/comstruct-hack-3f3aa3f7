@@ -22,17 +22,22 @@ import {
   PERIODS,
   type Period,
   REJECTIONS,
-  TIMEOFDAY,
-  WEEKDAY,
-  buildDailySeries,
   formatCHF,
   formatCHFShort,
-  scaleCategories,
-  scaleForemen,
-  scaleKPIs,
-  scaleProjects,
-  scaleSuppliers,
 } from "@/lib/analytics-mock";
+import {
+  computeCategories,
+  computeDailySeries,
+  computeForemen,
+  computeKPIs,
+  computeProjects,
+  computeSuppliers,
+  computeTimeOfDay,
+  computeWeekday,
+  filterByPeriod,
+  filterByProject,
+  useNegotiations,
+} from "@/lib/analytics-data";
 
 export const Route = createFileRoute("/procurement/analytics")({
   component: Analytics,
@@ -54,16 +59,28 @@ function Analytics() {
   const supplierRef = useRef<HTMLDivElement | null>(null);
   const approvalRef = useRef<HTMLDivElement | null>(null);
 
-  const kpis = useMemo(() => scaleKPIs(period), [period]);
-  const series = useMemo(() => buildDailySeries(period), [period]);
-  const projects = useMemo(() => scaleProjects(period, null), [period]);
-  const categories = useMemo(() => scaleCategories(period, projectFilter), [period, projectFilter]);
-  const suppliers = useMemo(() => scaleSuppliers(period, projectFilter), [period, projectFilter]);
-  const foremen = useMemo(() => scaleForemen(period, projectFilter), [period, projectFilter]);
+  const { data: allRows = [] } = useNegotiations();
+  const periodRows = useMemo(() => filterByPeriod(allRows, period), [allRows, period]);
+  const scopedRows = useMemo(() => filterByProject(periodRows, projectFilter), [periodRows, projectFilter]);
+
+  const kpis = useMemo(() => computeKPIs(scopedRows), [scopedRows]);
+  const series = useMemo(() => computeDailySeries(scopedRows, period), [scopedRows, period]);
+  const projects = useMemo(() => computeProjects(periodRows), [periodRows]);
+  const categories = useMemo(() => computeCategories(scopedRows), [scopedRows]);
+  const suppliers = useMemo(() => computeSuppliers(scopedRows), [scopedRows]);
+  const foremen = useMemo(() => computeForemen(scopedRows), [scopedRows]);
+  const WEEKDAY = useMemo(() => computeWeekday(scopedRows), [scopedRows]);
+  const TIMEOFDAY = useMemo(() => computeTimeOfDay(scopedRows), [scopedRows]);
 
   const categoryTotal = categories.reduce((s, c) => s + c.value, 0);
-  const topDay = useMemo(() => series.reduce((m, d) => (d.spend > m.spend ? d : m), series[0]), [series]);
-  const quietDay = useMemo(() => series.find((d) => d.spend === 0) ?? series[0], [series]);
+  const topDay = useMemo(
+    () => (series.length ? series.reduce((m, d) => (d.spend > m.spend ? d : m), series[0]) : { label: "—", spend: 0 }),
+    [series],
+  );
+  const quietDay = useMemo(
+    () => series.find((d) => d.spend === 0) ?? series[0] ?? { label: "—", spend: 0 },
+    [series],
+  );
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) =>
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
