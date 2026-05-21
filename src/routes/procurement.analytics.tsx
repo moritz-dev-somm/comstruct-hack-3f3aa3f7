@@ -280,19 +280,20 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
 
         {/* §4 Supplier Analysis */}
         <section ref={supplierRef} className={`${CARD} p-5`}>
-          <SectionHeader title="Lieferantenanalyse" subtitle="Ausgaben, Vertragskonformität und Lieferperformance" />
+          <SectionHeader title="Supplier analysis" subtitle="Spend, contract compliance and delivery performance" />
           <SupplierTable rows={suppliers} />
           <div className="mt-4 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-[13px] text-[#92400E]">
-              ⚠ CHF 224 wurden bei Lieferanten ohne Rahmenvertrag ausgegeben. Empfehlung: Bestellungen auf ACME und Würth AG konsolidieren.
+              ⚠ CHF 224 spent with suppliers without a framework agreement. Recommendation: consolidate orders with ACME and Würth AG.
             </div>
             <Link
               to="/settings"
               className="text-xs px-3 py-1.5 rounded-md bg-white border border-[#FDE68A] text-[#92400E] hover:bg-[#FFFBEB]"
             >
-              Bestellregeln anpassen →
+              Adjust ordering rules →
             </Link>
           </div>
+
         </section>
 
         {/* §5 Ordering Behaviour */}
