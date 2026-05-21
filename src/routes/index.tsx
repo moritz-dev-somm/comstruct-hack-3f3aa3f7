@@ -198,16 +198,31 @@ function Home() {
 
   function handleEvent(evt: { type: string; [k: string]: unknown }) {
     switch (evt.type) {
-      case "delta":
+      case "delta": {
+        const chunk = evt.content as string;
         setMessages((prev) => {
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.role === "assistant") {
-            next[next.length - 1] = { ...last, content: last.content + (evt.content as string) };
+            next[next.length - 1] = { ...last, content: last.content + chunk };
           }
           return next;
         });
+        // Detect inline product tokens as they stream in so the
+        // "Recommended for this job" panel below stays in sync.
+        const re = /\[\[product:([A-Za-z0-9_-]+)\]\]/g;
+        const found: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(chunk)) !== null) found.push(m[1]);
+        if (found.length) {
+          setRecommendedIds((prev) => {
+            const set = new Set(prev);
+            const add = found.filter((s) => !set.has(s));
+            return add.length ? [...prev, ...add] : prev;
+          });
+        }
         break;
+      }
       case "recommend":
         setRecommendedIds((prev) => {
           const skus = (evt.skus as string[]) ?? [];
