@@ -335,19 +335,12 @@ function AgentPage() {
     return buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address);
   }, [messagesQ.data, inbox]);
 
-  // Map: latest classification per AgentMail thread_id, and per reply_message_id.
-  const verdictByThread = useMemo(() => {
-    const m = new Map<string, VerdictInfo>();
+  // Map negotiations by thread_id (and by reply_message_id for per-msg verdicts).
+  const negByThread = useMemo(() => {
+    const m = new Map<string, NegotiationFull>();
     if (negotiationsQ.data?.ok !== true) return m;
-    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
-      const v = (n.classification?.verdict ?? null) as Verdict | null;
-      if (!v) continue;
-      const info: VerdictInfo = {
-        verdict: v,
-        replyMessageId: n.reply_message_id ?? null,
-        lastReplyAt: n.last_reply_at ?? null,
-      };
-      if (n.thread_id) m.set(n.thread_id, info);
+    for (const n of negotiationsQ.data.negotiations as NegotiationFull[]) {
+      if (n.thread_id) m.set(n.thread_id, n);
     }
     return m;
   }, [negotiationsQ.data]);
@@ -355,16 +348,27 @@ function AgentPage() {
   const verdictByMessageId = useMemo(() => {
     const m = new Map<string, Verdict>();
     if (negotiationsQ.data?.ok !== true) return m;
-    for (const n of negotiationsQ.data.negotiations as NegotiationLite[]) {
+    for (const n of negotiationsQ.data.negotiations as NegotiationFull[]) {
       const v = (n.classification?.verdict ?? null) as Verdict | null;
       if (v && n.reply_message_id) m.set(n.reply_message_id, v);
     }
     return m;
   }, [negotiationsQ.data]);
 
+  // Queue: anything that needs the human to act now.
+  const needsAttention = useMemo<NegotiationFull[]>(() => {
+    if (negotiationsQ.data?.ok !== true) return [];
+    return (negotiationsQ.data.negotiations as NegotiationFull[])
+      .filter((n) => statusOf(n.status) === "needs_user")
+      .sort((a, b) =>
+        (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
+      );
+  }, [negotiationsQ.data]);
+
   // Default: most recent thread expanded.
   const effectiveExpanded = (key: string, idx: number) =>
     key in expanded ? expanded[key] : idx === 0;
+
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-6">
