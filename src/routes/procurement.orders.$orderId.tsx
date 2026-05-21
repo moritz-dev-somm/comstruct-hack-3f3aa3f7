@@ -58,7 +58,7 @@ function OrderDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold font-mono">{order.id}</h1>
-            <StatusPill status={order.status} />
+            <StatusPill status={deriveOrderStatus(order, negotiationsByOrder[order.id])} />
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             Placed {new Date(order.createdAt).toLocaleString()} · {tierLabel(order.tier)}
