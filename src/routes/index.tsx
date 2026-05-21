@@ -484,7 +484,6 @@ function HeroView({
           </div>
         </div>
 
-
         <div className="mt-10">
           <div className="flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-wide">
             <div className="flex-1 h-px bg-border" />
@@ -494,6 +493,43 @@ function HeroView({
           <div className="mt-4 grid grid-cols-3 gap-3">
             {CATEGORY_TILES.map((c) => (
               <CategoryTile key={c.label} tile={c} onSelect={() => onSelectCategory(c.category)} />
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Reorder — dummy orders for now */}
+        <div className="mt-10">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-wide">
+            <div className="flex-1 h-px bg-border" />
+            quick reorder
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <div className="mt-4 space-y-3">
+            {QUICK_REORDER_ORDERS.map((order) => (
+              <button
+                key={order.id}
+                onClick={() => toast.success(`Reordered ${order.id}`)}
+                className="w-full text-left rounded-xl border bg-card p-4 transition-colors hover:bg-accent hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">{order.id}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="size-3.5" />
+                      {order.date}
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold">{order.total}</span>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {order.items.slice(0, 3).join(" · ")}
+                  {order.items.length > 3 && ` · +${order.items.length - 3} more`}
+                </div>
+                <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand">
+                  <Plus className="size-3.5" />
+                  Reorder
+                </div>
+              </button>
             ))}
           </div>
         </div>
