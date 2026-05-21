@@ -105,6 +105,17 @@ export async function getAgentSettings(): Promise<{
 
 /* ----- Reply classification via Lovable AI ----- */
 
+export type ChecklistField = "delivery_date" | "shipping_cost";
+
+export type ReplyChecklist = {
+  /** True if the supplier accepts the order (even if details are missing). */
+  order_confirmed: boolean;
+  /** Normalized delivery date / lead time string if present. */
+  delivery_date: string | null;
+  /** Shipping cost as the supplier expressed it (e.g. "€0", "included", "CHF 45"). */
+  shipping_cost: string | null;
+};
+
 export type ReplyClassification = {
   /** Overall verdict on the reply. */
   verdict:
@@ -119,17 +130,68 @@ export type ReplyClassification = {
   lead_time: string | null;
   /** Concrete list of issues that require user attention. */
   issues: string[];
+  /** Structured extraction of the fields we asked for in the initial PO. */
+  checklist: ReplyChecklist;
+  /** Fields from the initial PO request that the supplier has not answered yet. */
+  missing_checklist: ChecklistField[];
+  /** Number of automated targeted follow-ups already sent for the missing fields. */
+  followup_count?: number;
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
+
 Decide the verdict strictly:
-- "fully_confirmed": supplier accepts ALL items at the proposed prices AND gives a reasonable delivery date (within ~3 weeks) AND raises NO issues, NO delays, NO price changes, NO partial availability, NO questions.
-- "confirmed_with_issue": supplier accepts but mentions ANY of: delay, longer lead time, partial availability, price change, substitution, shipping surcharge, stock issue, anything that procurement should review.
+- "fully_confirmed": supplier accepts ALL items at the proposed prices AND raises NO issues, NO delays, NO price changes, NO partial availability, NO questions. The delivery date or shipping cost MAY be missing — that is handled separately via the checklist.
+- "confirmed_with_issue": supplier accepts but mentions ANY of: delay, longer lead time, partial availability, price change, substitution, shipping surcharge that exceeds expectations, stock issue, anything that procurement should review.
 - "declined": supplier refuses or cannot fulfil.
-- "needs_clarification": supplier asks us a question or requests info.
+- "needs_clarification": supplier asks us a question or requests info from us (e.g. asks for our VAT ID or delivery address).
 - "unclear": you cannot tell.
 Be conservative: if in doubt between fully_confirmed and confirmed_with_issue, choose confirmed_with_issue.
+
+In addition, extract a structured checklist of the two fields our initial PO explicitly asked for:
+- delivery_date: the earliest committed delivery date or lead time the supplier states. Normalize to a short string like "2026-06-04" or "2 weeks". Null if not stated.
+- shipping_cost: how the supplier expressed shipping. Use "included" if they say shipping is included or free, "€0" if explicitly zero, or the literal stated amount (e.g. "CHF 45"). Null if not mentioned at all.
+- order_confirmed: true if the supplier accepts the order in some form (fully_confirmed or confirmed_with_issue), false otherwise.
+
+Then list any of ["delivery_date", "shipping_cost"] that are still null/missing in missing_checklist.
+
 Always reply with strict JSON matching the schema. No prose.`;
+
+const EMPTY_CHECKLIST: ReplyChecklist = {
+  order_confirmed: false,
+  delivery_date: null,
+  shipping_cost: null,
+};
+
+function normalizeChecklist(input: Partial<ReplyChecklist> | undefined): ReplyChecklist {
+  return {
+    order_confirmed: Boolean(input?.order_confirmed),
+    delivery_date: input?.delivery_date?.toString().trim() || null,
+    shipping_cost: input?.shipping_cost?.toString().trim() || null,
+  };
+}
+
+function deriveMissing(checklist: ReplyChecklist): ChecklistField[] {
+  const missing: ChecklistField[] = [];
+  if (!checklist.delivery_date) missing.push("delivery_date");
+  if (!checklist.shipping_cost) missing.push("shipping_cost");
+  return missing;
+}
+
+function fallbackClassification(
+  verdict: ReplyClassification["verdict"],
+  summary: string,
+  issues: string[] = [],
+): ReplyClassification {
+  return {
+    verdict,
+    summary,
+    lead_time: null,
+    issues,
+    checklist: { ...EMPTY_CHECKLIST },
+    missing_checklist: ["delivery_date", "shipping_cost"],
+  };
+}
 
 export async function classifyReply(args: {
   orderSummary: string;
@@ -137,12 +199,11 @@ export async function classifyReply(args: {
 }): Promise<ReplyClassification> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) {
-    return {
-      verdict: "unclear",
-      summary: "LOVABLE_API_KEY missing — cannot classify reply.",
-      lead_time: null,
-      issues: ["AI classifier unavailable"],
-    };
+    return fallbackClassification(
+      "unclear",
+      "LOVABLE_API_KEY missing — cannot classify reply.",
+      ["AI classifier unavailable"],
+    );
   }
   const body = {
     model: "openai/gpt-5-mini",
@@ -153,7 +214,9 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, lead_time, issues.`,
+          `Return JSON with keys: verdict, summary, lead_time, issues, checklist, missing_checklist.\n` +
+          `checklist must be an object with keys order_confirmed (boolean), delivery_date (string|null), shipping_cost (string|null).\n` +
+          `missing_checklist must be an array containing any of "delivery_date" or "shipping_cost" that are still null.`,
       },
     ],
     response_format: { type: "json_object" },
@@ -170,23 +233,35 @@ export async function classifyReply(args: {
     if (!res.ok) {
       const t = await res.text();
       console.error("classifyReply gateway error", res.status, t);
-      return { verdict: "unclear", summary: "AI gateway error", lead_time: null, issues: [t.slice(0, 200)] };
+      return fallbackClassification("unclear", "AI gateway error", [t.slice(0, 200)]);
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as Partial<ReplyClassification>;
+    const checklist = normalizeChecklist(parsed.checklist);
+    // Trust the model's missing_checklist when present, else derive from checklist.
+    const missing =
+      Array.isArray(parsed.missing_checklist) && parsed.missing_checklist.length >= 0
+        ? (parsed.missing_checklist.filter((f) =>
+            f === "delivery_date" || f === "shipping_cost",
+          ) as ChecklistField[])
+        : deriveMissing(checklist);
+    // Reconcile: if checklist has a value but model claims it's missing, drop it.
+    const reconciled = missing.filter((f) => checklist[f] == null);
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
       summary: parsed.summary ?? "",
-      lead_time: parsed.lead_time ?? null,
+      lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+      checklist,
+      missing_checklist: reconciled,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("classifyReply failed", message);
-    return { verdict: "unclear", summary: "Classifier exception", lead_time: null, issues: [message] };
+    return fallbackClassification("unclear", "Classifier exception", [message]);
   }
 }
 

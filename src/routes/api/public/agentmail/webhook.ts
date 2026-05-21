@@ -6,7 +6,8 @@ import {
   getAgentSettings,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import { composeConfirmationEmail } from "../../../../../agent/templates";
+import { composeConfirmationEmail, composeFollowupEmail } from "../../../../../agent/templates";
+import type { ReplyClassification } from "../../../../../agent/agent.server";
 import type { Order } from "@/lib/orders";
 
 /**
@@ -97,12 +98,26 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
 
         const cls = await classifyReply({ orderSummary, supplierReply: replyText });
 
+        // Carry forward how many targeted follow-ups we have already sent for
+        // missing PO checklist fields, so we never loop forever.
+        const prevCls = (neg.classification ?? {}) as Partial<ReplyClassification>;
+        const prevFollowups = Number(prevCls.followup_count ?? 0);
+
+        // Pick supplier language from the original order snapshot (default en).
+        const supplierLang = ((neg.order_snapshot as { supplier_language?: string })?.supplier_language ??
+          "en") as "en" | "de" | "fr" | "it";
+
         let nextStatus: string;
         let needsUserReason: string | null = null;
         let replyMessageId: string | null = null;
+        let followupCount = prevFollowups;
 
-        if (cls.verdict === "fully_confirmed") {
-          // Auto-confirm: send a thank-you reply on the same thread.
+        const missing = cls.missing_checklist ?? [];
+        const shouldFollowUp =
+          cls.verdict === "fully_confirmed" && missing.length > 0 && prevFollowups < 1;
+
+        if (cls.verdict === "fully_confirmed" && missing.length === 0) {
+          // Clean confirm, all requested fields present → auto-confirm.
           try {
             const conf = composeConfirmationEmail(order, { leadTime: cls.lead_time });
             const sent = await agentMail().inboxes.messages.reply(inboxId, messageId, {
@@ -114,6 +129,25 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             console.error("webhook: failed to send confirmation", err);
           }
           nextStatus = "confirmed";
+        } else if (shouldFollowUp) {
+          // Order accepted but one of the PO checklist fields is missing →
+          // send a single targeted follow-up, stay in awaiting state.
+          try {
+            const followup = composeFollowupEmail(order, missing, supplierLang);
+            const sent = await agentMail().inboxes.messages.reply(inboxId, messageId, {
+              text: followup.text,
+              html: followup.html,
+            });
+            replyMessageId = (sent as { messageId?: string }).messageId ?? null;
+            followupCount = prevFollowups + 1;
+          } catch (err) {
+            console.error("webhook: failed to send targeted follow-up", err);
+          }
+          nextStatus = "awaiting_reply";
+        } else if (cls.verdict === "fully_confirmed" && missing.length > 0) {
+          // Already followed up once and supplier still didn't answer → escalate.
+          nextStatus = "needs_user";
+          needsUserReason = `Supplier confirmed but still missing: ${missing.join(", ")}`;
         } else {
           nextStatus = "needs_user";
           needsUserReason =
@@ -130,7 +164,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           .from("negotiations")
           .update({
             status: nextStatus,
-            classification: cls,
+            classification: { ...cls, followup_count: followupCount },
             reply_excerpt: replyText.slice(0, 1000),
             reply_message_id: replyMessageId,
             needs_user_reason: needsUserReason,
