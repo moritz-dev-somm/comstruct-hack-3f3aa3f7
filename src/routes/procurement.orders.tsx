@@ -121,13 +121,13 @@ function OrdersOverview() {
       </div>
 
       {previewOrder && (
-        <PdfPreviewModal order={previewOrder} onClose={() => setPreviewOrder(null)} />
+        <PdfPreviewModal order={previewOrder} contacts={contacts} onClose={() => setPreviewOrder(null)} />
       )}
     </div>
   );
 }
 
-function PdfPreviewModal({ order, onClose }: { order: Order; onClose: () => void }) {
+function PdfPreviewModal({ order, contacts, onClose }: { order: Order; contacts: ReturnType<typeof supplierContactMap>; onClose: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
