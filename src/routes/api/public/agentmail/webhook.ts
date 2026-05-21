@@ -6,18 +6,17 @@ import {
   getAgentSettings,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import type { ReplyClassification, SuggestedOutbound } from "../../../../../agent/agent.server";
+import type { ReplyClassification } from "../../../../../agent/agent.server";
 import {
   composeAnswerQuestionsEmail,
   composeClarificationRequestEmail,
   composeConfirmationEmail,
-  composeDeclineAckEmail,
   composeFollowupEmail,
-  composeIssuesAckEmail,
   buildAnswersFromOrder,
   type SupplierLanguage,
 } from "../../../../../agent/templates";
-import { decideAction } from "../../../../../agent/conditions";
+import { decideAction, mergeAnsweredChecklist, type CounterState } from "../../../../../agent/conditions";
+import type { ChecklistField } from "../../../../../agent/agent.server";
 import {
   extractOrderIdFromSubject,
   parseEmailAddress,
