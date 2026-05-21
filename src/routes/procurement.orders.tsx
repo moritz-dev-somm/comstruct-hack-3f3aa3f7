@@ -22,6 +22,7 @@ const STATUS_FILTERS: { value: "all" | OrderStatus; label: string }[] = [
 function OrdersOverview() {
   const { orders, advanceToDelivered } = useOrders();
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const navigate = useNavigate();
 
   const filtered = useMemo(
     () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
