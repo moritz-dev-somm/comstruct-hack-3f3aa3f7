@@ -93,12 +93,6 @@ function ProcurementLayout() {
           })}
         </nav>
         <div className="p-2 border-t space-y-1">
-          <Link
-            to="/"
-            className="flex items-center gap-2 px-3 h-9 rounded-md text-xs text-muted-foreground hover:bg-accent"
-          >
-            <ArrowLeft className="size-4" /> Back to foreman view
-          </Link>
           <SwitchRoleButton />
         </div>
       </aside>
