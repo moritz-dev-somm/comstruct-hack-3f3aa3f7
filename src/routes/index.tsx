@@ -758,6 +758,15 @@ function HeroView({
             ))}
           </div>
         </div>
+
+        {/* Decorative icon row — SubBase-style colored tiles, anchored at bottom */}
+        <div className="mt-12 flex items-center justify-center gap-3 flex-wrap">
+          <IconTile icon={CompassIcon} tone="brand" size="sm" />
+          <IconTile icon={CraneIcon} tone="dark" size="sm" />
+          <IconTile icon={GearIcon} tone="light" size="sm" />
+          <IconTile icon={ShovelIcon} tone="brand" size="sm" />
+          <IconTile icon={ConeIcon} tone="outline" size="sm" />
+        </div>
       </div>
     </div>
   );
