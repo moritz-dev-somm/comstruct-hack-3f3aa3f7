@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, FileText, Download, Package, Truck, CreditCard, MapPin, CheckCircle2 } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, STATUS_META, tierLabel, type Order } from "@/lib/orders";
+import { useNegotiationsByOrder } from "@/lib/negotiations";
+import { deriveOrderStatus } from "@/lib/order-status";
 import { downloadPurchaseOrdersBySupplier, openFirstPurchaseOrderPdf } from "@/lib/po-pdf";
 import { useSuppliers, supplierContactMap } from "@/lib/suppliers";
 import { useMemo } from "react";
