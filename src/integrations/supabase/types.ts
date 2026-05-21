@@ -14,6 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_settings: {
+        Row: {
+          created_at: string
+          id: string
+          inbox_address: string | null
+          inbox_id: string | null
+          updated_at: string
+          webhook_id: string | null
+          webhook_secret: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inbox_address?: string | null
+          inbox_id?: string | null
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inbox_address?: string | null
+          inbox_id?: string | null
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      negotiations: {
+        Row: {
+          classification: Json | null
+          confirmed_at: string | null
+          created_at: string
+          id: string
+          inbox_id: string
+          last_reply_at: string | null
+          message_id: string | null
+          needs_user_reason: string | null
+          order_id: string
+          order_snapshot: Json
+          project: string | null
+          reply_excerpt: string | null
+          reply_message_id: string | null
+          sent_at: string
+          status: string
+          subject: string | null
+          supplier_email: string
+          supplier_name: string
+          thread_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          classification?: Json | null
+          confirmed_at?: string | null
+          created_at?: string
+          id?: string
+          inbox_id: string
+          last_reply_at?: string | null
+          message_id?: string | null
+          needs_user_reason?: string | null
+          order_id: string
+          order_snapshot: Json
+          project?: string | null
+          reply_excerpt?: string | null
+          reply_message_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string | null
+          supplier_email: string
+          supplier_name: string
+          thread_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          classification?: Json | null
+          confirmed_at?: string | null
+          created_at?: string
+          id?: string
+          inbox_id?: string
+          last_reply_at?: string | null
+          message_id?: string | null
+          needs_user_reason?: string | null
+          order_id?: string
+          order_snapshot?: Json
+          project?: string | null
+          reply_excerpt?: string | null
+          reply_message_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string | null
+          supplier_email?: string
+          supplier_name?: string
+          thread_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           attributes: Json
