@@ -777,9 +777,8 @@ export async function verifyAnsweredQuestions(args: {
   confirmedStillOpen: string[];
   newlyAnswered: Array<{ question: string; evidence: string }>;
 }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
   const stillOpen = (args.stillOpen ?? []).map((s) => s.trim()).filter(Boolean);
-  if (!apiKey || stillOpen.length === 0) {
+  if (stillOpen.length === 0) {
     return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
   }
 
@@ -837,51 +836,35 @@ export async function verifyAnsweredQuestions(args: {
     `\n\nCONVERSATION TRANSCRIPT:\n${transcriptText}\n\n` +
     `LATEST SUPPLIER REPLY:\n${args.latestReply}\n`;
 
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userMsg },
-        ],
-        tools: [tool],
-        tool_choice: { type: "function" as const, function: { name: "report_answers" } },
-        reasoning: { effort: "low" },
-      }),
-    });
-    if (!res.ok) {
-      console.error("verifyAnsweredQuestions gateway error", res.status, await res.text());
-      return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+  const data = (await callOpenAI({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userMsg },
+    ],
+    tools: [tool],
+    tool_choice: { type: "function" as const, function: { name: "report_answers" } },
+  })) as {
+    choices?: Array<{
+      message?: { tool_calls?: Array<{ function?: { arguments?: string } }> };
+    }>;
+  };
+  const argsStr = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
+  const parsed = JSON.parse(argsStr) as {
+    answered?: Array<{ question?: string; evidence?: string; confidence?: number }>;
+  };
+  const openSet = new Set(stillOpen);
+  const newlyAnswered: Array<{ question: string; evidence: string }> = [];
+  for (const a of parsed.answered ?? []) {
+    const q = String(a.question ?? "").trim();
+    const ev = String(a.evidence ?? "").trim();
+    const conf = typeof a.confidence === "number" ? a.confidence : 0;
+    if (q && ev && conf >= 0.6 && openSet.has(q)) {
+      newlyAnswered.push({ question: q, evidence: ev.slice(0, 240) });
     }
-    const data = (await res.json()) as {
-      choices?: Array<{
-        message?: { tool_calls?: Array<{ function?: { arguments?: string } }> };
-      }>;
-    };
-    const argsStr = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
-    const parsed = JSON.parse(argsStr) as {
-      answered?: Array<{ question?: string; evidence?: string; confidence?: number }>;
-    };
-    const openSet = new Set(stillOpen);
-    const newlyAnswered: Array<{ question: string; evidence: string }> = [];
-    for (const a of parsed.answered ?? []) {
-      const q = String(a.question ?? "").trim();
-      const ev = String(a.evidence ?? "").trim();
-      const conf = typeof a.confidence === "number" ? a.confidence : 0;
-      if (q && ev && conf >= 0.6 && openSet.has(q)) {
-        newlyAnswered.push({ question: q, evidence: ev.slice(0, 240) });
-      }
-    }
-    const answeredSet = new Set(newlyAnswered.map((a) => a.question));
-    return {
-      confirmedStillOpen: stillOpen.filter((q) => !answeredSet.has(q)),
-      newlyAnswered,
-    };
-  } catch (err) {
-    console.error("verifyAnsweredQuestions failed:", err);
-    return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
   }
+  const answeredSet = new Set(newlyAnswered.map((a) => a.question));
+  return {
+    confirmedStillOpen: stillOpen.filter((q) => !answeredSet.has(q)),
+    newlyAnswered,
+  };
 }
