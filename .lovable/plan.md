@@ -1,81 +1,100 @@
-# Advanced Spend Analytics — Plan
+# Supplier Agent — Completion Plan
 
-Replace the current minimal `src/routes/procurement.analytics.tsx` with a full single-page dashboard that follows the spec exactly. Rendered inside the existing procurement sidebar layout (no new routes).
+Scope per spec §1–§14. Minimal-diff: extend existing `agent/*`, webhook, and UI surfaces. No new npm deps.
 
-## Scope
+## Sequencing (8 steps, each independently reviewable)
 
-- One file rewritten: `src/routes/procurement.analytics.tsx`
-- Small helpers extracted into `src/lib/analytics-mock.ts` (mock data + CHF formatter + period scaling)
-- No DB / server / schema changes. Pure presentation using recharts + mock data per the spec.
+### 1. Database migration
+Add to `negotiations`:
+- `supplier_language text`
+- `last_inbound_from text`
+- `last_processed_message_id text` (idempotency)
+- `security_reject_reason text`
+- `clarification_count int default 0`
+- `followup_count int default 0` (promote from jsonb so policy can index it cheaply; keep jsonb mirror for audit)
 
-## Page structure
+No new table for events — keep using `classification` jsonb + `negotiation.history`-style append in jsonb. RLS policies stay open as today (project pattern).
 
-Single scrollable page, white cards on `#F9FAFB`, German throughout.
+### 2. Pure helpers (testable, no I/O) → `agent/email-match.ts`
+- `parseEmailAddress(raw)` — handles `"Name" <a@b>` and bare
+- `registrableDomain(host)` — small public-suffix allowlist (`co.uk`, `com.au`, `ch`, `de`, `fr`, `it`, `com`, `net`, `org`, …); strips subdomains to eTLD+1
+- `senderMatchesNegotiation(from, negotiation, supplierRow?)` — exact email OR same registrable domain on open negotiations OR domain on `suppliers` row
+- `extractOrderIdFromSubject(subject)` — `[ORD-####]`
+Unit tests via `bunx vitest run` in `agent/email-match.test.ts`.
 
-```text
-Header: "Spend Analytics" + "C-Material Beschaffung"
-        [Filter: Diese Woche | Dieser Monat* | Letztes Quartal | Dieses Jahr]   [📥 Export]
-        [optional active project filter chip: "Filter aktiv: <Projekt> ×"]
+### 3. Classifier extension → `agent/agent.server.ts`
+Extend `ReplyClassification` with: `reply_language`, `summary_en`, `answerable_questions[]`, `unanswerable_questions[]`, `suggested_outbound` enum. Update `CLASSIFY_SYSTEM`:
+- Accept any language; always emit `summary_en` in English
+- Conservative verdict rules (unchanged)
+- Distinguish answerable vs unanswerable questions
+- Emit `suggested_outbound` so policy can default to it when conditions don't override
 
-§1 KPI row (6 cards)
-§2 Ausgabenverlauf — ComposedChart (Bar + 7d rolling avg Line) + 3 insight chips
-§3 Spend Breakdown — [Projekt horizontal bars | Kategorie donut]
-§4 Lieferantenanalyse — table + amber off-contract alert
-§5 Ordering Behaviour — [Top Besteller table | Wochentag/Tageszeit bars]
-§6 Genehmigungsperformance — 3 mini charts (Zeiten bar, Schwellwert pie, Ablehnung)
+Backward-compat: optional fields default safely.
+
+### 4. Outbound templates → `agent/templates.ts`
+New bilingual composers mirroring `composeFollowupEmail` shape (native + English when lang≠en):
+- `composeConfirmationEmail` (update existing for i18n if missing)
+- `composeChecklistFollowupEmail` (rename current targeted follow-up)
+- `composeClarificationRequestEmail`
+- `composeAnswerQuestionsEmail` — answers built from `order_snapshot` + company block
+- `composeIssuesAckEmail` — "received, routing to procurement"
+- `composeDeclineAckEmail`
+- `composeNudgeEmail` — localize
+Pick language: `classification.reply_language` if supported, else `order_snapshot.supplier_language`, else `en`.
+
+### 5. Policy layer → `agent/conditions.ts`
+Replace ad-hoc switch with `decideAction(classification, negotiation)` returning a discriminated `AgentAction`:
+```ts
+type AgentAction =
+  | { kind: 'send_confirmation' }
+  | { kind: 'send_checklist_followup'; fields: ChecklistField[] }
+  | { kind: 'send_answer_questions'; questions: string[] }
+  | { kind: 'send_clarification_request' }
+  | { kind: 'send_decline_ack' }
+  | { kind: 'send_issues_ack' }
+  | { kind: 'escalate_silent'; reason: string }
+  | { kind: 'no_op'; reason: string }
 ```
+Implements the §7 matrix using `followup_count` / `clarification_count`. Never confirms unless `verdict==='fully_confirmed' && issues.length===0 && missing_checklist.length===0`.
 
-All numeric values, table rows, colours, and insight-chip texts come straight from the spec.
+### 6. Webhook rewrite → `src/routes/api/public/agentmail/webhook.ts`
+Replace inline branching with the pipeline from §2 architecture:
+1. Idempotency: skip if `messageId === negotiation.last_processed_message_id`
+2. Resolve negotiation: thread match → fallback (domain + `[ORD-####]` in subject + open status); ambiguous → `needs_user` "Unmatched supplier email"
+3. `senderMatchesNegotiation`; fail → store `security_reject_reason`, return 200, no outbound
+4. `classifyReply` (extended)
+5. `decideAction` → execute (send via `agentMail()`, update status + counters + classification jsonb + history append)
+6. On fallback match success, update `negotiations.thread_id` to new thread
 
-## Interactivity
+### 7. Infra + env → `agent/agent.server.ts`
+- `publicBaseUrl()` → `process.env.PUBLIC_APP_URL ?? "https://comstruct-hack.lovable.app"`
+- `ensureAgentInbox` already returns inbox id/address; expose via a small `createServerFn` (`getAgentInboxFn`) so `/procurement/agent` hydrates from server (not orphan localStorage)
+- `startNegotiationForOrder`: persist `supplier_language` on the negotiation row from `suppliers.language` (lookup by email)
 
-- `period` state (default `monat`). A `scale` factor (`woche=0.25`, `monat=1`, `quartal=3`, `jahr=12`) is applied to all CHF/count values and the time-series is regenerated for the period's date range. KPI trends recomputed against previous period of same length.
-- `projectFilter` state. Clicking a bar in §3A sets it; chip in header clears it. While active, §4 and §5 recompute from that project's slice (mock filter).
-- KPI cards have `onClick` that smooth-scrolls (`scrollIntoView`) to the relevant section via section `ref`s: spend → §2, supplier → §4, approval/Ø-time → §6.
-- Tables sortable: column header click toggles sort key + direction (small caret icon on hover).
-- All recharts have `<Tooltip>` with formatted CHF values.
-- Export button triggers the exact CSV blob download from the spec.
+### 8. UI
+- **orders.tsx / procurement.orders.$orderId.tsx / orders.$orderId.track.tsx**: render per-negotiation card with `derived status`, `summary_en`, `needs_user_reason`, `last_reply_at`, last agent action label (derived from `classification.suggested_outbound` / last status transition). Track page: "Order accepted" turns done when any negotiation reaches `confirmed`.
+- **procurement.agent.tsx**: on mount, if no localStorage inbox, fetch via new `getAgentInboxFn`. Show "Unmatched" and "Rejected (domain)" badges on threads whose latest negotiation row has `security_reject_reason` or is unmatched.
 
-## Formatting
+## Out of scope (explicit)
+- No `negotiation_events` audit table — using existing jsonb fields.
+- No new translation API — classifier does multilingual natively.
+- No auth changes; RLS stays public per project pattern.
+- Hydration warnings in orders page (separate issue — `new Date().toLocaleString()` SSR mismatch) tracked separately unless you want me to fix in same pass.
 
-- `formatCHF(n)` → `CHF 4'284` (apostrophe thousands, no decimals).
-- Dates formatted `dd.MM` for x-axis, `dd.MM.yyyy` for tooltips.
+## Technical notes
+- Cloudflare Worker runtime: keep using `crypto.subtle` (already there) for HMAC; no Node `crypto`.
+- All AI calls keep going through Lovable AI Gateway with `openai/gpt-5-mini`.
+- AgentMail SDK send: reuse existing `am.inboxes.messages.send(...)` shape from `composeOrderEmail` send site.
+- Idempotency key is per-message; webhook returns 200 for all "handled" outcomes (including rejected senders) to avoid Svix retry storms.
 
-## Styling
+## Tests
+- `agent/email-match.test.ts` for domain/sender matching (exact, subdomain, foreign domain, malformed)
+- `agent/conditions.test.ts` for policy matrix (8 rows × counter states)
+Run with `bunx vitest run agent/`.
 
-The spec mandates concrete hex colours that override the project's red Swiss-Modernist tokens for this dashboard only:
+## Estimated diff
+~6 files edited, ~3 files created, 1 migration. Total ~700 LOC net new.
 
-- Primary chart green `#16A34A`, accent blue `#2563EB`, teal `#0D9488`, amber `#D97706`, gray `#6B7280`, danger `#DC2626`, amber bg `#FEF3C7`.
-- Cards: `rounded-xl border border-[#E5E7EB] shadow-sm bg-white`, page bg `#F9FAFB`.
-- Status pills: green/amber/red per "Vertragskonform" thresholds.
-- Off-contract row: `border-l-4 border-[#DC2626]`.
+---
 
-Note: This deliberately deviates from the comstruct brand tokens (which forbid hardcoded hex and shadows) because the spec is explicit. Scope is contained to this one route.
-
-## Mock data module (`src/lib/analytics-mock.ts`)
-
-Exports:
-- `formatCHF`
-- `PERIODS` + `scaleFor(period)`
-- `buildDailySeries(period)` → array of `{ date, spend, rolling7 }` with Monday spikes + occasional 300–450 CHF days
-- `KPIS`, `BY_PROJECT`, `BY_CATEGORY`, `SUPPLIERS`, `TOP_FOREMEN`, `WEEKDAY`, `TIMEOFDAY`, `APPROVAL_TIMES`, `APPROVAL_TIERS`, `REJECTIONS` — base monthly values from spec, scaled at render time.
-- `applyProjectFilter(data, project)` helpers for §4/§5.
-
-## Build order (matches spec priority)
-
-1. Scaffold page shell + header + filters + section refs
-2. §1 KPI row
-3. §3 Spend breakdown (bars + donut)
-4. §2 Ausgabenverlauf ComposedChart + insight chips
-5. §5 Top Besteller + Wochentag/Tageszeit
-6. §4 Lieferanten table + off-contract alert
-7. §6 Approval performance trio
-8. Wire date filter → recompute everything
-9. Wire project bar click → filter chip + §4/§5 filtering + KPI scroll
-10. CSV export button
-
-## Out of scope
-
-- No changes to sidebar, routing, DB, server functions, or other procurement pages.
-- The drawer for "click a Besteller row" is stubbed as a simple `Sheet` showing the foreman's filtered orders list (reuses existing `Sheet` ui component); no new routes.
-- "Bestellregeln anpassen →" and "Ablehnungen ansehen →" buttons link via `<Link>` to existing `/settings` and `/procurement/orders` respectively.
+Confirm and I'll execute steps 1→8 in order, pausing only at the migration approval prompt.
