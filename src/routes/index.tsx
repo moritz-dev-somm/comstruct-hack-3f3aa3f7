@@ -544,12 +544,14 @@ function HeroView({
   send,
   onSelectCategory,
   inputRef,
+  onAddQuickOrder,
 }: {
   input: string;
   setInput: (v: string) => void;
   send: (v: string) => void;
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onAddQuickOrder: (items: string[]) => void;
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
