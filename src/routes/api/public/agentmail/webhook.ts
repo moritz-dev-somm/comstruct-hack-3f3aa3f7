@@ -82,17 +82,32 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         const thread = payload.thread as Record<string, unknown> | undefined;
         if (!message) return new Response("no message", { status: 200 });
 
-        const threadId = String(message.threadId ?? thread?.threadId ?? "");
-        const inboxId = String(message.inboxId ?? "");
+        const threadId = String(
+          (message.thread_id as string | undefined) ??
+            (message.threadId as string | undefined) ??
+            (thread?.thread_id as string | undefined) ??
+            (thread?.threadId as string | undefined) ??
+            "",
+        );
+        const inboxId = String(
+          (message.inbox_id as string | undefined) ??
+            (message.inboxId as string | undefined) ??
+            "",
+        );
         const from = String(message.from ?? "");
         const subject = String(message.subject ?? "");
         const replyText = String(
-          (message.extractedText as string | undefined) ??
+          (message.extracted_text as string | undefined) ??
+            (message.extractedText as string | undefined) ??
             (message.text as string | undefined) ??
             (message.preview as string | undefined) ??
             "",
         );
-        const messageId = String(message.messageId ?? "");
+        const messageId = String(
+          (message.message_id as string | undefined) ??
+            (message.messageId as string | undefined) ??
+            "",
+        );
 
         const sb = adminClient();
 
