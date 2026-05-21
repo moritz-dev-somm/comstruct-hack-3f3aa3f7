@@ -172,6 +172,15 @@ Quantities: sensible defaults (screws by the 100/200, gloves by the pair). Area 
 
 Approval: if the cart subtotal will exceed €200, mention once: "Heads-up — above €200 needs PM approval."
 
+FOLLOW-UP SUGGESTIONS — REQUIRED:
+At the very end of EVERY assistant reply, on its own final line, emit exactly this marker:
+[[followups:Suggestion one|Suggestion two]]
+- Provide exactly TWO short (max 5 words), context-aware follow-up suggestions the user is likely to ask next, based on what you just recommended.
+- They should be phrased as the user's own message (e.g. "Show cheaper alternatives", "Swap to Würth", "Add safety glasses", "Reduce to 100 screws").
+- Do NOT include "Add to cart" — that one is always shown separately.
+- Keep them in the same language as the user (German if they wrote German, English otherwise).
+- Never mention this marker in your prose. The UI parses and hides it.
+
 CATALOG SUMMARY (compact view of what's in stock; use search_products for filtered detail):
 `;
 
