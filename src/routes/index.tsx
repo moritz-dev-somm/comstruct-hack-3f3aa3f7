@@ -454,6 +454,32 @@ function Home() {
             send={send}
             onSelectCategory={setSelectedCategory}
             inputRef={inputRef}
+            onAddQuickOrder={(items) => {
+              let added = 0;
+              for (const itemName of items) {
+                const product = products.find((p) =>
+                  p.name.toLowerCase().includes(itemName.toLowerCase()) ||
+                  itemName.toLowerCase().includes(p.name.toLowerCase())
+                );
+                if (product) {
+                  cart.add({
+                    productId: product.sku,
+                    name: product.name,
+                    price: product.price,
+                    category: product.category,
+                    unit: product.unit,
+                    qty: 1,
+                  });
+                  added++;
+                }
+              }
+              if (added > 0) {
+                toast.success(`Added ${added} item${added === 1 ? "" : "s"} to cart`);
+                setCartOpen(true);
+              } else {
+                toast.info("No matching products found in catalog");
+              }
+            }}
           />
         ) : (
           <ConversationView
@@ -544,12 +570,14 @@ function HeroView({
   send,
   onSelectCategory,
   inputRef,
+  onAddQuickOrder,
 }: {
   input: string;
   setInput: (v: string) => void;
   send: (v: string) => void;
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onAddQuickOrder: (items: string[]) => void;
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
@@ -640,10 +668,9 @@ function HeroView({
                 total: "€215.80",
               },
             ] as QuickOrder[]).map((order) => (
-              <button
+              <div
                 key={order.id}
-                onClick={() => toast.success(`Reordered ${order.id}`)}
-                className="w-full text-left rounded-xl border bg-card p-4 transition-colors hover:bg-accent hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                className="w-full rounded-xl border bg-card p-4 transition-colors hover:border-brand/40"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -659,11 +686,14 @@ function HeroView({
                   {order.items.slice(0, 3).join(" · ")}
                   {order.items.length > 3 && ` · +${order.items.length - 3} more`}
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand">
-                  <Plus className="size-3.5" />
-                  Reorder
-                </div>
-              </button>
+                <button
+                  onClick={() => onAddQuickOrder(order.items)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                >
+                  <ShoppingCart className="size-3.5" />
+                  Add all to cart
+                </button>
+              </div>
             ))}
           </div>
         </div>
