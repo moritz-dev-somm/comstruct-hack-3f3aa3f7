@@ -21,6 +21,8 @@ function OrderDetail() {
   const { orders, advanceToDelivered } = useOrders();
   const navigate = useNavigate();
   const order = orders.find((o) => o.id === orderId);
+  const { data: suppliers } = useSuppliers();
+  const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
 
   if (!order) {
     return (
