@@ -217,13 +217,27 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
 
         const followupCount = Number(neg.followup_count ?? 0);
         const clarificationCount = Number(neg.clarification_count ?? 0);
+        const prevAnswered = Array.isArray(
+          (neg.classification as { answered_checklist?: ChecklistField[] } | null)?.answered_checklist,
+        )
+          ? ((neg.classification as { answered_checklist: ChecklistField[] }).answered_checklist as ChecklistField[])
+          : [];
+        const answeredChecklist = mergeAnsweredChecklist(prevAnswered, cls);
+        const prevReplyCount = Number(
+          (neg.classification as { reply_count?: number } | null)?.reply_count ?? 0,
+        );
+        const replyCount = prevReplyCount + 1;
         const lang = pickLang(cls.reply_language, (neg.order_snapshot as { supplier_language?: string })?.supplier_language);
 
         /* -------- 5. Decide + execute -------- */
-        const action = decideAction(cls, {
+        const state: CounterState = {
           followup_count: followupCount,
           clarification_count: clarificationCount,
-        });
+          reply_count: replyCount,
+          answered_checklist: answeredChecklist,
+          order_subtotal_eur: Number(order.subtotal ?? 0),
+        };
+        const action = decideAction(cls, state);
 
         let nextStatus: string = neg.status ?? "awaiting_reply";
         let needsUserReason: string | null = null;
@@ -246,7 +260,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
 
         switch (action.kind) {
           case "send_confirmation": {
-            await reply(composeConfirmationEmail(order, { leadTime: cls.lead_time }));
+            await reply(composeConfirmationEmail(order, { leadTime: cls.lead_time }, lang));
             nextStatus = "confirmed";
             break;
           }
@@ -264,21 +278,9 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           }
           case "send_clarification_request": {
             const points = (cls.unclear_points ?? []).filter(Boolean);
-            await reply(composeClarificationRequestEmail(order, lang, points));
+            await reply(composeClarificationRequestEmail(order, lang, points, action.pendingChecklist));
             nextStatus = "clarifying";
             nextClarification = clarificationCount + 1;
-            break;
-          }
-          case "send_decline_ack": {
-            await reply(composeDeclineAckEmail(order, lang));
-            nextStatus = "declined";
-            needsUserReason = `Supplier declined: ${cls.summary_en || cls.summary}`;
-            break;
-          }
-          case "send_issues_ack": {
-            await reply(composeIssuesAckEmail(order, lang));
-            nextStatus = "issues_raised";
-            needsUserReason = `Issues: ${(cls.issues ?? []).join("; ") || cls.summary_en || cls.summary}`;
             break;
           }
           case "escalate_silent": {
