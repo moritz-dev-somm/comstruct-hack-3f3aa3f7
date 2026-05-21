@@ -155,6 +155,7 @@ export function VoiceButton({
     }
     cancelledRef.current = false;
     deliveredRef.current = false;
+    intentRef.current = true;
     setInterim("");
     setFinalText("");
 
