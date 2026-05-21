@@ -687,32 +687,7 @@ function HeroView({
                   {order.items.length > 3 && ` · +${order.items.length - 3} more`}
                 </div>
                 <button
-                  onClick={() => {
-                    let added = 0;
-                    for (const itemName of order.items) {
-                      const product = products.find((p) =>
-                        p.name.toLowerCase().includes(itemName.toLowerCase()) ||
-                        itemName.toLowerCase().includes(p.name.toLowerCase())
-                      );
-                      if (product) {
-                        cart.add({
-                          productId: product.sku,
-                          name: product.name,
-                          price: product.price,
-                          category: product.category,
-                          unit: product.unit,
-                          qty: 1,
-                        });
-                        added++;
-                      }
-                    }
-                    if (added > 0) {
-                      toast.success(`Added ${added} item${added === 1 ? "" : "s"} to cart`);
-                      setCartOpen(true);
-                    } else {
-                      toast.info("No matching products found in catalog");
-                    }
-                  }}
+                  onClick={() => onAddQuickOrder(order.items)}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                 >
                   <ShoppingCart className="size-3.5" />
