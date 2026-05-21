@@ -728,7 +728,66 @@ function ConversationView({
             </SuggestionButton>
           </div>
         )}
+
+        {/* End-of-chat hybrid search trigger */}
+        {!streaming && messages.length > 0 && (
+          <div className="pt-3">
+            <button
+              onClick={onRunSearch}
+              disabled={searching}
+              className="inline-flex items-center gap-2 rounded-full bg-brand text-brand-foreground px-4 h-10 text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+            >
+              {searching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Searching catalog…
+                </>
+              ) : (
+                <>
+                  <Search className="size-4" />
+                  Search catalog for matches
+                </>
+              )}
+            </button>
+            {searchExtracted && !searching && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Query: <span className="font-medium text-foreground">{searchExtracted.semantic_search_string}</span>
+                {searchExtracted.extracted_category && (
+                  <> · in <span className="font-medium">{searchExtracted.extracted_category}</span></>
+                )}
+                {searchExtracted.extracted_keywords.length > 0 && (
+                  <> · {searchExtracted.extracted_keywords.slice(0, 6).join(" · ")}</>
+                )}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Hybrid search results */}
+        {searchResults && (
+          <div className="pt-2">
+            <div className="flex items-end justify-between mb-3 border-b-2 border-brand/70 pb-2">
+              <h2 className="text-lg font-bold text-brand">Catalog matches</h2>
+              <span className="text-xs text-muted-foreground">
+                {searchResults.length} result{searchResults.length === 1 ? "" : "s"} · cheapest first
+              </span>
+            </div>
+            {searchResults.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                No matches found.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {searchResults.map((r) => (
+                  <SearchResultCard key={r.sku} result={r} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+
 
       {showTilesLayout ? (
         <>
