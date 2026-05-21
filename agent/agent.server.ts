@@ -292,6 +292,20 @@ export async function classifyReply(args: {
   const openQs = args.thread?.priorOpenQuestions ?? [];
   const answeredChk = args.thread?.priorAnsweredChecklist ?? [];
   const priorAnswers = args.thread?.priorAnswersSummary ?? [];
+  const transcript = args.thread?.transcript ?? [];
+
+  const transcriptBlock = transcript.length
+    ? `FULL CONVERSATION TRANSCRIPT (oldest → newest, excluding the LATEST reply below):\n` +
+      transcript
+        .map((m, i) => {
+          const who = m.role === "agent" ? "AGENT" : "SUPPLIER";
+          const lang = m.lang ? ` (${m.lang})` : "";
+          return `--- [${i + 1}] ${who}${lang} ---\n${(m.text || "").slice(0, 3500)}`;
+        })
+        .join("\n") +
+      `\n\n`
+    : "";
+
   const threadBlock =
     `THREAD CONTEXT:\n` +
     `OPEN QUESTION FROM AGENT (the supplier is expected to address these — copy verbatim into answered_open_questions / still_open_questions):\n` +
@@ -305,6 +319,46 @@ export async function classifyReply(args: {
       : "") +
     `\n`;
 
+  const tool = {
+    type: "function" as const,
+    function: {
+      name: "classify_reply",
+      description: "Return the classification of the supplier reply.",
+      parameters: {
+        type: "object",
+        properties: {
+          verdict: { type: "string", enum: ["fully_confirmed", "confirmed_with_issue", "declined", "needs_clarification", "unclear"] },
+          summary: { type: "string" },
+          summary_en: { type: "string" },
+          reply_language: { type: "string" },
+          lead_time: { type: ["string", "null"] },
+          lead_time_days: { type: ["number", "null"] },
+          shipping_cost_eur: { type: ["number", "null"] },
+          wants_human: { type: "boolean" },
+          issues: { type: "array", items: { type: "string" } },
+          checklist: {
+            type: "object",
+            properties: {
+              order_confirmed: { type: "boolean" },
+              delivery_date: { type: ["string", "null"] },
+              shipping_cost: { type: ["string", "null"] },
+            },
+            required: ["order_confirmed", "delivery_date", "shipping_cost"],
+          },
+          missing_checklist: { type: "array", items: { type: "string", enum: ["delivery_date", "shipping_cost"] } },
+          answerable_questions: { type: "array", items: { type: "string" } },
+          unanswerable_questions: { type: "array", items: { type: "string" } },
+          unclear_points: { type: "array", items: { type: "string" } },
+          unclear_points_en: { type: "array", items: { type: "string" } },
+          answered_open_questions: { type: "array", items: { type: "string" } },
+          still_open_questions: { type: "array", items: { type: "string" } },
+          suggested_outbound: { type: "string" },
+        },
+        required: ["verdict", "summary", "summary_en", "checklist", "missing_checklist", "answered_open_questions", "still_open_questions"],
+      },
+    },
+  };
+
   const body = {
     model: "openai/gpt-5-mini",
     messages: [
@@ -314,11 +368,12 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `${threadBlock}\n` +
-          `LATEST SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, lead_time_days, shipping_cost_eur, wants_human, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, answered_open_questions, still_open_questions, suggested_outbound.`,
+          transcriptBlock +
+          `LATEST SUPPLIER REPLY:\n${args.supplierReply}\n`,
       },
     ],
-    response_format: { type: "json_object" },
+    tools: [tool],
+    tool_choice: { type: "function" as const, function: { name: "classify_reply" } },
   };
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -335,10 +390,19 @@ export async function classifyReply(args: {
       return fallbackClassification("unclear", "AI gateway error", [t.slice(0, 200)]);
     }
     const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{
+        message?: {
+          content?: string;
+          tool_calls?: Array<{ function?: { name?: string; arguments?: string } }>;
+        };
+      }>;
     };
-    const content = data.choices?.[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as Partial<ReplyClassification>;
+    const msg = data.choices?.[0]?.message;
+    const argsStr =
+      msg?.tool_calls?.[0]?.function?.arguments ??
+      msg?.content ??
+      "{}";
+    const parsed = JSON.parse(argsStr) as Partial<ReplyClassification> & { unclear_points_en?: string[] };
     const checklist = normalizeChecklist(parsed.checklist);
     // Anything the supplier already answered in prior turns stays answered, even
     // if the model's missing_checklist regresses it.
@@ -371,7 +435,6 @@ export async function classifyReply(args: {
       : [];
     // Derive deterministically: anything not in answered_open is still open.
     const stillOpen = openQs.filter((q) => !answeredOpenSet.has(q));
-    // Prefer derived; only fall back to model output if derivation is empty AND model says so.
     const finalStillOpen = stillOpen.length ? stillOpen : stillOpenModel;
 
     // Drop unclear_points that just repeat a question the supplier just answered.
@@ -381,6 +444,13 @@ export async function classifyReply(args: {
     const unclearPoints = unclearPointsRaw
       .filter((p) => !answeredOpenSet.has(p))
       .slice(0, 6);
+    const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
+      ? parsed.unclear_points_en.map(String).filter(Boolean)
+      : [];
+    // Align EN array to native array length when model returns mismatched arrays.
+    const unclearPointsEn = unclearPointsEnRaw.length === unclearPoints.length
+      ? unclearPointsEnRaw
+      : unclearPoints.map((p, i) => unclearPointsEnRaw[i] ?? p);
 
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
@@ -401,6 +471,7 @@ export async function classifyReply(args: {
         ? parsed.unanswerable_questions.map(String).filter(Boolean)
         : [],
       unclear_points: unclearPoints,
+      unclear_points_en: unclearPointsEn,
       answered_open_questions: answeredOpen,
       still_open_questions: finalStillOpen,
       suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
