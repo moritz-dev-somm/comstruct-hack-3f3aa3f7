@@ -6,7 +6,8 @@ import {
   getAgentSettings,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import { composeConfirmationEmail } from "../../../../../agent/templates";
+import { composeConfirmationEmail, composeFollowupEmail } from "../../../../../agent/templates";
+import type { ReplyClassification } from "../../../../../agent/agent.server";
 import type { Order } from "@/lib/orders";
 
 /**
