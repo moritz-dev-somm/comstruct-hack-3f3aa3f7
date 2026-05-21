@@ -4,9 +4,10 @@ import {
   agentMail,
   classifyReply,
   getAgentSettings,
+  verifyAnsweredQuestions,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import type { ReplyClassification, ThreadContext } from "../../../../../agent/agent.server";
+import type { ReplyClassification, ThreadContext, ThreadMessage } from "../../../../../agent/agent.server";
 import {
   composeAnswerQuestionsEmail,
   composeClarificationRequestEmail,
@@ -32,9 +33,12 @@ const CHECKLIST_LABEL_EN: Record<ChecklistField, string> = {
   shipping_cost: "Shipping costs (or confirm shipping is included)",
 };
 
+const MAX_TRANSCRIPT_TURNS = 10;
+
 type NegotiationClassification = Partial<ReplyClassification> & {
   answered_checklist?: ChecklistField[];
   reply_count?: number;
+  /** ENGLISH canonical strings — language-stable identifiers for open questions. */
   open_questions?: string[];
   prior_answers?: string[];
 };
@@ -52,6 +56,7 @@ type NegotiationRow = {
   followup_count: number | null;
   clarification_count: number | null;
   last_processed_message_id: string | null;
+  thread_messages: ThreadMessage[] | null;
   sent_at: string;
 };
 
