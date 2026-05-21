@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" translate="no">
+  <head>
+    <link rel="preload" href="/fonts/WOFF2/TTF/SourceSans3-Regular.ttf.woff2" as="font" crossorigin="anonymous"/>
+    <link rel="preload" href="/fonts/WOFF2/TTF/SourceSans3-Bold.ttf.woff2" as="font" crossorigin="anonymous"/>
+    <link rel="preload" href="/fonts/WOFF2/TTF/SourceSans3-Semibold.ttf.woff2" as="font" crossorigin="anonymous"/>
+    <link rel="preload" href="/fonts/WOFF2/TTF/SourceSans3-It.ttf.woff2" as="font" crossorigin="anonymous"/>
+    <link rel="preload" href="/fonts/251113_lapp-icon-font.ttf" as="font" crossorigin="anonymous"/>
+    <meta charset="utf-8"/>
+    <title>Lapp</title>
+    <base href="/"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="icon" type="image/x-icon" href="favicon.ico"/>
+    <meta name="occ-backend-base-url" content="https://api-shop.lapp.com"/>
+    <meta name="media-backend-base-url" content="MEDIA_BACKEND_BASE_URL_VALUE"/>
+    <link rel="manifest" href="manifest.webmanifest"/>
+    <meta name="theme-color" content="#1976d2"/>
+    <meta name="author" content="LAPP 2023-04-12"/>
+  <link rel="stylesheet" href="styles-UFT6LPLG.css"></head>
+
+  <body><script type="text/javascript" id="ng-event-dispatch-contract">(()=>{function p(t,n,r,o,e,i,f,m){return{eventType:t,event:n,targetElement:r,eic:o,timeStamp:e,eia:i,eirp:f,eiack:m}}function u(t){let n=[],r=e=>{n.push(e)};return{c:t,q:n,et:[],etc:[],d:r,h:e=>{r(p(e.type,e,e.target,t,Date.now()))}}}function s(t,n,r){for(let o=0;o<n.length;o++){let e=n[o];(r?t.etc:t.et).push(e),t.c.addEventListener(e,t.h,r)}}function c(t,n,r,o,e=window){let i=u(t);e._ejsas||(e._ejsas={}),e._ejsas[n]=i,s(i,r),s(i,o,!0)}window.__jsaction_bootstrap=c;})();
+</script>
+    <app-root></app-root>
+    <noscript>
+      Please enable JavaScript to continue using this application.
+    </noscript>
+  <link rel="modulepreload" href="chunk-N3MILIJF.js"><link rel="modulepreload" href="chunk-SRE3AO5R.js"><link rel="modulepreload" href="chunk-6LWSSGU5.js"><link rel="modulepreload" href="chunk-WVZZ6CZA.js"><link rel="modulepreload" href="chunk-HG5BHQHZ.js"><link rel="modulepreload" href="chunk-BGH22GDW.js"><link rel="modulepreload" href="chunk-2GVCBUFT.js"><link rel="modulepreload" href="chunk-M77SPOWY.js"><link rel="modulepreload" href="chunk-JRKLMAA7.js"><link rel="modulepreload" href="chunk-32UMB4GM.js"><script src="polyfills-BUUDEW7V.js" type="module"></script><script src="scripts-IME2PUIM.js" defer=""></script><script src="main-R5I4C3NK.js" type="module"></script></body>
+  <script>
+    function userlikeTrackingEvent(event_name, global_ctx, session_ctx) {
+      const event = new CustomEvent("userlikeTrackingEvent", {
+        detail: { event_name, global_ctx, session_ctx },
+      });
+
+      // Dispatch the event on the Angular component's host element
+      const myComponentElement = document.querySelector("app-root");
+      if (myComponentElement) {
+        myComponentElement.dispatchEvent(event);
+      }
+    }
+  </script>
+</html>
