@@ -147,43 +147,44 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
         {/* §1 KPI row */}
         <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           <KpiCard
-            label="Gesamtausgaben C-Material"
+            label="Total C-material spend"
             value={formatCHF(kpis.spend)}
             trend={12}
-            trendLabel="vs Vormonat"
+            trendLabel="vs last month"
             onClick={() => scrollTo(spendRef)}
           />
           <KpiCard
-            label="Anzahl Bestellungen"
+            label="Number of orders"
             value={String(kpis.count)}
             trend={8}
             onClick={() => scrollTo(spendRef)}
           />
           <KpiCard
-            label="Ø Bestellwert"
+            label="Avg. order value"
             value={formatCHF(kpis.avg)}
             trend={-3}
             onClick={() => scrollTo(spendRef)}
           />
           <KpiCard
-            label="Aktive Lieferanten"
+            label="Active suppliers"
             value={String(kpis.suppliers)}
             trend={0}
             onClick={() => scrollTo(supplierRef)}
           />
           <KpiCard
-            label="Genehmigungsquote"
+            label="Approval rate"
             value={`${kpis.approvalRate}%`}
             trend={2}
             onClick={() => scrollTo(approvalRef)}
           />
           <KpiCard
-            label="Ø Genehmigungszeit"
-            value={`${kpis.approvalMinutes} Min.`}
+            label="Avg. approval time"
+            value={`${kpis.approvalMinutes} min`}
             trend={-22}
             invertTrend
             onClick={() => scrollTo(approvalRef)}
           />
+
         </section>
 
         {/* §2 Ausgabenverlauf */}
