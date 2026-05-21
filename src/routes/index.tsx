@@ -1332,6 +1332,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
       qty: 1,
       category: product.category,
       unit: product.unit,
+      supplier: product.supplier,
     });
   }
 
