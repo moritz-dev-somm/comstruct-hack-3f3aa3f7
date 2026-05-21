@@ -460,7 +460,7 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
     sign: "Thanks,",
     bullets: {
       delivery_date: "Earliest delivery date you can commit to",
-      shipping_cost: "Shipping costs (or confirm shipping is included)",
+      shipping_cost: "Shipping costs",
     },
   },
   de: {
@@ -469,7 +469,7 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
     sign: "Vielen Dank,",
     bullets: {
       delivery_date: "Frühestmöglicher Liefertermin, den Sie zusichern können",
-      shipping_cost: "Versandkosten (oder Bestätigung, dass der Versand inbegriffen ist)",
+      shipping_cost: "Versandkosten",
     },
   },
   fr: {
@@ -478,7 +478,7 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
     sign: "Merci,",
     bullets: {
       delivery_date: "Date de livraison la plus proche que vous pouvez garantir",
-      shipping_cost: "Frais de port (ou confirmation que le port est inclus)",
+      shipping_cost: "Frais de port",
     },
   },
   it: {
@@ -487,7 +487,7 @@ const FOLLOWUP_STRINGS: Record<SupplierLanguage, FollowupStrings> = {
     sign: "Grazie,",
     bullets: {
       delivery_date: "Data di consegna più rapida che potete garantire",
-      shipping_cost: "Costi di spedizione (oppure conferma che la spedizione è inclusa)",
+      shipping_cost: "Costi di spedizione",
     },
   },
 };
