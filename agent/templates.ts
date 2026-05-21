@@ -28,8 +28,16 @@ const COMPANY = {
   agentName: "comstruct procurement agent",
 };
 
-const AGENT_DISCLOSURE_TEXT = `Sent automatically by ${COMPANY.name}'s AI procurement agent.`;
-const AGENT_DISCLOSURE_HTML = `<p style="font-size:11px;color:#9ca3af;margin-top:14px"><em>${AGENT_DISCLOSURE_TEXT}</em></p>`;
+export type SupplierLanguage = "en" | "de" | "fr" | "it";
+
+const DISCLOSURE: Record<SupplierLanguage, string> = {
+  en: `Sent automatically by ${COMPANY.name}'s AI procurement agent.`,
+  de: `Automatisch gesendet vom KI-Beschaffungsagenten der ${COMPANY.name}.`,
+  fr: `Envoyé automatiquement par l'agent IA d'approvisionnement de ${COMPANY.name}.`,
+  it: `Inviato automaticamente dall'agente IA per gli acquisti di ${COMPANY.name}.`,
+};
+const disclosureHtml = (text: string) =>
+  `<p style="font-size:11px;color:#9ca3af;margin-top:14px"><em>${escapeHtml(text)}</em></p>`;
 
 const SEP_TEXT = "\n\n-------------------- ";
 const SEP_TEXT_END = " --------------------\n\n";
@@ -44,8 +52,6 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export type SupplierLanguage = "en" | "de" | "fr" | "it";
-
 const LANG_LABEL: Record<SupplierLanguage, string> = {
   en: "English",
   de: "Deutsch",
@@ -56,7 +62,8 @@ const LANG_LABEL: Record<SupplierLanguage, string> = {
 /**
  * Assemble a bilingual email with English ALWAYS first, then the supplier's
  * native language below. When the supplier language is English we just emit
- * the English block once.
+ * the English block once. The agent disclosure is rendered in BOTH languages,
+ * once under each block, so each half is self-contained.
  */
 function assembleBilingual(args: {
   language: SupplierLanguage;
@@ -68,21 +75,25 @@ function assembleBilingual(args: {
   htmlNative: string;
 }): ComposedEmail {
   const isBi = args.language !== "en";
+  const discEn = DISCLOSURE.en;
+  const discNative = DISCLOSURE[args.language];
   const subject = isBi ? `${args.subjectEn} / ${args.subjectNative}` : args.subjectEn;
   const text = isBi
     ? args.textEn +
+      `\n\n--\n${discEn}` +
       SEP_TEXT +
       LANG_LABEL[args.language] +
       SEP_TEXT_END +
       args.textNative +
-      `\n\n--\n${AGENT_DISCLOSURE_TEXT}`
-    : args.textEn + `\n\n--\n${AGENT_DISCLOSURE_TEXT}`;
+      `\n\n--\n${discNative}`
+    : args.textEn + `\n\n--\n${discEn}`;
   const html = `
 <div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">
   ${args.htmlEn}
+  ${disclosureHtml(discEn)}
   ${isBi ? SEP_HTML(LANG_LABEL[args.language]) : ""}
   ${isBi ? args.htmlNative : ""}
-  ${AGENT_DISCLOSURE_HTML}
+  ${isBi ? disclosureHtml(discNative) : ""}
 </div>`;
   return { subject, text, html };
 }
@@ -574,14 +585,18 @@ export function composeClarificationRequestEmail(
   language: SupplierLanguage = "en",
   points: string[] = [],
   pendingChecklist: ChecklistField[] = ["delivery_date", "shipping_cost"],
+  pointsEn: string[] = [],
 ): ComposedEmail {
-  const cleaned = points.map((p) => p.trim()).filter(Boolean);
-  const bulletsNative = cleaned.length
-    ? cleaned
+  const cleanedNative = points.map((p) => p.trim()).filter(Boolean);
+  const cleanedEn = pointsEn.map((p) => p.trim()).filter(Boolean);
+  const bulletsNative = cleanedNative.length
+    ? cleanedNative
     : pendingChecklist.map((f) => checklistBullet(language, f));
-  const bulletsEn = cleaned.length
-    ? cleaned
-    : pendingChecklist.map((f) => checklistBullet("en", f));
+  const bulletsEn = cleanedEn.length
+    ? cleanedEn
+    : cleanedNative.length && language === "en"
+      ? cleanedNative
+      : pendingChecklist.map((f) => checklistBullet("en", f));
   return assembleBilingual({
     language,
     subjectEn: `Re: [${order.id}] ${CLARIFY.en.subject}`,

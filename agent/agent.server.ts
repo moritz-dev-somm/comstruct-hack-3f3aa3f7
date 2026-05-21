@@ -148,6 +148,8 @@ export type ReplyClassification = {
   answerable_questions?: string[];
   unanswerable_questions?: string[];
   unclear_points?: string[];
+  /** Same as unclear_points but in ENGLISH — language-stable for cross-turn matching. */
+  unclear_points_en?: string[];
   /** Subset of priorOpenQuestions the latest reply addresses (verbatim). */
   answered_open_questions?: string[];
   /** Subset of priorOpenQuestions still not addressed by the latest reply. */
@@ -157,13 +159,24 @@ export type ReplyClassification = {
   clarification_count?: number;
 };
 
+export type ThreadMessage = {
+  role: "agent" | "supplier";
+  /** ISO 639-1 best effort. */
+  lang?: string;
+  /** Plain text body (no HTML). */
+  text: string;
+  at?: string;
+};
+
 export type ThreadContext = {
-  /** Open questions the agent has asked and is waiting on. */
+  /** Open questions the agent has asked and is waiting on (ENGLISH, canonical). */
   priorOpenQuestions: string[];
   /** Checklist fields the supplier already answered in earlier turns. */
   priorAnsweredChecklist: ChecklistField[];
   /** Short bullets of facts the supplier already gave us. */
   priorAnswersSummary?: string[];
+  /** Full raw transcript (oldest → newest), excluding the LATEST supplier reply. */
+  transcript?: ThreadMessage[];
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
@@ -194,8 +207,9 @@ Checklist (combine LATEST reply with THREAD CONTEXT — once answered, stays ans
 missing_checklist: any of ["delivery_date","shipping_cost"] still null after combining.
 
 Answered-questions tracking (REQUIRED):
-- answered_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply addresses (even partially). Copy each string VERBATIM from the OPEN QUESTION list. [] if none.
+- answered_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply addresses (even partially, even implicitly). Copy each string VERBATIM from the OPEN QUESTION list (English). [] if none.
 - still_open_questions: subset of "OPEN QUESTION FROM AGENT" strings the LATEST reply did NOT address. Copy verbatim. [] if all answered.
+When in doubt, lean towards "answered". A vague answer is still an answer — it should NOT show up in still_open_questions, only in unclear_points.
 
 Always provide:
 - reply_language: ISO 639-1.
@@ -212,6 +226,7 @@ Also:
 - wants_human: true ONLY if supplier explicitly asks to talk to a person.
 
 unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
+unclear_points_en: the SAME list as unclear_points, but in ENGLISH. Same order, same length. Used for cross-turn matching. [] when unclear_points is [].
 
 Finally pick suggested_outbound (policy may override):
 - "confirm" when fully_confirmed AND missing_checklist empty AND no issues AND still_open_questions empty
@@ -222,7 +237,7 @@ Finally pick suggested_outbound (policy may override):
 - "acknowledge_issues" when confirmed_with_issue
 - "escalate_silent" otherwise
 
-Always reply with strict JSON. No prose.`;
+Always reply by calling the classify_reply tool. No prose.`;
 
 const EMPTY_CHECKLIST: ReplyChecklist = {
   order_confirmed: false,
@@ -277,6 +292,20 @@ export async function classifyReply(args: {
   const openQs = args.thread?.priorOpenQuestions ?? [];
   const answeredChk = args.thread?.priorAnsweredChecklist ?? [];
   const priorAnswers = args.thread?.priorAnswersSummary ?? [];
+  const transcript = args.thread?.transcript ?? [];
+
+  const transcriptBlock = transcript.length
+    ? `FULL CONVERSATION TRANSCRIPT (oldest → newest, excluding the LATEST reply below):\n` +
+      transcript
+        .map((m, i) => {
+          const who = m.role === "agent" ? "AGENT" : "SUPPLIER";
+          const lang = m.lang ? ` (${m.lang})` : "";
+          return `--- [${i + 1}] ${who}${lang} ---\n${(m.text || "").slice(0, 3500)}`;
+        })
+        .join("\n") +
+      `\n\n`
+    : "";
+
   const threadBlock =
     `THREAD CONTEXT:\n` +
     `OPEN QUESTION FROM AGENT (the supplier is expected to address these — copy verbatim into answered_open_questions / still_open_questions):\n` +
@@ -290,6 +319,46 @@ export async function classifyReply(args: {
       : "") +
     `\n`;
 
+  const tool = {
+    type: "function" as const,
+    function: {
+      name: "classify_reply",
+      description: "Return the classification of the supplier reply.",
+      parameters: {
+        type: "object",
+        properties: {
+          verdict: { type: "string", enum: ["fully_confirmed", "confirmed_with_issue", "declined", "needs_clarification", "unclear"] },
+          summary: { type: "string" },
+          summary_en: { type: "string" },
+          reply_language: { type: "string" },
+          lead_time: { type: ["string", "null"] },
+          lead_time_days: { type: ["number", "null"] },
+          shipping_cost_eur: { type: ["number", "null"] },
+          wants_human: { type: "boolean" },
+          issues: { type: "array", items: { type: "string" } },
+          checklist: {
+            type: "object",
+            properties: {
+              order_confirmed: { type: "boolean" },
+              delivery_date: { type: ["string", "null"] },
+              shipping_cost: { type: ["string", "null"] },
+            },
+            required: ["order_confirmed", "delivery_date", "shipping_cost"],
+          },
+          missing_checklist: { type: "array", items: { type: "string", enum: ["delivery_date", "shipping_cost"] } },
+          answerable_questions: { type: "array", items: { type: "string" } },
+          unanswerable_questions: { type: "array", items: { type: "string" } },
+          unclear_points: { type: "array", items: { type: "string" } },
+          unclear_points_en: { type: "array", items: { type: "string" } },
+          answered_open_questions: { type: "array", items: { type: "string" } },
+          still_open_questions: { type: "array", items: { type: "string" } },
+          suggested_outbound: { type: "string" },
+        },
+        required: ["verdict", "summary", "summary_en", "checklist", "missing_checklist", "answered_open_questions", "still_open_questions"],
+      },
+    },
+  };
+
   const body = {
     model: "openai/gpt-5-mini",
     messages: [
@@ -299,11 +368,12 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `${threadBlock}\n` +
-          `LATEST SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, lead_time_days, shipping_cost_eur, wants_human, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, answered_open_questions, still_open_questions, suggested_outbound.`,
+          transcriptBlock +
+          `LATEST SUPPLIER REPLY:\n${args.supplierReply}\n`,
       },
     ],
-    response_format: { type: "json_object" },
+    tools: [tool],
+    tool_choice: { type: "function" as const, function: { name: "classify_reply" } },
   };
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -320,10 +390,19 @@ export async function classifyReply(args: {
       return fallbackClassification("unclear", "AI gateway error", [t.slice(0, 200)]);
     }
     const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{
+        message?: {
+          content?: string;
+          tool_calls?: Array<{ function?: { name?: string; arguments?: string } }>;
+        };
+      }>;
     };
-    const content = data.choices?.[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as Partial<ReplyClassification>;
+    const msg = data.choices?.[0]?.message;
+    const argsStr =
+      msg?.tool_calls?.[0]?.function?.arguments ??
+      msg?.content ??
+      "{}";
+    const parsed = JSON.parse(argsStr) as Partial<ReplyClassification> & { unclear_points_en?: string[] };
     const checklist = normalizeChecklist(parsed.checklist);
     // Anything the supplier already answered in prior turns stays answered, even
     // if the model's missing_checklist regresses it.
@@ -356,7 +435,6 @@ export async function classifyReply(args: {
       : [];
     // Derive deterministically: anything not in answered_open is still open.
     const stillOpen = openQs.filter((q) => !answeredOpenSet.has(q));
-    // Prefer derived; only fall back to model output if derivation is empty AND model says so.
     const finalStillOpen = stillOpen.length ? stillOpen : stillOpenModel;
 
     // Drop unclear_points that just repeat a question the supplier just answered.
@@ -366,6 +444,13 @@ export async function classifyReply(args: {
     const unclearPoints = unclearPointsRaw
       .filter((p) => !answeredOpenSet.has(p))
       .slice(0, 6);
+    const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
+      ? parsed.unclear_points_en.map(String).filter(Boolean)
+      : [];
+    // Align EN array to native array length when model returns mismatched arrays.
+    const unclearPointsEn = unclearPointsEnRaw.length === unclearPoints.length
+      ? unclearPointsEnRaw
+      : unclearPoints.map((p, i) => unclearPointsEnRaw[i] ?? p);
 
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
@@ -386,6 +471,7 @@ export async function classifyReply(args: {
         ? parsed.unanswerable_questions.map(String).filter(Boolean)
         : [],
       unclear_points: unclearPoints,
+      unclear_points_en: unclearPointsEn,
       answered_open_questions: answeredOpen,
       still_open_questions: finalStillOpen,
       suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
@@ -506,5 +592,121 @@ export async function translateForSupplier(
   } catch (err) {
     console.error("translateForSupplier failed:", err);
     return { en: trimmed, native: trimmed };
+  }
+}
+
+/**
+ * Second-pass recall check. After the main classifier reports `stillOpen`
+ * questions, we re-check each one against the FULL transcript with a stronger
+ * model. The first pass over-flags; this pass catches answers that were
+ * actually given (possibly in an earlier turn).
+ */
+export async function verifyAnsweredQuestions(args: {
+  stillOpen: string[]; // ENGLISH canonical strings
+  transcript: ThreadMessage[];
+  latestReply: string;
+}): Promise<{
+  confirmedStillOpen: string[];
+  newlyAnswered: Array<{ question: string; evidence: string }>;
+}> {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  const stillOpen = (args.stillOpen ?? []).map((s) => s.trim()).filter(Boolean);
+  if (!apiKey || stillOpen.length === 0) {
+    return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+  }
+
+  const transcriptText = (args.transcript ?? [])
+    .map((m, i) => {
+      const who = m.role === "agent" ? "AGENT" : "SUPPLIER";
+      return `--- [${i + 1}] ${who} ---\n${(m.text || "").slice(0, 3500)}`;
+    })
+    .join("\n");
+
+  const system =
+    "You are a strict recall checker for a procurement agent. " +
+    "Given a list of open questions the agent has asked, decide which ones the supplier HAS actually answered " +
+    "somewhere in the conversation (including the latest reply). Be generous about implicit, partial, or short answers " +
+    "('included', 'next Tuesday', 'yes', 'in stock', a single number or date). " +
+    "An answer in ANY language counts. You MUST quote the exact supplier phrase as evidence — if you cannot quote " +
+    "a phrase, the question is NOT answered. Return via the report_answers tool.";
+
+  const tool = {
+    type: "function" as const,
+    function: {
+      name: "report_answers",
+      description: "Report which open questions are answered, with evidence quoted from the supplier.",
+      parameters: {
+        type: "object",
+        properties: {
+          answered: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                question: { type: "string", description: "Exact verbatim copy of the open question (English)." },
+                evidence: { type: "string", description: "Short phrase quoted from the supplier that answers it." },
+                confidence: { type: "number", description: "0..1" },
+              },
+              required: ["question", "evidence", "confidence"],
+            },
+          },
+        },
+        required: ["answered"],
+      },
+    },
+  };
+
+  const userMsg =
+    `OPEN QUESTIONS (English, copy verbatim into "question"):\n` +
+    stillOpen.map((q, i) => `  ${i + 1}. ${q}`).join("\n") +
+    `\n\nCONVERSATION TRANSCRIPT:\n${transcriptText}\n\n` +
+    `LATEST SUPPLIER REPLY:\n${args.latestReply}\n`;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-5",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userMsg },
+        ],
+        tools: [tool],
+        tool_choice: { type: "function" as const, function: { name: "report_answers" } },
+        reasoning: { effort: "low" },
+      }),
+    });
+    if (!res.ok) {
+      console.error("verifyAnsweredQuestions gateway error", res.status, await res.text());
+      return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{
+        message?: { tool_calls?: Array<{ function?: { arguments?: string } }> };
+      }>;
+    };
+    const argsStr = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
+    const parsed = JSON.parse(argsStr) as {
+      answered?: Array<{ question?: string; evidence?: string; confidence?: number }>;
+    };
+    const openSet = new Set(stillOpen);
+    const newlyAnswered: Array<{ question: string; evidence: string }> = [];
+    for (const a of parsed.answered ?? []) {
+      const q = String(a.question ?? "").trim();
+      const ev = String(a.evidence ?? "").trim();
+      const conf = typeof a.confidence === "number" ? a.confidence : 0;
+      if (q && ev && conf >= 0.6 && openSet.has(q)) {
+        newlyAnswered.push({ question: q, evidence: ev.slice(0, 240) });
+      }
+    }
+    const answeredSet = new Set(newlyAnswered.map((a) => a.question));
+    return {
+      confirmedStillOpen: stillOpen.filter((q) => !answeredSet.has(q)),
+      newlyAnswered,
+    };
+  } catch (err) {
+    console.error("verifyAnsweredQuestions failed:", err);
+    return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
   }
 }
