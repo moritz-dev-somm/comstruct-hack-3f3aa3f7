@@ -237,6 +237,7 @@ export function VoiceButton({
   function cancel() {
     cancelledRef.current = true;
     deliveredRef.current = true;
+    intentRef.current = false;
     stopRecognition(true);
     teardownAudio();
     setListening(false);
@@ -251,6 +252,7 @@ export function VoiceButton({
       return;
     }
     deliveredRef.current = true;
+    intentRef.current = false;
     stopRecognition();
     teardownAudio();
     setListening(false);
@@ -258,6 +260,34 @@ export function VoiceButton({
     setInterim("");
     setFinalText("");
   }
+
+  /* ----- press-and-hold logic -----
+   * - Quick tap (< 2s held): start recording and leave the overlay open.
+   *   The user ends/sends via tapping again or the overlay Send button.
+   * - Long press (>= 2s held): release sends the transcript.
+   * - If already listening, a quick tap acts as "send/stop". */
+  const HOLD_MS = 2000;
+  function handlePressStart() {
+    pressStartRef.current = Date.now();
+    if (!listening) {
+      void start();
+    }
+  }
+  function handlePressEnd() {
+    const held = Date.now() - pressStartRef.current;
+    pressStartRef.current = 0;
+    if (!listening) return;
+    if (held >= HOLD_MS) {
+      sendNow();
+    } else {
+      // Quick tap while already listening → send (toggle off).
+      // If this tap is what started recording, leave the overlay open.
+      const wasJustStarted = held < 350 && (finalText + interim).trim() === "";
+      if (!wasJustStarted) sendNow();
+    }
+  }
+
+
 
   if (!supported) {
     return (
