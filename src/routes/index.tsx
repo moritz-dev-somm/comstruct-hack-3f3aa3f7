@@ -1747,6 +1747,7 @@ function SearchResultCard({ result }: { result: HybridSearchResult }) {
               qty: 1,
               category: result.category,
               unit: result.unit,
+              supplier: result.supplier,
             });
             toast.success(`Added ${result.name} to cart`);
           }}
