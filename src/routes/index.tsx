@@ -736,11 +736,18 @@ function AssistantContent({
   );
 }
 
-function InlineProductBubble({ product }: { product: Product }) {
+function InlineProductBubble({
+  product,
+  suggestedQty,
+}: {
+  product: Product;
+  suggestedQty?: number;
+}) {
   const cart = useCart();
   const [showDetail, setShowDetail] = useState(false);
   const inCart = cart.items.find((i) => i.productId === product.sku);
   const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const addQty = suggestedQty && suggestedQty > 0 ? suggestedQty : 1;
 
   function add(e: React.MouseEvent) {
     stop(e);
@@ -748,7 +755,7 @@ function InlineProductBubble({ product }: { product: Product }) {
       productId: product.sku,
       name: product.name,
       price: product.price,
-      qty: 1,
+      qty: addQty,
       category: product.category,
       unit: product.unit,
     });
@@ -805,11 +812,13 @@ function InlineProductBubble({ product }: { product: Product }) {
         ) : (
           <button
             onClick={add}
-            className="ml-1 shrink-0 inline-flex items-center gap-1 rounded-full bg-brand text-brand-foreground px-2 h-7 text-xs font-bold"
-            aria-label={`Add ${product.name} to cart`}
+            className="ml-1 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand text-brand-foreground px-2.5 h-7 text-xs font-bold"
+            aria-label={`Add ${addQty} ${product.name} to cart`}
           >
             <Plus className="size-3.5" />
-            <span className="tabular-nums">{formatEUR(product.price)}</span>
+            <span className="tabular-nums">
+              {addQty > 1 ? `Add ${addQty} · ${formatEUR(product.price)} ea` : `Add · ${formatEUR(product.price)}`}
+            </span>
           </button>
         )}
       </span>
