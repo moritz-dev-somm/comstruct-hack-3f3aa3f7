@@ -132,28 +132,30 @@ function labelForCategory(category: string): string {
 type QuickOrder = {
   id: string;
   date: string;
-  items: string[];
-  total: string;
+  skus: string[]; // real catalog SKUs — resolved against live products at render time
+  totalOverride?: string; // optional display total; otherwise computed from products
 };
 
+// Demo "past orders" wired to real catalog SKUs so "Add all to cart" actually works.
+// SKUs that don't exist in the current catalog are silently skipped.
 const QUICK_REORDER_ORDERS: QuickOrder[] = [
   {
     id: "#E-4821",
     date: "12 May 2026",
-    items: ["Drywall screws TX25", "Gypsum board 12.5mm", "Joint tape 50m", "Corner bead"],
-    total: "€347.50",
+    // Drywall / finishing: screws + bit + spachtel + tape
+    skus: ["C001", "C002", "C032", "C062", "C027"],
   },
   {
     id: "#E-4789",
     date: "03 May 2026",
-    items: ["Safety helmet white", "Work gloves L", "Dust masks FFP2 pack", "Safety glasses"],
-    total: "€128.00",
+    // PPE refresh: helmet, gloves, mask, glasses
+    skus: ["C073", "C019", "C023", "C021", "C024"],
   },
   {
     id: "#E-4755",
     date: "22 Apr 2026",
-    items: ["Anchor bolts M10x80", "Sealant gun", "Silicone transparent 310ml", "Foam gun cleaner"],
-    total: "€215.80",
+    // Anchoring + sealing: dübel + silicone + foam + cleaner
+    skus: ["C005", "C006", "C039", "C042", "C076"],
   },
 ];
 
