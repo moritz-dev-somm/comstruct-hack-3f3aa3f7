@@ -166,9 +166,26 @@ export const Route = createFileRoute("/api/hybrid-search")({
             return Response.json({ error: "messages required" }, { status: 400 });
           }
 
-          const extracted = await extractFromChat(messages);
+          let extracted: Extracted;
+          try {
+            extracted = await extractFromChat(messages);
+          } catch (e) {
+            console.error("extractFromChat failed, falling back", e);
+            extracted = { extracted_category: null, extracted_keywords: [], semantic_search_string: "" };
+          }
+          // Fallback: if extractor returned nothing usable, build a query from
+          // the user's own messages so we still surface something.
           if (!extracted.semantic_search_string) {
-            return Response.json({ error: "Could not extract a search query" }, { status: 422 });
+            const userText = messages
+              .filter((m) => m.role === "user")
+              .map((m) => m.content)
+              .join(" ")
+              .trim()
+              .slice(0, 400);
+            if (!userText) {
+              return Response.json({ error: "messages required" }, { status: 400 });
+            }
+            extracted = { ...extracted, semantic_search_string: userText };
           }
 
           const embedding = await embed(extracted.semantic_search_string);
