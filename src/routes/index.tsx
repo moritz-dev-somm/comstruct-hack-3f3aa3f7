@@ -761,12 +761,11 @@ function ConversationView({
             <SuggestionButton onClick={() => onSuggestion("Add the bundle to cart")}>
               Add the bundle to cart
             </SuggestionButton>
-            <SuggestionButton onClick={() => onSuggestion("Show me cheaper options")}>
-              Show me cheaper options
-            </SuggestionButton>
-            <SuggestionButton onClick={() => onSuggestion("Show me alternative suppliers")}>
-              Different brand
-            </SuggestionButton>
+            {followups.map((f) => (
+              <SuggestionButton key={f} onClick={() => onSuggestion(f)}>
+                {f}
+              </SuggestionButton>
+            ))}
           </div>
         )}
 
