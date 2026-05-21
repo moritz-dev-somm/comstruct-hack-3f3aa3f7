@@ -948,8 +948,8 @@ function ConversationView({
                 <div className="flex-1 h-px bg-border" />
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                {CATEGORY_TILES.map((c) => (
-                  <CategoryTile key={c.label} tile={c} onSelect={() => onSelectCategory(c.category)} />
+                {categoryTiles.map((c) => (
+                  <CategoryTile key={c.category} tile={c} onSelect={() => onSelectCategory(c.category)} />
                 ))}
               </div>
             </div>
