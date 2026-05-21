@@ -529,12 +529,10 @@ export async function classifyReply(args: {
 
     // Sanitise answered/still open: must be a subset of priorOpenQuestions.
     const openSet = new Set(openQs);
-    const answeredOpen = Array.from(new Set([...
-      (Array.isArray(parsed.answered_open_questions)
+    const modelAnsweredOpen = Array.isArray(parsed.answered_open_questions)
       ? parsed.answered_open_questions.map(String).filter((q) => openSet.has(q))
-      : []),
-      ...localSignals.answered_open_questions,
-    ]));
+      : [];
+    const answeredOpen = Array.from(new Set([...modelAnsweredOpen, ...localSignals.answered_open_questions]));
     const answeredOpenSet = new Set(answeredOpen);
     const stillOpenModel = Array.isArray(parsed.still_open_questions)
       ? parsed.still_open_questions.map(String).filter((q) => openSet.has(q))
