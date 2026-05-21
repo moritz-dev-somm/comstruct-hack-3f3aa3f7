@@ -941,9 +941,14 @@ function AssistantContent({
 }) {
   const prepared = useMemo(
     () =>
-      content.replace(PRODUCT_TOKEN_RE, (_m, sku, qty) =>
-        `\`${TOKEN_PREFIX}${sku}:${qty ?? ""}\``,
-      ),
+      content
+        .replace(FOLLOWUPS_RE, "")
+        // Hide partial trailing marker while streaming.
+        .replace(/\[\[followups:[^\]]*$/, "")
+        .replace(/\[\[follow?u?p?s?:?$/, "")
+        .replace(PRODUCT_TOKEN_RE, (_m, sku, qty) =>
+          `\`${TOKEN_PREFIX}${sku}:${qty ?? ""}\``,
+        ),
     [content],
   );
 
