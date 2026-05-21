@@ -263,6 +263,7 @@ function fallbackClassification(
 export async function classifyReply(args: {
   orderSummary: string;
   supplierReply: string;
+  thread?: ThreadContext;
 }): Promise<ReplyClassification> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) {
@@ -272,6 +273,23 @@ export async function classifyReply(args: {
       ["AI classifier unavailable"],
     );
   }
+
+  const openQs = args.thread?.priorOpenQuestions ?? [];
+  const answeredChk = args.thread?.priorAnsweredChecklist ?? [];
+  const priorAnswers = args.thread?.priorAnswersSummary ?? [];
+  const threadBlock =
+    `THREAD CONTEXT:\n` +
+    `OPEN QUESTION FROM AGENT (the supplier is expected to address these — copy verbatim into answered_open_questions / still_open_questions):\n` +
+    (openQs.length ? openQs.map((q, i) => `  ${i + 1}. ${q}`).join("\n") : "  (none)") +
+    `\nALREADY ANSWERED IN PRIOR TURNS (do NOT re-flag these as missing or unclear):\n` +
+    (answeredChk.length
+      ? answeredChk.map((f) => `  - ${f}`).join("\n")
+      : "  (none)") +
+    (priorAnswers.length
+      ? `\nFACTS ALREADY GIVEN BY SUPPLIER:\n` + priorAnswers.map((a) => `  - ${a}`).join("\n")
+      : "") +
+    `\n`;
+
   const body = {
     model: "openai/gpt-5-mini",
     messages: [
@@ -280,8 +298,9 @@ export async function classifyReply(args: {
         role: "user",
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
-          `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, lead_time_days, shipping_cost_eur, wants_human, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, suggested_outbound.`,
+          `${threadBlock}\n` +
+          `LATEST SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
+          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, lead_time_days, shipping_cost_eur, wants_human, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, answered_open_questions, still_open_questions, suggested_outbound.`,
       },
     ],
     response_format: { type: "json_object" },
@@ -306,13 +325,18 @@ export async function classifyReply(args: {
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as Partial<ReplyClassification>;
     const checklist = normalizeChecklist(parsed.checklist);
+    // Anything the supplier already answered in prior turns stays answered, even
+    // if the model's missing_checklist regresses it.
+    const stillMissingByPriorAnswers = (f: ChecklistField) => !answeredChk.includes(f);
     const missing =
       Array.isArray(parsed.missing_checklist) && parsed.missing_checklist.length >= 0
         ? (parsed.missing_checklist.filter((f) =>
             f === "delivery_date" || f === "shipping_cost",
           ) as ChecklistField[])
         : deriveMissing(checklist);
-    const reconciled = missing.filter((f) => checklist[f] == null);
+    const reconciled = missing
+      .filter((f) => checklist[f] == null)
+      .filter(stillMissingByPriorAnswers);
     const summary = parsed.summary ?? "";
     const parseNum = (v: unknown): number | null => {
       if (v == null) return null;
@@ -320,6 +344,29 @@ export async function classifyReply(args: {
       const n = parseFloat(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
       return Number.isFinite(n) ? n : null;
     };
+
+    // Sanitise answered/still open: must be a subset of priorOpenQuestions.
+    const openSet = new Set(openQs);
+    const answeredOpen = Array.isArray(parsed.answered_open_questions)
+      ? parsed.answered_open_questions.map(String).filter((q) => openSet.has(q))
+      : [];
+    const answeredOpenSet = new Set(answeredOpen);
+    const stillOpenModel = Array.isArray(parsed.still_open_questions)
+      ? parsed.still_open_questions.map(String).filter((q) => openSet.has(q))
+      : [];
+    // Derive deterministically: anything not in answered_open is still open.
+    const stillOpen = openQs.filter((q) => !answeredOpenSet.has(q));
+    // Prefer derived; only fall back to model output if derivation is empty AND model says so.
+    const finalStillOpen = stillOpen.length ? stillOpen : stillOpenModel;
+
+    // Drop unclear_points that just repeat a question the supplier just answered.
+    const unclearPointsRaw = Array.isArray(parsed.unclear_points)
+      ? parsed.unclear_points.map(String).filter(Boolean)
+      : [];
+    const unclearPoints = unclearPointsRaw
+      .filter((p) => !answeredOpenSet.has(p))
+      .slice(0, 6);
+
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
       summary,
@@ -338,9 +385,9 @@ export async function classifyReply(args: {
       unanswerable_questions: Array.isArray(parsed.unanswerable_questions)
         ? parsed.unanswerable_questions.map(String).filter(Boolean)
         : [],
-      unclear_points: Array.isArray(parsed.unclear_points)
-        ? parsed.unclear_points.map(String).filter(Boolean).slice(0, 6)
-        : [],
+      unclear_points: unclearPoints,
+      answered_open_questions: answeredOpen,
+      still_open_questions: finalStillOpen,
       suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
     };
   } catch (err) {
