@@ -33,6 +33,58 @@ export function webhookUrl(): string {
 }
 
 /**
+ * Small/cheap/strong OpenAI model used for ALL supplier-email reasoning
+ * (classification, translation, recall verification). Good at JSON tool
+ * calls and multilingual (EN/DE/FR/IT) — exactly what this agent needs.
+ */
+export const OPENAI_AGENT_MODEL = "gpt-4o-mini";
+
+/**
+ * Call OpenAI chat completions directly using the project's OPENAI_API_KEY.
+ * Retries transient errors (429 / 5xx / network) up to `retries` times with
+ * exponential backoff so we never silently fall back to heuristics.
+ * Throws on persistent failure — callers must surface that.
+ */
+export async function callOpenAI(
+  body: Record<string, unknown>,
+  opts: { retries?: number; timeoutMs?: number } = {},
+): Promise<unknown> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  const retries = opts.retries ?? 3;
+  const timeoutMs = opts.timeoutMs ?? 45_000;
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: OPENAI_AGENT_MODEL, ...body }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) return await res.json();
+      const text = await res.text();
+      const transient = res.status === 429 || res.status >= 500;
+      lastErr = new Error(`OpenAI ${res.status}: ${text.slice(0, 500)}`);
+      if (!transient || attempt === retries) throw lastErr;
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt === retries) throw err;
+    }
+    await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)));
+  }
+  throw lastErr ?? new Error("OpenAI call failed");
+}
+
+/**
  * Idempotently ensure an inbox + a `message.received` webhook exist, and
  * persist the inbox id, webhook id and signing secret in `agent_settings`.
  */
@@ -410,10 +462,7 @@ export async function classifyReply(args: {
   const priorAnswers = args.thread?.priorAnswersSummary ?? [];
   const transcript = args.thread?.transcript ?? [];
   const localSignals = inferLocalReplySignals(args.supplierReply, openQs);
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    return heuristicClassification(args.supplierReply, openQs, answeredChk);
-  }
+
 
   const transcriptBlock = transcript.length
     ? `FULL CONVERSATION TRANSCRIPT (oldest → newest, excluding the LATEST reply below):\n` +
@@ -499,7 +548,6 @@ export async function classifyReply(args: {
   };
 
   const body = {
-    model: "openai/gpt-5-mini",
     messages: [
       { role: "system", content: CLASSIFY_SYSTEM },
       {
@@ -515,26 +563,7 @@ export async function classifyReply(args: {
     tool_choice: { type: "function" as const, function: { name: "classify_reply" } },
   };
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      console.error("classifyReply gateway error", res.status, t);
-      const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
-      return {
-        ...fallback,
-        issues: fallback.verdict === "unclear" ? [t.slice(0, 200)] : [],
-        summary: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary,
-        summary_en: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary_en,
-      };
-    }
-    const data = (await res.json()) as {
+    const data = (await callOpenAI(body)) as {
       choices?: Array<{
         message?: {
           content?: string;
@@ -630,16 +659,10 @@ export async function classifyReply(args: {
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("classifyReply failed", message);
-    const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
-    return fallback.verdict === "unclear"
-      ? {
-          ...fallback,
-          summary: "Classifier exception",
-          summary_en: "Classifier exception",
-          issues: [message],
-        }
-      : fallback;
+    console.error("classifyReply OpenAI call failed (no fallback):", message);
+    // Re-throw so the webhook surfaces the failure instead of silently
+    // accepting a degraded heuristic classification.
+    throw err instanceof Error ? err : new Error(message);
   }
 }
 
@@ -717,12 +740,6 @@ export async function translateForSupplier(
   if (!trimmed) return { en: "", native: "" };
   if (supplierLang === "en") return { en: trimmed, native: trimmed };
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    console.warn("translateForSupplier: LOVABLE_API_KEY missing — sending untranslated.");
-    return { en: trimmed, native: trimmed };
-  }
-
   const LANG_NAME = { en: "English", de: "German", fr: "French", it: "Italian" } as const;
   const system =
     "You translate short business emails between a construction procurement team and their suppliers. " +
@@ -731,34 +748,19 @@ export async function translateForSupplier(
     "Preserve meaning, tone, numbers, dates and product names exactly. Do NOT add greetings, signatures or commentary — translate only what is given. " +
     "If the input is already in the target language, return it unchanged in that field.";
 
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5-mini",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: trimmed },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (!res.ok) {
-      console.error("translateForSupplier gateway error", res.status, await res.text());
-      return { en: trimmed, native: trimmed };
-    }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as { en?: string; native?: string };
-    return {
-      en: (parsed.en || trimmed).trim(),
-      native: (parsed.native || trimmed).trim(),
-    };
-  } catch (err) {
-    console.error("translateForSupplier failed:", err);
-    return { en: trimmed, native: trimmed };
-  }
+  const data = (await callOpenAI({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: trimmed },
+    ],
+    response_format: { type: "json_object" },
+  })) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(content) as { en?: string; native?: string };
+  return {
+    en: (parsed.en || trimmed).trim(),
+    native: (parsed.native || trimmed).trim(),
+  };
 }
 
 /**
@@ -775,9 +777,8 @@ export async function verifyAnsweredQuestions(args: {
   confirmedStillOpen: string[];
   newlyAnswered: Array<{ question: string; evidence: string }>;
 }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
   const stillOpen = (args.stillOpen ?? []).map((s) => s.trim()).filter(Boolean);
-  if (!apiKey || stillOpen.length === 0) {
+  if (stillOpen.length === 0) {
     return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
   }
 
@@ -835,51 +836,35 @@ export async function verifyAnsweredQuestions(args: {
     `\n\nCONVERSATION TRANSCRIPT:\n${transcriptText}\n\n` +
     `LATEST SUPPLIER REPLY:\n${args.latestReply}\n`;
 
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userMsg },
-        ],
-        tools: [tool],
-        tool_choice: { type: "function" as const, function: { name: "report_answers" } },
-        reasoning: { effort: "low" },
-      }),
-    });
-    if (!res.ok) {
-      console.error("verifyAnsweredQuestions gateway error", res.status, await res.text());
-      return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
+  const data = (await callOpenAI({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userMsg },
+    ],
+    tools: [tool],
+    tool_choice: { type: "function" as const, function: { name: "report_answers" } },
+  })) as {
+    choices?: Array<{
+      message?: { tool_calls?: Array<{ function?: { arguments?: string } }> };
+    }>;
+  };
+  const argsStr = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
+  const parsed = JSON.parse(argsStr) as {
+    answered?: Array<{ question?: string; evidence?: string; confidence?: number }>;
+  };
+  const openSet = new Set(stillOpen);
+  const newlyAnswered: Array<{ question: string; evidence: string }> = [];
+  for (const a of parsed.answered ?? []) {
+    const q = String(a.question ?? "").trim();
+    const ev = String(a.evidence ?? "").trim();
+    const conf = typeof a.confidence === "number" ? a.confidence : 0;
+    if (q && ev && conf >= 0.6 && openSet.has(q)) {
+      newlyAnswered.push({ question: q, evidence: ev.slice(0, 240) });
     }
-    const data = (await res.json()) as {
-      choices?: Array<{
-        message?: { tool_calls?: Array<{ function?: { arguments?: string } }> };
-      }>;
-    };
-    const argsStr = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
-    const parsed = JSON.parse(argsStr) as {
-      answered?: Array<{ question?: string; evidence?: string; confidence?: number }>;
-    };
-    const openSet = new Set(stillOpen);
-    const newlyAnswered: Array<{ question: string; evidence: string }> = [];
-    for (const a of parsed.answered ?? []) {
-      const q = String(a.question ?? "").trim();
-      const ev = String(a.evidence ?? "").trim();
-      const conf = typeof a.confidence === "number" ? a.confidence : 0;
-      if (q && ev && conf >= 0.6 && openSet.has(q)) {
-        newlyAnswered.push({ question: q, evidence: ev.slice(0, 240) });
-      }
-    }
-    const answeredSet = new Set(newlyAnswered.map((a) => a.question));
-    return {
-      confirmedStillOpen: stillOpen.filter((q) => !answeredSet.has(q)),
-      newlyAnswered,
-    };
-  } catch (err) {
-    console.error("verifyAnsweredQuestions failed:", err);
-    return { confirmedStillOpen: stillOpen, newlyAnswered: [] };
   }
+  const answeredSet = new Set(newlyAnswered.map((a) => a.question));
+  return {
+    confirmedStillOpen: stillOpen.filter((q) => !answeredSet.has(q)),
+    newlyAnswered,
+  };
 }
