@@ -7,7 +7,7 @@ import {
   ensureAgentInbox,
   listInboxMessages,
   sendOrderEmail,
-} from "@/lib/supplier-agent.functions";
+} from "@agent/supplier-agent.functions";
 import { useOrders } from "@/lib/orders";
 import { formatEUR } from "@/lib/catalog";
 
@@ -19,7 +19,7 @@ import { formatEUR } from "@/lib/catalog";
  *   fire off the placeholder order email.
  * - Shows the inbox so we can watch replies land.
  *
- * The reply classification + condition engine (src/lib/agent-mail/conditions.ts)
+ * The reply classification + condition engine (agent/conditions.ts)
  * is ready to wire in once we have a persistence layer for Negotiation
  * records and a way to trigger polls (cron or webhook).
  */
@@ -214,9 +214,9 @@ function AgentPage() {
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          Copy is placeholder — see <code>src/lib/agent-mail/templates.ts</code>.
+          Copy is placeholder — see <code>agent/templates.ts</code>.
           A 24h SLA timer + nudge/abort logic lives in{" "}
-          <code>src/lib/agent-mail/conditions.ts</code>, ready to wire in.
+          <code>agent/conditions.ts</code>, ready to wire in.
         </p>
       </section>
 

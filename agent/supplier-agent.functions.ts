@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { AgentMailClient } from "agentmail";
-import { composeOrderEmail, composeNudgeEmail } from "./agent-mail/templates";
+import { composeOrderEmail, composeNudgeEmail } from "./templates";
 import type { Order } from "./orders";
 
 /**
