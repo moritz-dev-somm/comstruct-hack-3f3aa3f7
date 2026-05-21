@@ -126,38 +126,30 @@ export type SuggestedOutbound =
   | "escalate_silent";
 
 export type ReplyClassification = {
-  /** Overall verdict on the reply. */
   verdict:
     | "fully_confirmed"
     | "confirmed_with_issue"
     | "declined"
     | "needs_clarification"
     | "unclear";
-  /** Short summary in the supplier's language (mirrors summary_en for legacy). */
   summary: string;
-  /** Always-English 1–2 sentence summary, used in procurement UI. */
   summary_en?: string;
-  /** ISO 639-1 of the supplier reply (de, fr, it, en, …). null if unknown. */
   reply_language?: string | null;
-  /** Extracted delivery time / lead time string if mentioned. */
   lead_time: string | null;
-  /** Concrete list of issues that require user attention. */
+  /** Lead time normalised to days (best effort). */
+  lead_time_days?: number | null;
+  /** Shipping cost normalised to EUR (best effort). 0 means included/free. */
+  shipping_cost_eur?: number | null;
+  /** True if the supplier explicitly asks to talk to a human / sales rep. */
+  wants_human?: boolean;
   issues: string[];
-  /** Structured extraction of the fields we asked for in the initial PO. */
   checklist: ReplyChecklist;
-  /** Fields from the initial PO request that the supplier has not answered yet. */
   missing_checklist: ChecklistField[];
-  /** Questions we can confidently answer from order / company context. */
   answerable_questions?: string[];
-  /** Questions that require a human to answer. */
   unanswerable_questions?: string[];
-  /** Specific vague points / unanswered items we should re-ask the supplier about. */
   unclear_points?: string[];
-  /** Hint from the classifier as to which outbound action fits. Policy may override. */
   suggested_outbound?: SuggestedOutbound;
-  /** Number of automated targeted follow-ups already sent for the missing fields. */
   followup_count?: number;
-  /** Number of clarification requests already sent for unclear replies. */
   clarification_count?: number;
 };
 
@@ -186,6 +178,11 @@ Always provide:
 If the supplier asks us questions, split them:
 - answerable_questions: questions we can answer from purchase-order data (delivery address, VAT ID, payment terms, line items, contact, project reference). Use the supplier's own wording, translated to English.
 - unanswerable_questions: questions that need a human (custom discounts, off-PO terms, anything we don't know).
+
+Also extract:
+- lead_time_days: integer best estimate of the lead time in days (e.g. "2 weeks" → 14, "next Tuesday" → relative days from today, "in stock, ships tomorrow" → 1). Null if the supplier did not state a lead time.
+- shipping_cost_eur: numeric shipping cost in EUR. Use 0 if shipping is "included" / "free". Null if not mentioned. Convert CHF → EUR roughly 1:1 if no rate hint is available.
+- wants_human: true ONLY if the supplier explicitly asks to talk to / be contacted by a real person, sales rep, account manager, or similar. False otherwise.
 
 If the verdict is "unclear" OR the supplier replied but left specific points vague or unanswered, populate unclear_points with ONLY the items the supplier actually left vague or unanswered in THIS reply — do not list anything the supplier already answered clearly, and do not add generic boilerplate about availability/price/delivery if those were addressed. Be minimal: if only delivery time is unclear, return exactly ONE bullet about delivery time. If two items are unclear, return two bullets (or a single combined bullet when they naturally belong together, e.g. unit price + total). Max 4 bullets, but prefer 1. Phrase each bullet in the SUPPLIER'S language as a direct, specific question referencing the exact item/SKU/phrase the supplier used — e.g. "Confirm earliest delivery date for the steel beams (you mentioned 'soon')", "Confirm unit price for SKU Y after the discount you mentioned". Never write generic prose. If nothing is unclear, return [].
 
@@ -257,7 +254,7 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, suggested_outbound.`,
+          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, lead_time_days, shipping_cost_eur, wants_human, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, suggested_outbound.`,
       },
     ],
     response_format: { type: "json_object" },
@@ -290,12 +287,21 @@ export async function classifyReply(args: {
         : deriveMissing(checklist);
     const reconciled = missing.filter((f) => checklist[f] == null);
     const summary = parsed.summary ?? "";
+    const parseNum = (v: unknown): number | null => {
+      if (v == null) return null;
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      const n = parseFloat(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
       summary,
       summary_en: parsed.summary_en?.toString().trim() || summary,
       reply_language: parsed.reply_language?.toString().toLowerCase().slice(0, 5) || null,
       lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
+      lead_time_days: parseNum((parsed as { lead_time_days?: unknown }).lead_time_days),
+      shipping_cost_eur: parseNum((parsed as { shipping_cost_eur?: unknown }).shipping_cost_eur),
+      wants_human: Boolean((parsed as { wants_human?: unknown }).wants_human),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       checklist,
       missing_checklist: reconciled,
