@@ -1558,74 +1558,98 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
 
   async function submit() {
     if (cart.items.length === 0) return;
-    const created = orders.createFromCart(cart.items);
+    const createdOrders = orders.createFromCart(cart.items);
     cart.clear();
     onClose();
-    // Generate one PO PDF per supplier — split & enriched with supplier contacts.
+    if (createdOrders.length === 0) return;
+
     const [{ generatePurchaseOrdersBySupplier }, { fetchSuppliers, supplierContactMap }] = await Promise.all([
       import("@/lib/po-pdf"),
       import("@/lib/suppliers"),
     ]);
     const contacts = supplierContactMap(await fetchSuppliers().catch(() => []));
-    const perSupplier = generatePurchaseOrdersBySupplier(created, contacts);
-    // Trigger one download per supplier (small stagger so the browser keeps them all).
-    perSupplier.forEach((p, i) => setTimeout(() => p.doc.save(p.filename), i * 250));
 
-    if (created.tier === "auto") {
-      const attachments = await Promise.all(
-        perSupplier.map(async (p) => {
-          const dataUri = p.doc.output("datauristring");
-          const comma = dataUri.indexOf(",");
-          const pdfBase64 = comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
-          return {
-            supplierName: p.supplierName,
-            filename: p.filename,
-            pdfBase64,
-          };
-        }),
-      );
-      const supplierCount = perSupplier.length;
+    // One Order is already one supplier — so each yields exactly one PO PDF.
+    // Stagger downloads so the browser keeps them all.
+    let dlIndex = 0;
+    const perOrderPOs = createdOrders.map((created) => {
+      const pos = generatePurchaseOrdersBySupplier(created, contacts);
+      pos.forEach((p) => {
+        const i = dlIndex++;
+        setTimeout(() => p.doc.save(p.filename), i * 250);
+      });
+      return { created, pos };
+    });
+
+    const orderCount = createdOrders.length;
+    const orderLabel = orderCount === 1
+      ? createdOrders[0].id
+      : `${orderCount} orders (${createdOrders.map((o) => o.id).join(", ")})`;
+
+    // Kick off negotiations for every auto-approved order in parallel.
+    const autoOrders = perOrderPOs.filter(({ created }) => created.tier === "auto");
+    if (autoOrders.length > 0) {
       const sendingToast = toast.loading(
-        `${created.id}: contacting ${supplierCount} supplier${supplierCount === 1 ? "" : "s"}…`,
+        `${orderLabel}: contacting ${autoOrders.length} supplier${autoOrders.length === 1 ? "" : "s"}…`,
       );
       try {
-        const res = (await startNegotiation({
-          data: {
-            order: {
-              id: created.id,
-              project: created.project,
-              subtotal: created.subtotal,
-              items: created.items.map((i) => ({
-                productId: i.productId,
-                name: i.name,
-                qty: i.qty,
-                price: i.price,
-                unit: i.unit,
-                category: i.category,
-                supplier: i.supplier ?? null,
-              })),
-            },
-            attachments,
-          },
-        })) as
-          | { ok: true; results: Array<{ supplier: string; email: string }> }
-          | { ok: false; error: string };
-        if (res?.ok) {
-          const labels = res.results.map((r) => r.supplier).join(", ");
-          toast.success(`${created.id} sent to ${labels} · PO PDF downloaded`, { id: sendingToast });
+        const results = await Promise.all(
+          autoOrders.map(async ({ created, pos }) => {
+            const attachments = await Promise.all(
+              pos.map(async (p) => {
+                const dataUri = p.doc.output("datauristring");
+                const comma = dataUri.indexOf(",");
+                const pdfBase64 = comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
+                return { supplierName: p.supplierName, filename: p.filename, pdfBase64 };
+              }),
+            );
+            return startNegotiation({
+              data: {
+                order: {
+                  id: created.id,
+                  project: created.project,
+                  subtotal: created.subtotal,
+                  items: created.items.map((i) => ({
+                    productId: i.productId,
+                    name: i.name,
+                    qty: i.qty,
+                    price: i.price,
+                    unit: i.unit,
+                    category: i.category,
+                    supplier: i.supplier ?? null,
+                  })),
+                },
+                attachments,
+              },
+            }) as Promise<
+              | { ok: true; results: Array<{ supplier: string; email: string }> }
+              | { ok: false; error: string }
+            >;
+          }),
+        );
+        const okCount = results.filter((r) => r?.ok).length;
+        if (okCount === results.length) {
+          toast.success(`${orderLabel} sent · PO PDFs downloaded`, { id: sendingToast });
         } else {
-          toast.error(`Email agent failed: ${res?.error ?? "unknown error"}`, { id: sendingToast });
+          toast.error(`Email agent failed for ${results.length - okCount}/${results.length} order(s)`, { id: sendingToast });
         }
       } catch (e) {
         console.error("startNegotiationForOrder error:", e);
         toast.error("Email agent failed to start", { id: sendingToast });
       }
-    } else if (created.tier === "pm") {
-      toast.success(`${created.id} sent to ${PM.name} for approval · PO PDF downloaded`);
-    } else {
-      toast.success(`${created.id} sent to ${CENTRAL.name} for approval · PO PDF downloaded`);
     }
-    navigate({ to: "/orders/$orderId/track", params: { orderId: created.id } });
+
+    const pmCount = createdOrders.filter((o) => o.tier === "pm").length;
+    const centralCount = createdOrders.filter((o) => o.tier === "central").length;
+    if (pmCount > 0) {
+      toast.success(`${pmCount} order${pmCount === 1 ? "" : "s"} sent to ${PM.name} for approval`);
+    }
+    if (centralCount > 0) {
+      toast.success(`${centralCount} order${centralCount === 1 ? "" : "s"} sent to ${CENTRAL.name} for approval`);
+    }
+
+    // Navigate to the first order's tracking page; the orders list shows the rest.
+    navigate({ to: "/orders/$orderId/track", params: { orderId: createdOrders[0].id } });
   }
 
 
