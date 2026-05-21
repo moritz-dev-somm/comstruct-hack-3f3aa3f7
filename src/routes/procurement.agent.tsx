@@ -304,9 +304,15 @@ function AgentPage() {
           </div>
         </div>
 
-        {!inbox ? (
+        {!inbox && inboxQ.isLoading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            No agent inbox configured yet.
+            Loading agent inbox…
+          </div>
+        ) : !inbox ? (
+          <div className="p-8 text-center text-sm text-destructive">
+            {inboxQ.data?.ok === false
+              ? `Agent inbox unavailable: ${inboxQ.data.error}`
+              : "No agent inbox configured yet."}
           </div>
         ) : messagesQ.data?.ok === false ? (
           <div className="p-8 text-center text-sm text-destructive">{messagesQ.data.error}</div>
