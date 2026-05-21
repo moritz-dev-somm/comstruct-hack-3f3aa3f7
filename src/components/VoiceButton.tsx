@@ -73,6 +73,11 @@ export function VoiceButton({
   // Mobile Safari sometimes fires `end` after a few seconds of silence — track
   // whether we've already delivered a transcript so we don't double-send.
   const deliveredRef = useRef(false);
+  // True while the user wants the mic open (used to auto-restart if the
+  // browser drops continuous recognition mid-session).
+  const intentRef = useRef(false);
+  // Timestamp of pointerdown for press-vs-hold detection.
+  const pressStartRef = useRef<number>(0);
 
   useEffect(() => {
     setSupported(isVoiceSupported());
@@ -150,6 +155,7 @@ export function VoiceButton({
     }
     cancelledRef.current = false;
     deliveredRef.current = false;
+    intentRef.current = true;
     setInterim("");
     setFinalText("");
 
@@ -159,7 +165,7 @@ export function VoiceButton({
       (typeof navigator !== "undefined" && navigator.language) ||
       "en-US";
     rec.interimResults = true;
-    rec.continuous = false; // single utterance — most reliable on mobile
+    rec.continuous = true; // keep recording until user sends/cancels
     rec.maxAlternatives = 1;
 
     rec.onresult = (e) => {
@@ -192,17 +198,18 @@ export function VoiceButton({
     };
 
     rec.onend = () => {
+      // If user still intends to record (continuous mode dropped by browser),
+      // restart the recognizer transparently. Otherwise tear down.
+      if (intentRef.current && !cancelledRef.current && !deliveredRef.current) {
+        try {
+          rec.start();
+          return;
+        } catch {
+          /* fallthrough — treat as ended */
+        }
+      }
       setListening(false);
       teardownAudio();
-      if (cancelledRef.current || deliveredRef.current) return;
-      // Auto-deliver if we already have something usable
-      const text = (finalTextLatestRef.current + " " + interimLatestRef.current).trim();
-      if (text) {
-        deliveredRef.current = true;
-        onTranscript(text);
-        setInterim("");
-        setFinalText("");
-      }
     };
 
     recRef.current = rec;
@@ -230,6 +237,7 @@ export function VoiceButton({
   function cancel() {
     cancelledRef.current = true;
     deliveredRef.current = true;
+    intentRef.current = false;
     stopRecognition(true);
     teardownAudio();
     setListening(false);
@@ -244,6 +252,7 @@ export function VoiceButton({
       return;
     }
     deliveredRef.current = true;
+    intentRef.current = false;
     stopRecognition();
     teardownAudio();
     setListening(false);
@@ -251,6 +260,34 @@ export function VoiceButton({
     setInterim("");
     setFinalText("");
   }
+
+  /* ----- press-and-hold logic -----
+   * - Quick tap (< 2s held): start recording and leave the overlay open.
+   *   The user ends/sends via tapping again or the overlay Send button.
+   * - Long press (>= 2s held): release sends the transcript.
+   * - If already listening, a quick tap acts as "send/stop". */
+  const HOLD_MS = 2000;
+  function handlePressStart() {
+    pressStartRef.current = Date.now();
+    if (!listening) {
+      void start();
+    }
+  }
+  function handlePressEnd() {
+    const held = Date.now() - pressStartRef.current;
+    pressStartRef.current = 0;
+    if (!listening) return;
+    if (held >= HOLD_MS) {
+      sendNow();
+    } else {
+      // Quick tap while already listening → send (toggle off).
+      // If this tap is what started recording, leave the overlay open.
+      const wasJustStarted = held < 350 && (finalText + interim).trim() === "";
+      if (!wasJustStarted) sendNow();
+    }
+  }
+
+
 
   if (!supported) {
     return (
@@ -277,9 +314,13 @@ export function VoiceButton({
         <div className="flex flex-col items-center">
           <button
             type="button"
-            onClick={start}
-            aria-label="Hold to talk"
-            className="group relative grid h-24 w-24 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg shadow-brand/30 transition-transform active:scale-95 hover:shadow-xl hover:shadow-brand/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+            onPointerDown={handlePressStart}
+            onPointerUp={handlePressEnd}
+            onPointerLeave={(e) => { if (pressStartRef.current) handlePressEnd(); }}
+            onPointerCancel={() => { if (pressStartRef.current) handlePressEnd(); }}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="Tap to speak, or hold and release to send"
+            className="group relative grid h-24 w-24 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg shadow-brand/30 transition-transform active:scale-95 hover:shadow-xl hover:shadow-brand/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 select-none touch-none"
           >
             <span className="absolute inset-0 rounded-full bg-brand/30 opacity-0 group-hover:opacity-100 animate-ping" />
             <Mic className="relative size-10" strokeWidth={2.5} />
@@ -305,9 +346,13 @@ export function VoiceButton({
     <>
       <button
         type="button"
-        onClick={start}
-        aria-label="Voice input"
-        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground shadow-md shadow-brand/20 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+        onPointerDown={handlePressStart}
+        onPointerUp={handlePressEnd}
+        onPointerLeave={() => { if (pressStartRef.current) handlePressEnd(); }}
+        onPointerCancel={() => { if (pressStartRef.current) handlePressEnd(); }}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label="Tap to speak, or hold and release to send"
+        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground shadow-md shadow-brand/20 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 select-none touch-none"
       >
         <Mic className="size-6" strokeWidth={2.5} />
       </button>
