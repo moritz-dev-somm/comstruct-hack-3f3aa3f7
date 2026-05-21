@@ -253,9 +253,7 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, lead_time, issues, checklist, missing_checklist.\n` +
-          `checklist must be an object with keys order_confirmed (boolean), delivery_date (string|null), shipping_cost (string|null).\n` +
-          `missing_checklist must be an array containing any of "delivery_date" or "shipping_cost" that are still null.`,
+          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, suggested_outbound.`,
       },
     ],
     response_format: { type: "json_object" },
@@ -280,22 +278,30 @@ export async function classifyReply(args: {
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as Partial<ReplyClassification>;
     const checklist = normalizeChecklist(parsed.checklist);
-    // Trust the model's missing_checklist when present, else derive from checklist.
     const missing =
       Array.isArray(parsed.missing_checklist) && parsed.missing_checklist.length >= 0
         ? (parsed.missing_checklist.filter((f) =>
             f === "delivery_date" || f === "shipping_cost",
           ) as ChecklistField[])
         : deriveMissing(checklist);
-    // Reconcile: if checklist has a value but model claims it's missing, drop it.
     const reconciled = missing.filter((f) => checklist[f] == null);
+    const summary = parsed.summary ?? "";
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
-      summary: parsed.summary ?? "",
+      summary,
+      summary_en: parsed.summary_en?.toString().trim() || summary,
+      reply_language: parsed.reply_language?.toString().toLowerCase().slice(0, 5) || null,
       lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       checklist,
       missing_checklist: reconciled,
+      answerable_questions: Array.isArray(parsed.answerable_questions)
+        ? parsed.answerable_questions.map(String).filter(Boolean)
+        : [],
+      unanswerable_questions: Array.isArray(parsed.unanswerable_questions)
+        ? parsed.unanswerable_questions.map(String).filter(Boolean)
+        : [],
+      suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
