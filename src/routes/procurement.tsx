@@ -39,14 +39,28 @@ function ProcurementLayout() {
   return (
     <div className="min-h-screen flex bg-muted/30 text-foreground">
       <aside className="w-60 shrink-0 border-r bg-card hidden md:flex flex-col">
-        <div className="h-14 border-b px-4 flex items-center gap-2">
-          <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
-            <HardHat className="size-5" />
+        <div className="border-b px-3 py-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
+              <HardHat className="size-5" />
+            </div>
+            <div className="leading-tight">
+              <div className="font-semibold text-sm">comstruct</div>
+              <div className="text-[11px] text-muted-foreground">Procurement</div>
+            </div>
           </div>
-          <div className="leading-tight">
-            <div className="font-semibold text-sm">comstruct</div>
-            <div className="text-[11px] text-muted-foreground">Procurement</div>
-          </div>
+          <Select value={project} onValueChange={setProject}>
+            <SelectTrigger className="h-9 w-full text-xs">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {nav.map((n) => {
