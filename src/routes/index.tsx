@@ -312,6 +312,9 @@ function Home() {
           return next;
         });
         break;
+    }
+  }
+
 
   function handleTool(name: string, args: Record<string, unknown>) {
     if (name === "add_to_cart") {
