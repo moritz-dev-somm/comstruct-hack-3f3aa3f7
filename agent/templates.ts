@@ -22,7 +22,7 @@ const COMPANY = {
   agentName: "comstruct procurement agent",
 };
 
-const AGENT_DISCLOSURE_TEXT = `Sent automatically by ${COMPANY.name}'s AI procurement agent. Replies are routed to a human.`;
+const AGENT_DISCLOSURE_TEXT = `Sent automatically by ${COMPANY.name}'s AI procurement agent.`;
 const AGENT_DISCLOSURE_HTML = `<p style="font-size:11px;color:#9ca3af;margin-top:14px"><em>${AGENT_DISCLOSURE_TEXT}</em></p>`;
 
 function escapeHtml(s: string): string {
