@@ -29,6 +29,8 @@ function OrdersOverview() {
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const navigate = useNavigate();
+  const { data: suppliers } = useSuppliers();
+  const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
 
   const filtered = useMemo(
     () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
