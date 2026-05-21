@@ -1,91 +1,70 @@
-# Supplier agent — emails, policy, and human-in-the-loop UI
 
-Everything below stays inside `agent/`, `src/lib/supplier-agent.functions.ts`, the AgentMail webhook, and `src/routes/procurement.agent.tsx`. No DB schema changes (we already store `classification` JSONB and `followup_count` / `clarification_count`).
+## 1. Bilingual agent disclosure
 
-## 1. Email text & bilingual ordering (templates.ts)
+**Where:** `agent/templates.ts`
 
-- **Remove** "so we can route it to the right person quickly." from the initial PO (`flagDiscrepancy`) — and the equivalent in `de`, `fr`, `it`.
-- **Remove** the German `outroSingle` "Eine kurze Zeile genügt — die übrige Bestellung muss nicht wiederholt werden." Apply the same shortening across `en/fr/it`: drop the outro entirely from clarification emails (it duplicates the intro intent).
-- **Clarification fallback fix.** Today, when no `unclear_points` exist we still send the generic "Could you confirm the specific point you left open…" *plus* the intro that already asks the same thing. New behaviour:
-  - `composeClarificationRequestEmail` takes an extra `pendingChecklist: ChecklistField[]` arg.
-  - If `points` is empty, fall back to the **still-unanswered checklist questions** from the very first email (`earliestDelivery`, `shippingCosts`) — reusing `STRINGS[lang].earliestDelivery` / `.shippingCosts` so the wording matches the original ask.
-  - Drop the standalone `fallback` string; the email now always has concrete bullets.
-- **Bilingual ordering.** In every composer (`composeOrderEmail`, `composeFollowupEmail`, `composeClarificationRequestEmail`, `composeAnswerQuestionsEmail`, `composeIssuesAckEmail`, `composeDeclineAckEmail`, `composeConfirmationEmail`, `composeNudgeEmail`, `bilingual()`), put **English first**, then the supplier's language block. Subject becomes `[ID] <english> / <native>`.
-- **Short confirmation on every supplier confirmation** — `composeConfirmationEmail` already runs on `send_confirmation`; keep, but trim to ~3 short lines.
-- **No automatic cancel email** when supplier declines. Replace `send_decline_ack` action with `no_op` + needs_user. The decline-ack email is only sent later when a human authorizes a replacement purchase (new server fn, see §4).
+Today `AGENT_DISCLOSURE_TEXT` / `AGENT_DISCLOSURE_HTML` are a single English string. `assembleBilingual` appends it once at the very bottom of both the text and HTML body, so the German/French/Italian half of every email ends with an English-only disclaimer.
 
-## 2. Policy / state machine (agent/conditions.ts + webhook)
+**Change:**
+- Replace the two constants with a lookup table:
+  ```ts
+  const DISCLOSURE: Record<SupplierLanguage, string> = {
+    en: `Sent automatically by ${COMPANY.name}'s AI procurement agent.`,
+    de: `Automatisch gesendet vom KI-Beschaffungsagenten der ${COMPANY.name}.`,
+    fr: `Envoyé automatiquement par l'agent IA d'approvisionnement de ${COMPANY.name}.`,
+    it: `Inviato automaticamente dall'agente IA per gli acquisti di ${COMPANY.name}.`,
+  };
+  ```
+- In `assembleBilingual`, render the English disclosure under the English block and the native-language disclosure under the native block (so each half is self-contained). For `language === "en"` keep the single English line.
+- Mirror the same change in the HTML wrapper (small italic `<p>` under each block).
 
-Add a richer `CounterState` and reply-cap logic:
+No call-site changes needed — every template already routes through `assembleBilingual` with the language.
 
-```
-CounterState {
-  followup_count, clarification_count,
-  reply_count,                 // total supplier replies seen
-  answered_checklist: ChecklistField[],  // accumulated across the thread
-  pending_checklist: ChecklistField[],   // = ["delivery_date","shipping_cost"] − answered
-}
-```
+## 2. Root cause of missed answers
 
-- **Hard cap: 5 replies.** Webhook increments `reply_count` on every inbound. When `reply_count >= 5` and not already `confirmed`, force `escalate_silent` with reason `Reply limit reached (5) — human review needed.`
-- **Human handoff triggers** (all → `escalate_silent` + `needs_user_reason`):
-  - Supplier explicitly asks for a human (new classifier field `wants_human: boolean`, plus regex backstop on phrases like `talk to`, `speak with`, `sprechen`, `parler à`, `un commercial`).
-  - Supplier asks a question we cannot auto-answer (existing `unanswerable_questions` non-empty).
-  - Supplier says item unavailable / declined (verdict `declined` OR `confirmed_with_issue` with `unavailable`/`out of stock`/`nicht verfügbar` in `issues`).
-  - 24h silence (see §3).
-- **Auto-approve thresholds** for `confirmed_with_issue`:
-  - `lead_time_days <= 14` AND no `issues` other than shipping/lead-time → `send_confirmation` automatically.
-  - `shipping_cost_eur <= max(20, 5% × order.subtotal)` → counts as acceptable.
-  - Otherwise → `escalate_silent` (`Needs human approval: lead time X days / shipping €Y`).
-  - Classifier returns `lead_time_days: number|null` and `shipping_cost_eur: number|null` for this.
-- **Accumulated checklist.** Webhook merges `cls.checklist.delivery_date != null` and `cls.checklist.shipping_cost != null` into a `answered_checklist` array on the negotiation row (stored inside `classification.answered_checklist`). The clarification/follow-up emails use only the still-pending fields.
+The classifier already has thread context, but recognition still fails. The root cause is **information loss between turns**, not a prompt-tuning issue:
 
-## 3. 24h-no-reply timeout
+1. **Classifier sees only the latest reply text + a short summary of prior facts.** The actual prior supplier emails are never re-sent to the model. If turn N-1 was misclassified (e.g. it missed a "ships next Tuesday" buried in a quoted block), that fact is permanently absent from `prior_answers`, and turn N can never recover it.
+2. **`open_questions` are stored in whatever language the model emitted in `unclear_points`** (often the supplier's language for clarification emails). The classifier prompt instructs the model to copy them **verbatim** into `answered_open_questions`. When language and phrasing drift between turns, the verbatim match collapses to `[]` and we falsely conclude "still open".
+3. **Single-pass JSON with `response_format: json_object`** is noisier than function calling. The model occasionally drops `answered_open_questions` entirely or returns `still_open_questions` as a paraphrase that doesn't match the stored strings, so the webhook treats every question as unanswered.
+4. **Short / implicit replies** ("ok", "passt", "compris") are correctly described as ambiguous, but with no anchor to the open question they default to `unclear` → another clarification email.
 
-Add a public endpoint and pg_cron:
+### Fix (no new infra, two LLM calls per inbound)
 
-- `src/routes/api/public/agent-timeouts.ts` (POST). Auth: `apikey` header = anon. Scans `negotiations` where status ∈ {sent, awaiting_reply, clarifying, following_up, answering_questions} AND `greatest(sent_at, last_reply_at) < now() - interval '24 hours'`. For each row → set `status = 'needs_user'`, `needs_user_reason = 'No reply in 24h — human follow-up needed.'`. No outbound email.
-- pg_cron job every 15 minutes calling that endpoint.
+**A. Preserve raw thread in DB**, not just summary bullets.
+- Add a `thread_messages` JSON column on `negotiations` storing `{role: "agent"|"supplier", lang, text, at}[]` (cap last 10 turns).
+- Webhook appends the inbound text to `thread_messages` before classifying, and appends every outbound after sending.
 
-## 4. Human-in-the-loop server actions
+**B. Send the raw thread to the classifier.**
+- Extend `ThreadContext` with `transcript: ThreadMessage[]`.
+- Update `CLASSIFY_SYSTEM` + user prompt to include the full transcript above `LATEST SUPPLIER REPLY`. This is the single biggest recall win: the model can re-derive facts the previous pass missed.
 
-`src/lib/supplier-agent.functions.ts` adds three server fns the UI calls:
+**C. Stop relying on verbatim string matching for open questions.**
+- Give each open question a stable `id` (`q_<uuid>`) and store `open_questions: {id, text_en, text_native}[]`.
+- Pass `{id, text_en}` to the classifier; ask it to return `answered_ids` / `still_open_ids`. IDs are language-agnostic and survive paraphrase.
 
-- `approveNegotiation(id)` — used when human approves auto-confirmable-but-escalated cases (lead time high, shipping high). Sends `composeConfirmationEmail` reply to the supplier's last message; sets status `confirmed`.
-- `declineAndReplaceNegotiation(id)` — used after human re-sources elsewhere. Sends `composeDeclineAckEmail` ("thanks, sourcing elsewhere"); sets status `declined`. *This is the only place that email is sent now.*
-- `humanFollowupNegotiation(id, text)` — sends a free-text reply on the same thread; clears `needs_user`; sets status `awaiting_reply`.
+**D. Add a dedicated second-pass "answer-check" LLM call** (one call, one prompt, all open questions at once). After the main classifier returns, if `still_open_ids` is non-empty, run a focused recall pass:
+- Inputs: list of `{id, text_en}` + the full transcript + the latest reply.
+- Use function calling (`tool_choice: "function"`) with a schema:
+  ```json
+  { "answered": [{ "id": "q_…", "evidence": "<quoted phrase>", "confidence": 0..1 }] }
+  ```
+- Use `openai/gpt-5` (stronger recall than `gpt-5-mini`) and `reasoning: { effort: "low" }`.
+- Merge: any `confidence >= 0.6` moves the id from `still_open_ids` to `answered_ids` and the `evidence` string is appended to `prior_answers`.
 
-All three reuse `am.inboxes.messages.reply()` with the negotiation's last message id (already stored as `reply_message_id` / `message_id`).
+**E. Switch the main classifier from `response_format: json_object` to tool-calling** with the same schema it already emits. Eliminates the "model dropped a key" failure mode that silently regresses state.
 
-## 5. UI — Action queue + clearer tags (procurement.agent.tsx)
+### Does this need an LLM call?
 
-This page already loads `negotiations` via `listNegotiationsForInbox`. Extend the response to include `status`, `needs_user_reason`, `last_reply_at`, `classification` (it already does) and `order_snapshot.subtotal`.
+Yes — the recognition problem is fundamentally semantic ("does this German sentence answer 'Earliest delivery date you can commit to?'"). Regex/keyword logic will keep producing the same false negatives. The cost is bounded: one extra `gpt-5` call only fires when the first pass reports unresolved questions, which is exactly the case the user is complaining about.
 
-- **New top section "Needs your attention"** (mobile-first card list). Shows every negotiation where `status === 'needs_user'` OR `derivedStatus === 'action_required'`. Each card:
-  - Supplier + order id + 1-line reason (`needs_user_reason` or generated from classification).
-  - Primary action button(s): `Approve` / `Decline & source elsewhere` / `Send custom reply` (opens a small textarea).
-  - Subtle, mobile-friendly: full-width on `<sm`, two-column grid on `≥md`. Sticky-ish header on mobile.
-- **Tag rewrite.** Replace the current `VERDICT_META` with action-state meta keyed by `negotiation.status` (not classifier verdict) so each tag describes "what's happening" not "how the AI labelled it":
-  - `confirmed` → "Confirmed" (green check)
-  - `awaiting_reply` → "Waiting on supplier"
-  - `clarifying` → "We asked a clarification"
-  - `following_up` → "We asked for missing details"
-  - `answering_questions` → "We answered supplier"
-  - `issues_raised` → "Supplier flagged issues"
-  - `declined` → "Supplier declined"
-  - `needs_user` → "Needs you" (brand-red pill — same as Action queue)
-- **Per-message annotation** stays, but uses the same colour family so list ↔ thread are visually consistent.
+## Technical summary
 
-## 6. Out of scope
+Files touched:
+- `agent/templates.ts` — per-language `DISCLOSURE`, dual-render in `assembleBilingual`.
+- `agent/agent.server.ts` — `ThreadContext.transcript`, IDs for open questions, switch to tool-calling, new `verifyAnsweredQuestions()` second-pass function.
+- `agent/conditions.ts` — accept `still_open_ids` (just length check), no policy change.
+- `src/routes/api/public/agentmail/webhook.ts` — append to `thread_messages`, build open-question objects with IDs, merge second-pass results into `open_questions` + `prior_answers`.
+- New Supabase migration: add `thread_messages jsonb default '[]'::jsonb` to `negotiations`; change `classification.open_questions` shape (backfill: wrap any existing `string[]` into `{id: uuid(), text_en: s, text_native: s}` lazily in code, no destructive migration).
 
-- No new tables or DB columns.
-- No changes to chat, catalogue, or cart.
-- No real Stripe / payments flow.
-- The PO-cancel email is intentionally NOT a real cancel to the supplier — it's the "we'll source elsewhere this time" ack we already had, just gated behind human confirmation.
-
-## Technical notes
-
-- Bilingual swap is one-line per composer (`renderTextBlock(english,…) + sep + renderTextBlock(primary,…)`).
-- `classifyReply` JSON schema adds `wants_human`, `lead_time_days`, `shipping_cost_eur` — fall back to current behaviour when missing so older rows still work.
-- `decideAction` becomes the single source of truth — the webhook just executes the returned action; no inline overrides.
-- pg_cron migration is the only DB change; rest is code.
+Out of scope: UI tag changes, conditions thresholds.
