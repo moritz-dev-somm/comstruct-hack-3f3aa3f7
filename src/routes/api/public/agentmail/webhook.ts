@@ -424,7 +424,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           .update({
             status: nextStatus,
             classification: {
-              ...cls,
+              ...effectiveCls,
               followup_count: nextFollowup,
               clarification_count: nextClarification,
               reply_count: replyCount,
@@ -434,6 +434,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
               last_action: action.kind,
               last_action_reason: (action as { reason?: string }).reason ?? null,
             },
+            thread_messages: cappedTranscript,
             reply_excerpt: replyText.slice(0, 1000),
             reply_message_id: replyMessageId,
             needs_user_reason: needsUserReason,
@@ -444,7 +445,6 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             last_processed_message_id: messageId || null,
             last_inbound_from: fromEmail,
             security_reject_reason: null,
-            // If we matched by fallback, lock in the new thread for future replies.
             ...(matchedByFallback && threadId ? { thread_id: threadId } : {}),
           })
           .eq("id", neg.id);
