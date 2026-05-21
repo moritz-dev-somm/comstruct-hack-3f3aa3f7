@@ -187,9 +187,9 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
 
         </section>
 
-        {/* §2 Ausgabenverlauf */}
+        {/* §2 Spend over time */}
         <section ref={spendRef} className={`${CARD} p-5`}>
-          <SectionHeader title="Ausgabenverlauf" subtitle="Tägliche C-Material-Ausgaben im ausgewählten Zeitraum" />
+          <SectionHeader title="Spend over time" subtitle="Daily C-material spend over the selected period" />
           <div className="h-[320px] mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={series} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
@@ -201,17 +201,18 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                   formatter={(v: number, name: string) => [formatCHF(v), name]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="spend" name="Tagesausgaben" fill={GREEN} fillOpacity={0.75} radius={[3, 3, 0, 0]} />
-                <Line dataKey="rolling7" name="7-Tage-Durchschnitt" stroke={BLUE} strokeWidth={2} dot={false} />
+                <Bar dataKey="spend" name="Daily spend" fill={GREEN} fillOpacity={0.75} radius={[3, 3, 0, 0]} />
+                <Line dataKey="rolling7" name="7-day average" stroke={BLUE} strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
           <div className="flex flex-wrap gap-2 mt-4">
-            <Chip>📈 Höchster Tag: {topDay.label} — {formatCHF(topDay.spend)} (Elektro Grundausstattung ×3)</Chip>
-            <Chip>📉 Ruhigster Tag: {quietDay.label} (Sonntag) — CHF 0</Chip>
-            <Chip>⚡ Ø Montag 34% höher als andere Wochentage</Chip>
+            <Chip>📈 Peak day: {topDay.label} — {formatCHF(topDay.spend)} (Electrical starter kit ×3)</Chip>
+            <Chip>📉 Quietest day: {quietDay.label} (Sunday) — CHF 0</Chip>
+            <Chip>⚡ Avg. Monday 34% higher than other weekdays</Chip>
           </div>
         </section>
+
 
         {/* §3 Spend Breakdown */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
