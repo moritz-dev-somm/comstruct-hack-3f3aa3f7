@@ -18,8 +18,10 @@ import {
   ShoppingCart,
   X,
   Zap,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
+import { useRole } from "@/lib/role";
 import { useProducts, formatEUR, type Product } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
