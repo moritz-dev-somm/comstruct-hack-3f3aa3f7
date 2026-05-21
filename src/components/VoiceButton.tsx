@@ -346,9 +346,13 @@ export function VoiceButton({
     <>
       <button
         type="button"
-        onClick={start}
-        aria-label="Voice input"
-        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground shadow-md shadow-brand/20 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+        onPointerDown={handlePressStart}
+        onPointerUp={handlePressEnd}
+        onPointerLeave={() => { if (pressStartRef.current) handlePressEnd(); }}
+        onPointerCancel={() => { if (pressStartRef.current) handlePressEnd(); }}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label="Tap to speak, or hold and release to send"
+        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground shadow-md shadow-brand/20 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 select-none touch-none"
       >
         <Mic className="size-6" strokeWidth={2.5} />
       </button>
