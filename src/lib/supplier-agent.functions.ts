@@ -4,6 +4,7 @@ import {
   agentMail,
   ensureAgentInfra,
   adminClient,
+  translateForSupplier,
   HARDCODED_SUPPLIER_EMAIL,
 } from "@agent/agent.server";
 import {
