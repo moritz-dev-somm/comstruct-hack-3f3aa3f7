@@ -25,6 +25,9 @@ function OrderDetail() {
   const order = orders.find((o) => o.id === orderId);
   const { data: suppliers } = useSuppliers();
   const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
+  const orderIds = useMemo(() => (order ? [order.id] : []), [order]);
+  const negotiationsByOrder = useNegotiationsByOrder(orderIds);
+
 
   if (!order) {
     return (
