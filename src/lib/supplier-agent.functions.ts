@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { AgentMail } from "agentmail";
+import { AgentMailClient } from "agentmail";
 import { composeOrderEmail, composeNudgeEmail } from "./agent-mail/templates";
 import type { Order } from "./orders";
 
@@ -16,10 +16,10 @@ import type { Order } from "./orders";
  * inside a server fn triggered by a polling/webhook route.
  */
 
-function client(): AgentMail {
+function client(): AgentMailClient {
   const apiKey = process.env.AGENTMAIL_API_KEY;
   if (!apiKey) throw new Error("AGENTMAIL_API_KEY is not configured");
-  return new AgentMail({ apiKey });
+  return new AgentMailClient({ apiKey });
 }
 
 /**
@@ -143,7 +143,7 @@ export const listInboxMessages = createServerFn({ method: "POST" })
         limit: data.limit,
       });
       // Map to a serialization-safe DTO.
-      const messages = (res.messages ?? []).map((m) => {
+      const messages = ((res as { messages?: unknown[] }).messages ?? []).map((m: unknown) => {
         const anyM = m as Record<string, unknown>;
         return {
           id: String(anyM.messageId ?? anyM.id ?? ""),

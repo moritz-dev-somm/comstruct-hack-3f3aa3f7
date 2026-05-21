@@ -247,7 +247,7 @@ function AgentPage() {
           </div>
         ) : (
           <ul className="divide-y">
-            {messagesQ.data.messages.map((m) => (
+            {messagesQ.data.messages.map((m: { id: string; subject: string; from: string; receivedAt: string; preview: string }) => (
               <li key={m.id} className="px-5 py-3 text-sm">
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="font-medium truncate">{m.subject || "(no subject)"}</div>
