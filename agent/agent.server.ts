@@ -305,6 +305,9 @@ export async function classifyReply(args: {
       unanswerable_questions: Array.isArray(parsed.unanswerable_questions)
         ? parsed.unanswerable_questions.map(String).filter(Boolean)
         : [],
+      unclear_points: Array.isArray(parsed.unclear_points)
+        ? parsed.unclear_points.map(String).filter(Boolean).slice(0, 6)
+        : [],
       suggested_outbound: parsed.suggested_outbound as SuggestedOutbound | undefined,
     };
   } catch (err) {
