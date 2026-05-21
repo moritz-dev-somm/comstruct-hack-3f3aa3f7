@@ -555,6 +555,7 @@ function Home() {
             onSuggestion={(s) => send(s)}
             followups={followups}
             allProducts={products}
+            categoryTiles={categoryTiles}
             onRunSearch={runHybridSearch}
             searching={searching}
             searchResults={searchResults}
