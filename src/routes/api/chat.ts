@@ -266,9 +266,12 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Missing LOVABLE_API_KEY or OPENAI_API_KEY", { status: 500 });
         }
 
+        const lastUser = [...messages].reverse().find((m) => m.role === "user");
+        const lang = detectLang(typeof lastUser?.content === "string" ? lastUser.content : "");
+
         let summary = "(catalog unavailable)";
         try {
-          summary = await categorySummary();
+          summary = await categorySummary(lang);
         } catch (e) {
           console.error("Catalog summary failed", e);
         }
