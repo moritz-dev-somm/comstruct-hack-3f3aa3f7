@@ -659,16 +659,10 @@ export async function classifyReply(args: {
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("classifyReply failed", message);
-    const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
-    return fallback.verdict === "unclear"
-      ? {
-          ...fallback,
-          summary: "Classifier exception",
-          summary_en: "Classifier exception",
-          issues: [message],
-        }
-      : fallback;
+    console.error("classifyReply OpenAI call failed (no fallback):", message);
+    // Re-throw so the webhook surfaces the failure instead of silently
+    // accepting a degraded heuristic classification.
+    throw err instanceof Error ? err : new Error(message);
   }
 }
 
