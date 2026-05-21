@@ -14,9 +14,11 @@ import {
   Droplets,
   Hammer,
   HardHat,
+  Loader2,
   Package,
   Plus,
   Ruler,
+  Search,
   SlidersHorizontal,
   ShoppingCart,
   X,
@@ -51,6 +53,26 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   suggestions?: string[];
+};
+
+export type HybridExtracted = {
+  extracted_category: string | null;
+  extracted_keywords: string[];
+  semantic_search_string: string;
+};
+
+export type HybridSearchResult = {
+  sku: string;
+  name: string;
+  category: string;
+  description: string | null;
+  price_eur: number | string;
+  unit: string;
+  supplier: string | null;
+  keywords: string[] | null;
+  similarity: number;
+  keyword_score: number;
+  hybrid_score: number;
 };
 
 const SUGGESTED_CHIPS = [
@@ -129,6 +151,9 @@ function Home() {
   const [aMaterialFlag, setAMaterialFlag] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<HybridSearchResult[] | null>(null);
+  const [searchExtracted, setSearchExtracted] = useState<HybridExtracted | null>(null);
+  const [searching, setSearching] = useState(false);
   const cart = useCart();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -293,7 +318,44 @@ function Home() {
     setMessages([]);
     setRecommendedIds([]);
     setSelectedCategory(null);
+    setSearchResults(null);
+    setSearchExtracted(null);
     localStorage.removeItem("comstruct-chat");
+  }
+
+  async function runHybridSearch() {
+    if (searching || messages.length === 0) return;
+    setSearching(true);
+    setSearchResults(null);
+    setSearchExtracted(null);
+    try {
+      const res = await fetch("/api/hybrid-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || "Search failed");
+        return;
+      }
+      setSearchExtracted(json.extracted ?? null);
+      setSearchResults(Array.isArray(json.results) ? json.results : []);
+      // bring results into view
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 50);
+    } catch (e) {
+      console.error("hybrid-search failed", e);
+      toast.error("Search failed");
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
@@ -388,7 +450,12 @@ function Home() {
             onResetRecommendations={() => setRecommendedIds([])}
             onSuggestion={(s) => send(s)}
             allProducts={products}
+            onRunSearch={runHybridSearch}
+            searching={searching}
+            searchResults={searchResults}
+            searchExtracted={searchExtracted}
           />
+
         )}
       </main>
 
@@ -600,6 +667,10 @@ function ConversationView({
   onResetRecommendations,
   onSuggestion,
   allProducts,
+  onRunSearch,
+  searching,
+  searchResults,
+  searchExtracted,
 }: {
   messages: ChatMessage[];
   streaming: boolean;
@@ -613,6 +684,10 @@ function ConversationView({
   onResetRecommendations: () => void;
   onSuggestion: (s: string) => void;
   allProducts: Product[];
+  onRunSearch: () => void;
+  searching: boolean;
+  searchResults: HybridSearchResult[] | null;
+  searchExtracted: HybridExtracted | null;
 }) {
   const recSet = new Set(recommendedIds);
   const lastAssistant = messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1] : null;
@@ -653,7 +728,66 @@ function ConversationView({
             </SuggestionButton>
           </div>
         )}
+
+        {/* End-of-chat hybrid search trigger */}
+        {!streaming && messages.length > 0 && (
+          <div className="pt-3">
+            <button
+              onClick={onRunSearch}
+              disabled={searching}
+              className="inline-flex items-center gap-2 rounded-full bg-brand text-brand-foreground px-4 h-10 text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+            >
+              {searching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Searching catalog…
+                </>
+              ) : (
+                <>
+                  <Search className="size-4" />
+                  Search catalog for matches
+                </>
+              )}
+            </button>
+            {searchExtracted && !searching && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Query: <span className="font-medium text-foreground">{searchExtracted.semantic_search_string}</span>
+                {searchExtracted.extracted_category && (
+                  <> · in <span className="font-medium">{searchExtracted.extracted_category}</span></>
+                )}
+                {searchExtracted.extracted_keywords.length > 0 && (
+                  <> · {searchExtracted.extracted_keywords.slice(0, 6).join(" · ")}</>
+                )}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Hybrid search results */}
+        {searchResults && (
+          <div className="pt-2">
+            <div className="flex items-end justify-between mb-3 border-b-2 border-brand/70 pb-2">
+              <h2 className="text-lg font-bold text-brand">Catalog matches</h2>
+              <span className="text-xs text-muted-foreground">
+                {searchResults.length} result{searchResults.length === 1 ? "" : "s"} · cheapest first
+              </span>
+            </div>
+            {searchResults.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                No matches found.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {searchResults.map((r) => (
+                  <SearchResultCard key={r.sku} result={r} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+
 
       {showTilesLayout ? (
         <>
@@ -1500,4 +1634,54 @@ function ApprovalBanner() {
   );
 }
 
+
+function SearchResultCard({ result }: { result: HybridSearchResult }) {
+  const cart = useCart();
+  const price = Number(result.price_eur);
+  return (
+    <div className="rounded-md border bg-card p-4 flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span>{result.category}</span>
+            <span>·</span>
+            <span className="font-mono">{result.sku}</span>
+          </div>
+          <h3 className="font-semibold text-sm mt-1 leading-tight">{result.name}</h3>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-base font-bold">{formatEUR(price)}</div>
+          <div className="text-[10px] text-muted-foreground">/{result.unit}</div>
+        </div>
+      </div>
+      {result.description && (
+        <p className="text-xs text-muted-foreground line-clamp-2">{result.description}</p>
+      )}
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[10px] text-muted-foreground">
+          match {(result.similarity * 100).toFixed(0)}%
+          {result.keyword_score > 0 && ` · ${result.keyword_score} kw`}
+        </span>
+        <button
+          onClick={() => {
+            cart.add({
+              productId: result.sku,
+              name: result.name,
+              price,
+              qty: 1,
+              category: result.category,
+              unit: result.unit,
+            });
+            toast.success(`Added ${result.name} to cart`);
+          }}
+          className="inline-flex items-center gap-1 rounded-md bg-brand text-brand-foreground px-2.5 h-8 text-xs font-semibold hover:opacity-90"
+        >
+          <Plus className="size-3.5" /> Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export type {};
+

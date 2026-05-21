@@ -124,6 +124,7 @@ export type Database = {
           created_at: string
           description: string | null
           description_en: string | null
+          embedding: string | null
           enriched_at: string | null
           hazardous: boolean
           id: string
@@ -132,6 +133,7 @@ export type Database = {
           name: string
           name_en: string | null
           price_eur: number
+          search_document: string | null
           sku: string
           source_category: string | null
           storage_location: string | null
@@ -150,6 +152,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           description_en?: string | null
+          embedding?: string | null
           enriched_at?: string | null
           hazardous?: boolean
           id?: string
@@ -158,6 +161,7 @@ export type Database = {
           name: string
           name_en?: string | null
           price_eur?: number
+          search_document?: string | null
           sku: string
           source_category?: string | null
           storage_location?: string | null
@@ -176,6 +180,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           description_en?: string | null
+          embedding?: string | null
           enriched_at?: string | null
           hazardous?: boolean
           id?: string
@@ -184,6 +189,7 @@ export type Database = {
           name?: string
           name_en?: string | null
           price_eur?: number
+          search_document?: string | null
           sku?: string
           source_category?: string | null
           storage_location?: string | null
@@ -202,7 +208,48 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      hybrid_search_materials: {
+        Args: {
+          category_filter?: string
+          keyword_filters?: string[]
+          match_count?: number
+          user_embedding: string
+        }
+        Returns: {
+          category: string
+          description: string
+          hybrid_score: number
+          keyword_score: number
+          keywords: string[]
+          name: string
+          price_eur: number
+          similarity: number
+          sku: string
+          supplier: string
+          unit: string
+        }[]
+      }
+      hybrid_search_materials_cheap_first: {
+        Args: {
+          category_filter?: string
+          keyword_filters?: string[]
+          match_count?: number
+          user_embedding: string
+        }
+        Returns: {
+          category: string
+          description: string
+          hybrid_score: number
+          keyword_score: number
+          keywords: string[]
+          name: string
+          price_eur: number
+          similarity: number
+          sku: string
+          supplier: string
+          unit: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
