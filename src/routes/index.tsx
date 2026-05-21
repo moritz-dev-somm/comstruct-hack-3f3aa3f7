@@ -629,6 +629,7 @@ function HeroView({
   onSelectCategory,
   inputRef,
   onAddQuickOrder,
+  categoryTiles,
 }: {
   input: string;
   setInput: (v: string) => void;
