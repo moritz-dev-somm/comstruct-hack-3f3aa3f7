@@ -31,13 +31,12 @@ export type NegotiationRow = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   Fasteners: "#16A34A",
-  Befestigung: "#16A34A",
-  PSA: "#2563EB",
-  Elektro: "#0D9488",
-  "Hand Tools": "#D97706",
-  Werkzeug: "#D97706",
-  Sonstige: "#6B7280",
+  PPE: "#2563EB",
+  Electrical: "#0D9488",
+  Tools: "#D97706",
+  Other: "#6B7280",
 };
+
 
 const CATEGORY_PALETTE = ["#16A34A", "#2563EB", "#0D9488", "#D97706", "#7C3AED", "#DC2626", "#6B7280"];
 
