@@ -323,7 +323,7 @@ function Home() {
       const p = products.find((x) => x.sku === sku);
       if (!p) return;
       const qty = (args.quantity as number) || 1;
-      cart.add({ productId: p.sku, name: p.name, price: p.price, qty, category: p.category, unit: p.unit });
+      cart.add({ productId: p.sku, name: p.name, price: p.price, qty, category: p.category, unit: p.unit, supplier: p.supplier });
       toast.success(`Added ${qty}× ${p.name} to cart`);
     } else if (name === "flag_as_a_material") {
       setAMaterialFlag((args.what_they_asked_for as string) || "this item");
@@ -469,6 +469,7 @@ function Home() {
                     category: product.category,
                     unit: product.unit,
                     qty: 1,
+                    supplier: product.supplier,
                   });
                   added++;
                 }
@@ -1061,6 +1062,7 @@ function InlineProductBubble({
       qty: addQty,
       category: product.category,
       unit: product.unit,
+      supplier: product.supplier,
     });
   }
 
@@ -1219,6 +1221,7 @@ function ProductCard({
       qty: 1,
       category: product.category,
       unit: product.unit,
+      supplier: product.supplier,
     });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
@@ -1329,6 +1332,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
       qty: 1,
       category: product.category,
       unit: product.unit,
+      supplier: product.supplier,
     });
   }
 
@@ -1492,11 +1496,39 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     cart.clear();
     onClose();
     // Generate the EU-standard PO PDF and trigger a download for the foreman.
-    import("@/lib/po-pdf").then(({ downloadPurchaseOrderPdf }) => {
-      downloadPurchaseOrderPdf(created);
-    });
+    const { generatePurchaseOrderPdf, purchaseOrderFilename, purchaseOrderPdfBase64 } = await import(
+      "@/lib/po-pdf"
+    );
+    generatePurchaseOrderPdf(created).save(purchaseOrderFilename(created));
+
     if (created.tier === "auto") {
-      const sendingToast = toast.loading(`${created.id}: contacting supplier…`);
+      // Group items by supplier and build per-supplier PO PDFs to attach.
+      const FALLBACK = "Generisch";
+      const groups = new Map<string, typeof created.items>();
+      for (const it of created.items) {
+        const key = (it.supplier && it.supplier.trim()) || FALLBACK;
+        const arr = groups.get(key) ?? [];
+        arr.push(it);
+        groups.set(key, arr);
+      }
+      const attachments = Array.from(groups.entries()).map(([supplierName, items]) => {
+        const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
+        const pdfBase64 = purchaseOrderPdfBase64(created, {
+          supplier: { name: supplierName },
+          itemsOverride: items,
+          subtotalOverride: subtotal,
+        });
+        return {
+          supplierName,
+          filename: purchaseOrderFilename(created, supplierName),
+          pdfBase64,
+        };
+      });
+
+      const supplierCount = groups.size;
+      const sendingToast = toast.loading(
+        `${created.id}: contacting ${supplierCount} supplier${supplierCount === 1 ? "" : "s"}…`,
+      );
       try {
         const res = (await startNegotiation({
           data: {
@@ -1511,12 +1543,17 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
                 price: i.price,
                 unit: i.unit,
                 category: i.category,
+                supplier: i.supplier ?? null,
               })),
             },
+            attachments,
           },
-        })) as { ok: true; supplier: string } | { ok: false; error: string };
+        })) as
+          | { ok: true; results: Array<{ supplier: string; email: string }> }
+          | { ok: false; error: string };
         if (res?.ok) {
-          toast.success(`${created.id} sent to ${res.supplier} · PO PDF downloaded`, { id: sendingToast });
+          const labels = res.results.map((r) => r.supplier).join(", ");
+          toast.success(`${created.id} sent to ${labels} · PO PDF downloaded`, { id: sendingToast });
         } else {
           toast.error(`Email agent failed: ${res?.error ?? "unknown error"}`, { id: sendingToast });
         }
@@ -1743,6 +1780,7 @@ function SearchResultCard({ result }: { result: HybridSearchResult }) {
               qty: 1,
               category: result.category,
               unit: result.unit,
+              supplier: result.supplier,
             });
             toast.success(`Added ${result.name} to cart`);
           }}

@@ -25,11 +25,20 @@ const BUYER = {
   phone: "+41 61 555 01 23",
 };
 
-const SUPPLIER = {
+const DEFAULT_SUPPLIER = {
   name: "OBI Bau- und Heimwerkermärkte GmbH",
   street: "Albert-Einstein-Straße 7-9",
   city: "42929 Wermelskirchen, Germany",
   vat: "DE 121 758 727",
+};
+
+export type SupplierBlock = {
+  name: string;
+  street?: string;
+  city?: string;
+  vat?: string;
+  email?: string;
+  phone?: string;
 };
 
 const VAT_RATE = 0.19;
@@ -39,7 +48,13 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function generatePurchaseOrderPdf(order: Order): jsPDF {
+export function generatePurchaseOrderPdf(
+  order: Order,
+  opts?: { supplier?: SupplierBlock; itemsOverride?: Order["items"]; subtotalOverride?: number },
+): jsPDF {
+  const supplierBlock: SupplierBlock = opts?.supplier ?? DEFAULT_SUPPLIER;
+  const items = opts?.itemsOverride ?? order.items;
+  const subtotal = opts?.subtotalOverride ?? order.subtotal;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const page = { w: 210, h: 297, m: 15 };
 
@@ -85,7 +100,14 @@ export function generatePurchaseOrderPdf(order: Order): jsPDF {
   /* ----- Address blocks ----- */
   const addrY = metaY + 30;
   drawAddressBlock(doc, "BUYER", BUYER, page.m, addrY);
-  drawAddressBlock(doc, "SUPPLIER", SUPPLIER, page.m + 65, addrY);
+  drawAddressBlock(doc, "SUPPLIER", {
+    name: supplierBlock.name,
+    street: supplierBlock.street ?? "",
+    city: supplierBlock.city ?? "",
+    vat: supplierBlock.vat ?? "",
+    email: supplierBlock.email,
+    phone: supplierBlock.phone,
+  }, page.m + 65, addrY);
   drawAddressBlock(
     doc,
     "DELIVER TO",
@@ -103,7 +125,7 @@ export function generatePurchaseOrderPdf(order: Order): jsPDF {
 
   /* ----- Line items ----- */
   const tableStartY = addrY + 38;
-  const rows = order.items.map((it, idx) => {
+  const rows = items.map((it, idx) => {
     const lineNet = it.qty * it.price;
     return [
       String(idx + 1),
@@ -143,7 +165,7 @@ export function generatePurchaseOrderPdf(order: Order): jsPDF {
   /* ----- Totals ----- */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const afterTableY: number = (doc as any).lastAutoTable.finalY + 6;
-  const net = order.subtotal;
+  const net = subtotal;
   const vat = net * VAT_RATE;
   const gross = net + vat;
   const totalsX = page.w - page.m - 70;
@@ -228,9 +250,21 @@ function drawTotalRow(doc: jsPDF, label: string, value: string, x: number, y: nu
   doc.text(value, x + 70, y, { align: "right" });
 }
 
-export function purchaseOrderFilename(order: Order): string {
+export function purchaseOrderFilename(order: Order, supplierName?: string): string {
   const safeProject = order.project.replace(/[^a-z0-9]+/gi, "-");
-  return `PO-${order.id}-${safeProject}.pdf`;
+  const safeSupplier = supplierName ? `-${supplierName.replace(/[^a-z0-9]+/gi, "-")}` : "";
+  return `PO-${order.id}${safeSupplier}-${safeProject}.pdf`;
+}
+
+/** Returns just the base64 payload (no data: prefix), suitable for AgentMail attachments. */
+export function purchaseOrderPdfBase64(
+  order: Order,
+  opts?: { supplier?: SupplierBlock; itemsOverride?: Order["items"]; subtotalOverride?: number },
+): string {
+  const doc = generatePurchaseOrderPdf(order, opts);
+  const dataUri = doc.output("datauristring");
+  const comma = dataUri.indexOf(",");
+  return comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
 }
 
 export function downloadPurchaseOrderPdf(order: Order): void {
