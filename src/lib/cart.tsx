@@ -14,11 +14,13 @@ type CartCtx = {
   items: CartItem[];
   add: (item: Omit<CartItem, "qty"> & { qty?: number }) => void;
   setQty: (productId: string, qty: number) => void;
+  adjust: (productId: string, delta: number) => void;
   remove: (productId: string) => void;
   subtotal: number;
   count: number;
   clear: () => void;
 };
+
 
 const Ctx = createContext<CartCtx | null>(null);
 const KEY = "comstruct-cart-v2";
