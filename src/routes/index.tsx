@@ -778,9 +778,8 @@ function ProductCard({
           </div>
         )}
 
-        <div className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-muted/50 rounded grid place-items-center text-4xl">
-          📦
-        </div>
+        <ProductImage sku={product.sku} name={product.name} className="shrink-0 w-28 h-28 sm:w-32 sm:h-32" />
+
 
         <div className="flex-1 min-w-0 flex flex-col">
           <h3 className="font-bold text-base leading-tight text-foreground line-clamp-2">
@@ -887,9 +886,8 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           <div className="flex gap-4 items-start">
-            <div className="shrink-0 w-32 h-32 bg-muted/50 rounded grid place-items-center text-5xl">
-              📦
-            </div>
+            <ProductImage sku={product.sku} name={product.name} className="shrink-0 w-32 h-32" iconSize="text-5xl" />
+
             <div className="flex-1 min-w-0 space-y-3">
               <div>
                 <div className="text-3xl font-bold tabular-nums">{formatEUR(product.price)}</div>
