@@ -299,12 +299,12 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
         {/* §5 Ordering Behaviour */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           <div className={`${CARD} p-5 lg:col-span-3`}>
-            <SectionHeader title="Top Besteller" subtitle="Bestellverhalten je Polier" />
+            <SectionHeader title="Top orderers" subtitle="Ordering behaviour by foreman" />
             <ForemanTable rows={foremen} onSelect={setForemanDrawer} />
           </div>
           <div className={`${CARD} p-5 lg:col-span-2`}>
-            <SectionHeader title="Bestellmuster" subtitle="Wann ordern Poliere?" />
-            <div className="text-[12px] text-[#6B7280] mt-3 mb-1">Bestellungen nach Wochentag</div>
+            <SectionHeader title="Ordering patterns" subtitle="When do foremen order?" />
+            <div className="text-[12px] text-[#6B7280] mt-3 mb-1">Orders by weekday</div>
             <div className="h-[170px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={WEEKDAY} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -320,7 +320,8 @@ Post Building Refurb,Thomas Meier,6,604,Fischer,Plastics,May 2026`;
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="text-[12px] text-[#6B7280] mt-4 mb-2">Bestellungen nach Tageszeit</div>
+            <div className="text-[12px] text-[#6B7280] mt-4 mb-2">Orders by time of day</div>
+
             <div className="space-y-2">
               {TIMEOFDAY.map((t) => (
                 <div key={t.slot} className="flex items-center gap-2 text-[12px]">
