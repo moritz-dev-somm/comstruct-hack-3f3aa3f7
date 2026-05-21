@@ -317,9 +317,11 @@ function Home() {
             sortedProducts={sortedProducts}
             recommendedIds={recommendedIds}
             selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
             onClearCategory={() => setSelectedCategory(null)}
             onResetRecommendations={() => setRecommendedIds([])}
             onSuggestion={(s) => send(s)}
+            allProducts={products}
           />
         )}
       </main>
@@ -489,9 +491,11 @@ function ConversationView({
   sortedProducts,
   recommendedIds,
   selectedCategory,
+  onSelectCategory,
   onClearCategory,
   onResetRecommendations,
   onSuggestion,
+  allProducts,
 }: {
   messages: ChatMessage[];
   streaming: boolean;
@@ -500,13 +504,23 @@ function ConversationView({
   sortedProducts: Product[];
   recommendedIds: string[];
   selectedCategory: string | null;
+  onSelectCategory: (c: string) => void;
   onClearCategory: () => void;
   onResetRecommendations: () => void;
   onSuggestion: (s: string) => void;
+  allProducts: Product[];
 }) {
   const recSet = new Set(recommendedIds);
   const lastAssistant = messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1] : null;
   const isThinking = streaming && (!lastAssistant || lastAssistant.content === "");
+
+  // When no explicit category filter is active, show ONLY the recommended
+  // picks above, then the same category-tile grid as the landing page.
+  // When a category tile is clicked, fall back to the full filtered catalog.
+  const showTilesLayout = !selectedCategory;
+  const recommendedProducts = recommendedIds
+    .map((sku) => allProducts.find((p) => p.sku === sku))
+    .filter((p): p is Product => !!p);
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -537,52 +551,82 @@ function ConversationView({
         )}
       </div>
 
-      {/* Grid — McMaster-style catalog */}
-      <div className="border-t bg-muted/30">
-        <div className="mx-auto max-w-5xl px-4 py-6">
-          <div className="flex items-end justify-between mb-4 border-b-2 border-brand/70 pb-2">
-            <h2 className="text-xl font-bold text-brand">
-              {recommendedIds.length > 0
-                ? "Recommended for this job"
-                : selectedCategory
-                  ? selectedCategory
-                  : "Catalog"}
-            </h2>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{sortedProducts.length} Products</span>
-              {recommendedIds.length > 0 && (
-                <button
-                  onClick={onResetRecommendations}
-                  className="text-sm font-medium text-brand hover:underline"
-                >
-                  Show all
-                </button>
-              )}
-              {selectedCategory && (
+      {showTilesLayout ? (
+        <>
+          {/* Recommended picks above */}
+          {recommendedProducts.length > 0 && (
+            <div className="border-t bg-muted/30">
+              <div className="mx-auto max-w-5xl px-4 py-6">
+                <div className="flex items-end justify-between mb-4 border-b-2 border-brand/70 pb-2">
+                  <h2 className="text-xl font-bold text-brand">Recommended for this job</h2>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-muted-foreground">{recommendedProducts.length} Products</span>
+                    <button
+                      onClick={onResetRecommendations}
+                      className="text-sm font-medium text-brand hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {recommendedProducts.map((p) => (
+                    <ProductCard key={p.sku} product={p} recommended dimmed={false} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Category tiles — identical to landing page */}
+          <div className="border-t">
+            <div className="mx-auto max-w-2xl px-4 py-8">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-wide">
+                <div className="flex-1 h-px bg-border" />
+                or browse by category
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {CATEGORY_TILES.map((c) => (
+                  <CategoryTile key={c.label} tile={c} onSelect={() => onSelectCategory(c.category)} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* Full filtered catalog grid — when a category tile was clicked */
+        <div className="border-t bg-muted/30">
+          <div className="mx-auto max-w-5xl px-4 py-6">
+            <div className="flex items-end justify-between mb-4 border-b-2 border-brand/70 pb-2">
+              <h2 className="text-xl font-bold text-brand">{selectedCategory}</h2>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">{sortedProducts.length} Products</span>
                 <button
                   onClick={onClearCategory}
                   className="text-sm font-medium text-brand hover:underline"
                 >
                   Clear filter
                 </button>
-              )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {sortedProducts.map((p) => (
+                <ProductCard
+                  key={p.sku}
+                  product={p}
+                  recommended={recSet.has(p.sku)}
+                  dimmed={false}
+                />
+              ))}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {sortedProducts.map((p) => (
-              <ProductCard
-                key={p.sku}
-                product={p}
-                recommended={recSet.has(p.sku)}
-                dimmed={recommendedIds.length > 0 && !recSet.has(p.sku)}
-              />
-            ))}
-          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
+
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   if (msg.role === "user") {
