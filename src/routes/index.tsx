@@ -704,11 +704,31 @@ function AssistantContent({
   );
 
   return (
-    <div className="prose prose-sm max-w-none prose-headings:font-bold prose-headings:text-foreground prose-p:my-2 prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-em:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:marker:text-brand prose-h1:text-lg prose-h2:text-base prose-h3:text-[15px] prose-a:text-brand">
+    <div className="text-[15px] leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ children, className, ...rest }) {
+          p: ({ children }) => <p className="my-2">{children}</p>,
+          h1: ({ children }) => <h1 className="text-lg font-bold mt-4 mb-2">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-base font-bold mt-3 mb-2">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-[15px] font-bold mt-3 mb-1.5">{children}</h3>,
+          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          ul: ({ children }) => <ul className="my-2 pl-5 list-disc marker:text-brand space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="my-2 pl-5 list-decimal marker:text-brand space-y-1">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          a: ({ children, href }) => (
+            <a href={href} className="text-brand underline underline-offset-2" target="_blank" rel="noreferrer">
+              {children}
+            </a>
+          ),
+          hr: () => <hr className="my-3 border-border" />,
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-brand/40 pl-3 my-2 italic text-muted-foreground">
+              {children}
+            </blockquote>
+          ),
+          code: ({ children, className, ...rest }: { children?: React.ReactNode; className?: string }) => {
             const raw = String(children ?? "");
             if (raw.startsWith(TOKEN_PREFIX)) {
               const body = raw.slice(TOKEN_PREFIX.length);
@@ -723,7 +743,7 @@ function AssistantContent({
               );
             }
             return (
-              <code className={className} {...rest}>
+              <code className={`font-mono text-[0.85em] px-1 py-0.5 rounded bg-muted ${className ?? ""}`} {...rest}>
                 {children}
               </code>
             );
