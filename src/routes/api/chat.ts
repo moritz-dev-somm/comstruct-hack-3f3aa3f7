@@ -174,13 +174,75 @@ async function searchProducts(args: {
   return (data ?? []) as ProductRow[];
 }
 
+async function fetchProductsBySkus(skus: string[]): Promise<ProductRow[]> {
+  if (!skus.length) return [];
+  const sb = sbClient();
+  const { data, error } = await sb.from("products").select(SELECT_COLS).in("sku", skus);
+  if (error) throw error;
+  return (data ?? []) as ProductRow[];
+}
+
+/** Embed a short query string using the same 1536-dim model as /api/hybrid-search. */
+async function embedQuery(text: string, apiKey: string): Promise<number[] | null> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const useOpenAI = !!openaiKey;
+  const url = useOpenAI
+    ? "https://api.openai.com/v1/embeddings"
+    : "https://ai.gateway.lovable.dev/v1/embeddings";
+  const model = useOpenAI ? "text-embedding-3-small" : "openai/text-embedding-3-small";
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, input: text, dimensions: 1536 }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const vec = json.data?.[0]?.embedding;
+    return Array.isArray(vec) ? (vec as number[]) : null;
+  } catch (e) {
+    console.error("embedQuery failed", e);
+    return null;
+  }
+}
+
 type RetrievedItem = ProductRow & { requested_quantity: number | null };
 
-async function retrieveRelevant(intents: SearchIntent[]): Promise<RetrievedItem[]> {
+/**
+ * For each extracted intent, run a forgiving hybrid search (embedding +
+ * keyword) instead of strict ILIKE. This makes single-word queries like
+ * "nails" match catalog rows even when no name/desc contains the exact
+ * substring. Falls back to ILIKE if the embedding/RPC step fails or empty.
+ */
+async function retrieveRelevant(
+  intents: SearchIntent[],
+  apiKey: string,
+): Promise<RetrievedItem[]> {
   if (!intents.length) return [];
+  const sb = sbClient();
   const results = await Promise.all(
     intents.map(async (intent) => {
       try {
+        const embedding = await embedQuery(intent.q, apiKey);
+        if (embedding) {
+          const { data, error } = await sb.rpc("hybrid_search_materials", {
+            user_embedding: embedding as unknown as string,
+            category_filter: intent.category_filter,
+            keyword_filters: [intent.q],
+            match_count: 5,
+          });
+          if (!error && Array.isArray(data) && data.length) {
+            const skus = (data as Array<{ sku: string }>).map((r) => r.sku);
+            const full = await fetchProductsBySkus(skus);
+            const order = new Map(skus.map((s, i) => [s, i]));
+            full.sort((a, b) => (order.get(a.sku) ?? 0) - (order.get(b.sku) ?? 0));
+            return full.map((r) => ({ ...r, requested_quantity: intent.requested_quantity }));
+          }
+        }
+        // Fallback: ILIKE search if embedding/RPC unavailable or empty
         const rows = await searchProducts({
           query: intent.q,
           category: intent.category_filter ?? undefined,
@@ -442,7 +504,7 @@ export const Route = createFileRoute("/api/chat")({
             : lastUserText.trim()
               ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
               : [];
-          let items = await retrieveRelevant(effective);
+          let items = await retrieveRelevant(effective, apiKey);
 
           // Phase 2b: if direct retrieval found nothing, ask an LLM to brainstorm
           // concrete C-material product keywords (e.g. "PPE for new hire" →
@@ -450,7 +512,7 @@ export const Route = createFileRoute("/api/chat")({
           if (items.length === 0 && lastUserText.trim()) {
             const expanded = await expandQueryToKeywords(lastUserText, apiKey);
             if (expanded.length) {
-              items = await retrieveRelevant(expanded);
+              items = await retrieveRelevant(expanded, apiKey);
             }
           }
 

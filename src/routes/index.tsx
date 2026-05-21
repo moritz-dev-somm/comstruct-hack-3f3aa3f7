@@ -905,9 +905,18 @@ function ConversationView({
               </p>
             ) : searchResults ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {searchResults.slice(0, 5).map((r) => (
-                  <SearchResultCard key={r.sku} result={r} />
-                ))}
+                {searchResults.slice(0, 5).map((r) => {
+                  const product =
+                    allProducts.find((p) => p.sku === r.sku) ?? hybridResultToProduct(r);
+                  return (
+                    <ProductCard
+                      key={r.sku}
+                      product={product}
+                      recommended={recSet.has(r.sku)}
+                      dimmed={false}
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </div>
@@ -1827,53 +1836,33 @@ function ApprovalBanner() {
 }
 
 
-function SearchResultCard({ result }: { result: HybridSearchResult }) {
-  const cart = useCart();
-  const price = Number(result.price_eur);
-  return (
-    <div className="rounded-md border bg-card p-4 flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <span>{result.category}</span>
-            <span>·</span>
-            <span className="font-mono">{result.sku}</span>
-          </div>
-          <h3 className="font-semibold text-sm mt-1 leading-tight">{result.name}</h3>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-base font-bold">{formatEUR(price)}</div>
-          <div className="text-[10px] text-muted-foreground">/{result.unit}</div>
-        </div>
-      </div>
-      {result.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2">{result.description}</p>
-      )}
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-[10px] text-muted-foreground">
-          match {(result.similarity * 100).toFixed(0)}%
-          {result.keyword_score > 0 && ` · ${result.keyword_score} kw`}
-        </span>
-        <button
-          onClick={() => {
-            cart.add({
-              productId: result.sku,
-              name: result.name,
-              price,
-              qty: 1,
-              category: result.category,
-              unit: result.unit,
-              supplier: result.supplier,
-            });
-            toast.success(`Added ${result.name} to cart`);
-          }}
-          className="inline-flex items-center gap-1 rounded-md bg-brand text-brand-foreground px-2.5 h-8 text-xs font-semibold hover:opacity-90"
-        >
-          <Plus className="size-3.5" /> Add
-        </button>
-      </div>
-    </div>
-  );
+/**
+ * Convert a hybrid-search RPC row into a `Product` so it can be rendered
+ * with the same `<ProductCard>` used by category browsing. The RPC returns
+ * a subset of columns (no image_url / use_cases / attributes), so we fill
+ * in safe defaults — the live catalog usually has the same SKU and that
+ * version (with image) is preferred at the call site.
+ */
+function hybridResultToProduct(r: HybridSearchResult): Product {
+  return {
+    sku: r.sku,
+    name: r.name,
+    category: r.category,
+    sourceCategory: null,
+    unit: r.unit,
+    price: Number(r.price_eur),
+    supplier: r.supplier,
+    consumable: null,
+    hazardous: false,
+    storageLocation: null,
+    typicalSite: null,
+    attributes: {},
+    keywords: r.keywords ?? [],
+    description: r.description,
+    useCases: [],
+    enrichedAt: null,
+    imageUrl: null,
+  };
 }
 
 
