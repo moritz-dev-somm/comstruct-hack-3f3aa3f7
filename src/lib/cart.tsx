@@ -7,6 +7,7 @@ export type CartItem = {
   price: number; // EUR
   category: string;
   unit: string;
+  supplier?: string | null;
 };
 
 type CartCtx = {
