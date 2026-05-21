@@ -1563,37 +1563,30 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     const created = orders.createFromCart(cart.items);
     cart.clear();
     onClose();
-    // Generate the EU-standard PO PDF and trigger a download for the foreman.
-    const { generatePurchaseOrderPdf, purchaseOrderFilename, purchaseOrderPdfBase64 } = await import(
-      "@/lib/po-pdf"
-    );
-    generatePurchaseOrderPdf(created).save(purchaseOrderFilename(created));
+    // Generate one PO PDF per supplier — split & enriched with supplier contacts.
+    const [{ generatePurchaseOrdersBySupplier }, { fetchSuppliers, supplierContactMap }] = await Promise.all([
+      import("@/lib/po-pdf"),
+      import("@/lib/suppliers"),
+    ]);
+    const contacts = supplierContactMap(await fetchSuppliers().catch(() => []));
+    const perSupplier = generatePurchaseOrdersBySupplier(created, contacts);
+    // Trigger one download per supplier (small stagger so the browser keeps them all).
+    perSupplier.forEach((p, i) => setTimeout(() => p.doc.save(p.filename), i * 250));
 
     if (created.tier === "auto") {
-      // Group items by supplier and build per-supplier PO PDFs to attach.
-      const FALLBACK = "Generisch";
-      const groups = new Map<string, typeof created.items>();
-      for (const it of created.items) {
-        const key = (it.supplier && it.supplier.trim()) || FALLBACK;
-        const arr = groups.get(key) ?? [];
-        arr.push(it);
-        groups.set(key, arr);
-      }
-      const attachments = Array.from(groups.entries()).map(([supplierName, items]) => {
-        const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
-        const pdfBase64 = purchaseOrderPdfBase64(created, {
-          supplier: { name: supplierName },
-          itemsOverride: items,
-          subtotalOverride: subtotal,
-        });
-        return {
-          supplierName,
-          filename: purchaseOrderFilename(created, supplierName),
-          pdfBase64,
-        };
-      });
-
-      const supplierCount = groups.size;
+      const attachments = await Promise.all(
+        perSupplier.map(async (p) => {
+          const dataUri = p.doc.output("datauristring");
+          const comma = dataUri.indexOf(",");
+          const pdfBase64 = comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
+          return {
+            supplierName: p.supplierName,
+            filename: p.filename,
+            pdfBase64,
+          };
+        }),
+      );
+      const supplierCount = perSupplier.length;
       const sendingToast = toast.loading(
         `${created.id}: contacting ${supplierCount} supplier${supplierCount === 1 ? "" : "s"}…`,
       );
