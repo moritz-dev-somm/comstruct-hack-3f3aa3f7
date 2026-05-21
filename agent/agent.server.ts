@@ -548,7 +548,6 @@ export async function classifyReply(args: {
   };
 
   const body = {
-    model: "openai/gpt-5-mini",
     messages: [
       { role: "system", content: CLASSIFY_SYSTEM },
       {
@@ -564,26 +563,7 @@ export async function classifyReply(args: {
     tool_choice: { type: "function" as const, function: { name: "classify_reply" } },
   };
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      console.error("classifyReply gateway error", res.status, t);
-      const fallback = heuristicClassification(args.supplierReply, openQs, answeredChk);
-      return {
-        ...fallback,
-        issues: fallback.verdict === "unclear" ? [t.slice(0, 200)] : [],
-        summary: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary,
-        summary_en: fallback.verdict === "unclear" ? "AI gateway error" : fallback.summary_en,
-      };
-    }
-    const data = (await res.json()) as {
+    const data = (await callOpenAI(body)) as {
       choices?: Array<{
         message?: {
           content?: string;
