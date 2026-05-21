@@ -36,6 +36,17 @@ import { ScanButton } from "@/components/ScanButton";
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
+import {
+  IconTile,
+  CompassIcon,
+  GearIcon,
+  ShovelIcon,
+  CraneIcon,
+  ConeIcon,
+  WheelbarrowIcon,
+  BlueprintIcon,
+  HardHatIcon as _unused, // not exported
+} from "@/components/construction-icons";
 
 const CHOCOLATE_THRESHOLD = 500;
 
