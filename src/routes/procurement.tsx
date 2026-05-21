@@ -18,6 +18,15 @@ function ProcurementLayout() {
     (o) => o.status === "pending_pm" || o.status === "pending_central",
   ).length;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [project, setProject] = useState("ramistrasse-101");
+
+  const projects = [
+    { id: "ramistrasse-101", label: "Rämistrasse 101" },
+    { id: "bahnhofstrasse-42", label: "Bahnhofstrasse 42" },
+    { id: "langstrasse-77", label: "Langstrasse 77" },
+    { id: "sechselautenplatz-1", label: "Sechseläutenplatz 1" },
+    { id: "limmatquai-150", label: "Limmatquai 150" },
+  ];
 
   const nav = [
     { to: "/procurement", label: "Approvals", icon: Inbox, badge: pendingCount },
