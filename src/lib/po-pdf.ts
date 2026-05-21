@@ -1,15 +1,11 @@
 /**
  * EU-standard purchase-order PDF generator (client-side, jsPDF).
  *
- * Format follows the conventions of a European construction-site PO:
- *   - Buyer / Supplier / Ship-to blocks
- *   - PO header (number, date, project, payment terms, currency)
- *   - Line items table with code, description, qty, unit, unit price, line total
- *   - Net subtotal, VAT (19%), gross total
- *   - Terms & signature block
- *
- * PDF is regenerated deterministically from the Order — no blob is persisted,
- * the order data itself is the source of truth.
+ * All data is derived from the Order + supplier records — nothing about the
+ * supplier is hardcoded. When an order has items from multiple suppliers,
+ * one PDF is produced per supplier group via
+ * `generatePurchaseOrdersBySupplier`. Long supplier / project / item names
+ * are wrapped with `splitTextToSize` so blocks never overlap.
  */
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -25,45 +21,63 @@ const BUYER = {
   phone: "+41 61 555 01 23",
 };
 
-const DEFAULT_SUPPLIER = {
-  name: "OBI Bau- und Heimwerkermärkte GmbH",
-  street: "Albert-Einstein-Straße 7-9",
-  city: "42929 Wermelskirchen, Germany",
-  vat: "DE 121 758 727",
-};
-
 export type SupplierBlock = {
   name: string;
-  street?: string;
-  city?: string;
-  vat?: string;
-  email?: string;
-  phone?: string;
+  email?: string | null;
+  phone?: string | null;
+};
+
+export type SupplierContact = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
 };
 
 const VAT_RATE = 0.19;
+const FALLBACK_SUPPLIER = "Unassigned";
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** Group an order's items by supplier name (case-insensitive trim). */
+export function groupOrderBySupplier(order: Order): Array<{
+  supplierName: string;
+  items: Order["items"];
+  subtotal: number;
+}> {
+  const groups = new Map<string, Order["items"]>();
+  for (const it of order.items) {
+    const key = (it.supplier && it.supplier.trim()) || FALLBACK_SUPPLIER;
+    const arr = groups.get(key) ?? [];
+    arr.push(it);
+    groups.set(key, arr);
+  }
+  return Array.from(groups.entries())
+    .map(([supplierName, items]) => ({
+      supplierName,
+      items,
+      subtotal: items.reduce((s, i) => s + i.qty * i.price, 0),
+    }))
+    .sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+}
+
 export function generatePurchaseOrderPdf(
   order: Order,
-  opts?: { supplier?: SupplierBlock; itemsOverride?: Order["items"]; subtotalOverride?: number },
+  supplier: SupplierBlock,
+  items: Order["items"],
+  subtotal: number,
 ): jsPDF {
-  const supplierBlock: SupplierBlock = opts?.supplier ?? DEFAULT_SUPPLIER;
-  const items = opts?.itemsOverride ?? order.items;
-  const subtotal = opts?.subtotalOverride ?? order.subtotal;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const page = { w: 210, h: 297, m: 15 };
 
   /* ----- Header band ----- */
-  doc.setFillColor(47, 104, 121); // brand petrol-teal
+  doc.setFillColor(47, 104, 121);
   doc.rect(0, 0, page.w, 26, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(18);
   doc.text("PURCHASE ORDER", page.m, 17);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
@@ -87,49 +101,46 @@ export function generatePurchaseOrderPdf(
   const colW = (page.w - 2 * page.m) / metaCols.length;
   metaCols.forEach((c, i) => {
     const x = page.m + i * colW + 4;
+    const innerW = colW - 8;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(110);
     doc.text(c.label.toUpperCase(), x, metaY + 7);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(20);
-    doc.text(c.value, x, metaY + 14);
+    // Wrap & truncate so long values never overflow into the next column.
+    const lines = doc.splitTextToSize(c.value, innerW) as string[];
+    const display = lines[0] + (lines.length > 1 ? "…" : "");
+    doc.text(display, x, metaY + 14);
   });
 
-  /* ----- Address blocks ----- */
+  /* ----- Address blocks (3 columns, each 60mm wide, 5mm gutter) ----- */
   const addrY = metaY + 30;
-  drawAddressBlock(doc, "BUYER", BUYER, page.m, addrY);
-  drawAddressBlock(doc, "SUPPLIER", {
-    name: supplierBlock.name,
-    street: supplierBlock.street ?? "",
-    city: supplierBlock.city ?? "",
-    vat: supplierBlock.vat ?? "",
-    email: supplierBlock.email,
-    phone: supplierBlock.phone,
-  }, page.m + 65, addrY);
-  drawAddressBlock(
-    doc,
-    "DELIVER TO",
-    {
-      name: `Site: ${order.project}`,
-      street: "c/o Site Office",
-      city: "Attn: " + order.foreman,
-      vat: "",
-      email: "",
-      phone: "",
-    },
-    page.m + 130,
-    addrY,
-  );
+  const addrColW = (page.w - 2 * page.m - 10) / 3; // ≈ 56.6mm
+  const buyerH = drawAddressBlock(doc, "BUYER", {
+    name: BUYER.name,
+    lines: [BUYER.street, BUYER.city, "VAT " + BUYER.vat, BUYER.email, BUYER.phone],
+  }, page.m, addrY, addrColW);
+  const supplierH = drawAddressBlock(doc, "SUPPLIER", {
+    name: supplier.name,
+    lines: [
+      supplier.email ?? null,
+      supplier.phone ?? null,
+    ],
+  }, page.m + addrColW + 5, addrY, addrColW);
+  const shipH = drawAddressBlock(doc, "DELIVER TO", {
+    name: `Site: ${order.project}`,
+    lines: ["c/o Site Office", "Attn: " + order.foreman],
+  }, page.m + 2 * (addrColW + 5), addrY, addrColW);
 
   /* ----- Line items ----- */
-  const tableStartY = addrY + 38;
+  const tableStartY = addrY + Math.max(buyerH, supplierH, shipH) + 6;
   const rows = items.map((it, idx) => {
     const lineNet = it.qty * it.price;
     return [
       String(idx + 1),
-      it.productId,
+      it.productId ?? "",
       it.name + (it.category ? `\n${it.category}` : ""),
       String(it.qty),
       it.unit ?? "pcs",
@@ -143,7 +154,13 @@ export function generatePurchaseOrderPdf(
     head: [["#", "Item code", "Description", "Qty", "Unit", "Unit price", "Net amount"]],
     body: rows,
     theme: "grid",
-    styles: { fontSize: 9, cellPadding: 2.2, textColor: 30 },
+    styles: {
+      fontSize: 9,
+      cellPadding: 2.2,
+      textColor: 30,
+      overflow: "linebreak",
+      valign: "top",
+    },
     headStyles: {
       fillColor: [244, 245, 246],
       textColor: 60,
@@ -152,14 +169,14 @@ export function generatePurchaseOrderPdf(
     },
     columnStyles: {
       0: { cellWidth: 8, halign: "right" },
-      1: { cellWidth: 22, font: "courier", fontSize: 8 },
+      1: { cellWidth: 24, font: "courier", fontSize: 8 },
       2: { cellWidth: "auto" },
       3: { cellWidth: 12, halign: "right" },
       4: { cellWidth: 14 },
       5: { cellWidth: 24, halign: "right" },
       6: { cellWidth: 26, halign: "right", fontStyle: "bold" },
     },
-    margin: { left: page.m, right: page.m },
+    margin: { left: page.m, right: page.m, bottom: 28 },
   });
 
   /* ----- Totals ----- */
@@ -196,52 +213,74 @@ export function generatePurchaseOrderPdf(
   terms.forEach((t, i) => doc.text("• " + t, page.m, termsY + 5 + i * 4));
 
   /* ----- Signature ----- */
-  const sigY = termsY + 32;
+  const sigY = Math.min(termsY + 32, page.h - 22);
   doc.setDrawColor(180);
   doc.line(page.m, sigY, page.m + 60, sigY);
   doc.line(page.w - page.m - 60, sigY, page.w - page.m, sigY);
   doc.setFontSize(8);
   doc.setTextColor(110);
   doc.text("Authorised by — Buyer", page.m, sigY + 4);
-  doc.text(order.approver ?? order.foreman, page.m, sigY + 8);
+  const approverLine = doc.splitTextToSize(order.approver ?? order.foreman, 60)[0];
+  doc.text(approverLine, page.m, sigY + 8);
   doc.text("Acknowledged by — Supplier", page.w - page.m - 60, sigY + 4);
+  const supplierAck = doc.splitTextToSize(supplier.name, 60)[0];
+  doc.text(supplierAck, page.w - page.m - 60, sigY + 8);
 
-  /* ----- Footer ----- */
-  doc.setFontSize(7);
-  doc.setTextColor(150);
-  doc.text(
-    `${BUYER.name} · ${BUYER.vat} · Generated ${new Date().toLocaleString("en-GB")} · Page 1`,
-    page.w / 2,
-    page.h - 8,
-    { align: "center" },
-  );
+  /* ----- Footer on every page ----- */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pageCount = (doc as any).internal.getNumberOfPages() as number;
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(150);
+    doc.text(
+      `${BUYER.name} · ${BUYER.vat} · Generated ${new Date().toLocaleString("en-GB")} · Page ${i} of ${pageCount}`,
+      page.w / 2,
+      page.h - 8,
+      { align: "center" },
+    );
+  }
 
   return doc;
 }
 
+/**
+ * Draw an address block with wrapped name and stacked detail lines.
+ * Returns the total height consumed (in mm) so callers can lay out beneath it.
+ */
 function drawAddressBlock(
   doc: jsPDF,
   title: string,
-  a: { name: string; street: string; city: string; vat: string; email?: string; phone?: string },
+  block: { name: string; lines: Array<string | null | undefined> },
   x: number,
   y: number,
-) {
+  maxWidth: number,
+): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
   doc.setTextColor(120);
   doc.text(title, x, y);
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(25);
-  doc.text(a.name, x, y + 5);
+  const nameLines = doc.splitTextToSize(block.name, maxWidth) as string[];
+  const nameLineH = 4.2;
+  nameLines.forEach((ln, i) => doc.text(ln, x, y + 5 + i * nameLineH));
+
+  let cursorY = y + 5 + nameLines.length * nameLineH + 1.5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(70);
-  doc.text(a.street, x, y + 10);
-  doc.text(a.city, x, y + 14);
-  if (a.vat) doc.text("VAT " + a.vat, x, y + 18);
-  if (a.email) doc.text(a.email, x, y + 22);
-  if (a.phone) doc.text(a.phone, x, y + 26);
+  for (const raw of block.lines) {
+    if (!raw) continue;
+    const wrapped = doc.splitTextToSize(raw, maxWidth) as string[];
+    for (const ln of wrapped) {
+      doc.text(ln, x, cursorY);
+      cursorY += 3.8;
+    }
+  }
+  return cursorY - y;
 }
 
 function drawTotalRow(doc: jsPDF, label: string, value: string, x: number, y: number) {
@@ -250,31 +289,80 @@ function drawTotalRow(doc: jsPDF, label: string, value: string, x: number, y: nu
   doc.text(value, x + 70, y, { align: "right" });
 }
 
-export function purchaseOrderFilename(order: Order, supplierName?: string): string {
-  const safeProject = order.project.replace(/[^a-z0-9]+/gi, "-");
-  const safeSupplier = supplierName ? `-${supplierName.replace(/[^a-z0-9]+/gi, "-")}` : "";
-  return `PO-${order.id}${safeSupplier}-${safeProject}.pdf`;
+function safeSlug(s: string): string {
+  return s.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
 }
 
-/** Returns just the base64 payload (no data: prefix), suitable for AgentMail attachments. */
+export function purchaseOrderFilename(order: Order, supplierName?: string): string {
+  const project = safeSlug(order.project);
+  const supplier = supplierName ? `-${safeSlug(supplierName)}` : "";
+  return `PO-${order.id}${supplier}-${project}.pdf`;
+}
+
+/** One PDF per supplier group, derived from the order data. */
+export function generatePurchaseOrdersBySupplier(
+  order: Order,
+  contacts: Map<string, SupplierContact> | undefined = undefined,
+): Array<{
+  supplierName: string;
+  contact: SupplierBlock;
+  doc: jsPDF;
+  filename: string;
+  items: Order["items"];
+  subtotal: number;
+}> {
+  const groups = groupOrderBySupplier(order);
+  return groups.map((g) => {
+    const ct = contacts?.get(g.supplierName.toLowerCase());
+    const supplier: SupplierBlock = {
+      name: ct?.name ?? g.supplierName,
+      email: ct?.email ?? null,
+      phone: ct?.phone ?? null,
+    };
+    const doc = generatePurchaseOrderPdf(order, supplier, g.items, g.subtotal);
+    return {
+      supplierName: g.supplierName,
+      contact: supplier,
+      doc,
+      filename: purchaseOrderFilename(order, g.supplierName),
+      items: g.items,
+      subtotal: g.subtotal,
+    };
+  });
+}
+
+/** Returns just the base64 payload (no data: prefix), for AgentMail attachments. */
 export function purchaseOrderPdfBase64(
   order: Order,
-  opts?: { supplier?: SupplierBlock; itemsOverride?: Order["items"]; subtotalOverride?: number },
+  supplier: SupplierBlock,
+  items: Order["items"],
+  subtotal: number,
 ): string {
-  const doc = generatePurchaseOrderPdf(order, opts);
+  const doc = generatePurchaseOrderPdf(order, supplier, items, subtotal);
   const dataUri = doc.output("datauristring");
   const comma = dataUri.indexOf(",");
   return comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
 }
 
-export function downloadPurchaseOrderPdf(order: Order): void {
-  const doc = generatePurchaseOrderPdf(order);
-  doc.save(purchaseOrderFilename(order));
+/** Save one PDF per supplier — staggered so browsers don't drop downloads. */
+export function downloadPurchaseOrdersBySupplier(
+  order: Order,
+  contacts?: Map<string, SupplierContact>,
+): void {
+  const pdfs = generatePurchaseOrdersBySupplier(order, contacts);
+  pdfs.forEach((p, i) => {
+    setTimeout(() => p.doc.save(p.filename), i * 250);
+  });
 }
 
-export function openPurchaseOrderPdf(order: Order): void {
-  const doc = generatePurchaseOrderPdf(order);
-  const blob = doc.output("blob");
+/** Open the first per-supplier PO in a new tab (used by simple "View PO" buttons). */
+export function openFirstPurchaseOrderPdf(
+  order: Order,
+  contacts?: Map<string, SupplierContact>,
+): void {
+  const pdfs = generatePurchaseOrdersBySupplier(order, contacts);
+  if (pdfs.length === 0) return;
+  const blob = pdfs[0].doc.output("blob");
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank", "noopener,noreferrer");
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
