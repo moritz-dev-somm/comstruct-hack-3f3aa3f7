@@ -78,3 +78,19 @@ function ProcurementLayout() {
     </div>
   );
 }
+
+function SwitchRoleButton() {
+  const { logout } = useRole();
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => {
+        logout();
+        navigate({ to: "/login" });
+      }}
+      className="w-full flex items-center gap-2 px-3 h-9 rounded-md text-xs text-muted-foreground hover:bg-accent"
+    >
+      <LogOut className="size-4" /> Switch role
+    </button>
+  );
+}
