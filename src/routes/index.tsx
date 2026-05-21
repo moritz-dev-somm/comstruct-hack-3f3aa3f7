@@ -1062,6 +1062,7 @@ function InlineProductBubble({
       qty: addQty,
       category: product.category,
       unit: product.unit,
+      supplier: product.supplier,
     });
   }
 
