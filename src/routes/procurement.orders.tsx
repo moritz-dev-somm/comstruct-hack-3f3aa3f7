@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, Download, ChevronRight, X, Eye } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type OrderStatus, type Order } from "@/lib/orders";
+import { useNegotiationsByOrder } from "@/lib/negotiations";
+import { deriveOrderStatus } from "@/lib/order-status";
 import {
   downloadPurchaseOrdersBySupplier,
   generatePurchaseOrdersBySupplier,

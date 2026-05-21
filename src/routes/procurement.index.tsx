@@ -67,7 +67,7 @@ function ApprovalsInbox() {
                       <span>·</span>
                       <span>{o.project}</span>
                     </div>
-                    <div className="mt-1.5"><StatusPill status={o.status} /></div>
+                    <div className="mt-1.5"><StatusPill status={deriveOrderStatus(o, [])} /></div>
                   </button>
                 </li>
               ))}
@@ -83,7 +83,7 @@ function ApprovalsInbox() {
                     Submitted by {active.foreman} · {new Date(active.createdAt).toLocaleString()}
                   </div>
                 </div>
-                <StatusPill status={active.status} />
+                <StatusPill status={deriveOrderStatus(active, [])} />
               </div>
 
               <div className="p-5 flex-1 space-y-4 overflow-y-auto">
