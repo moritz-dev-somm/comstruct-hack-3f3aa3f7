@@ -83,6 +83,34 @@ const CATEGORY_TILES: CategoryTileData[] = [
   { label: "Other",         icon: Package,  category: "Other" },
 ];
 
+type QuickOrder = {
+  id: string;
+  date: string;
+  items: string[];
+  total: string;
+};
+
+const QUICK_REORDER_ORDERS: QuickOrder[] = [
+  {
+    id: "#E-4821",
+    date: "12 May 2026",
+    items: ["Drywall screws TX25", "Gypsum board 12.5mm", "Joint tape 50m", "Corner bead"],
+    total: "€347.50",
+  },
+  {
+    id: "#E-4789",
+    date: "03 May 2026",
+    items: ["Safety helmet white", "Work gloves L", "Dust masks FFP2 pack", "Safety glasses"],
+    total: "€128.00",
+  },
+  {
+    id: "#E-4755",
+    date: "22 Apr 2026",
+    items: ["Anchor bolts M10x80", "Sealant gun", "Silicone transparent 310ml", "Foam gun cleaner"],
+    total: "€215.80",
+  },
+];
+
 const THINKING_WORDS = [
   "Checking the catalog…",
   "Asking the procurement team…",
