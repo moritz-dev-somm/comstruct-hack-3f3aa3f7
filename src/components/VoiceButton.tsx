@@ -314,9 +314,13 @@ export function VoiceButton({
         <div className="flex flex-col items-center">
           <button
             type="button"
-            onClick={start}
-            aria-label="Hold to talk"
-            className="group relative grid h-24 w-24 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg shadow-brand/30 transition-transform active:scale-95 hover:shadow-xl hover:shadow-brand/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+            onPointerDown={handlePressStart}
+            onPointerUp={handlePressEnd}
+            onPointerLeave={(e) => { if (pressStartRef.current) handlePressEnd(); }}
+            onPointerCancel={() => { if (pressStartRef.current) handlePressEnd(); }}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="Tap to speak, or hold and release to send"
+            className="group relative grid h-24 w-24 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg shadow-brand/30 transition-transform active:scale-95 hover:shadow-xl hover:shadow-brand/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 select-none touch-none"
           >
             <span className="absolute inset-0 rounded-full bg-brand/30 opacity-0 group-hover:opacity-100 animate-ping" />
             <Mic className="relative size-10" strokeWidth={2.5} />
