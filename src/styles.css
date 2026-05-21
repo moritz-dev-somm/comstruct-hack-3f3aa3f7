@@ -143,12 +143,12 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
-    /* SubBase-style dot field, brand-tinted */
+    /* Equidistant brand-tinted dot field (~0.5cm grid) */
     background-image: radial-gradient(
-      rgba(var(--brand-rgb), 0.10) 1.1px,
-      transparent 1.2px
+      rgba(var(--brand-rgb), 0.18) 0.9px,
+      transparent 1px
     );
-    background-size: 22px 22px;
+    background-size: 0.5cm 0.5cm;
     background-position: 0 0;
     background-attachment: fixed;
   }
