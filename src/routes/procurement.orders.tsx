@@ -4,10 +4,11 @@ import { FileText, Download, ChevronRight, X, Eye } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type OrderStatus, type Order } from "@/lib/orders";
 import {
-  downloadPurchaseOrderPdf,
-  generatePurchaseOrderPdf,
+  downloadPurchaseOrdersBySupplier,
+  generatePurchaseOrdersBySupplier,
   purchaseOrderFilename,
 } from "@/lib/po-pdf";
+import { useSuppliers, supplierContactMap } from "@/lib/suppliers";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/orders")({
@@ -28,6 +29,8 @@ function OrdersOverview() {
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const navigate = useNavigate();
+  const { data: suppliers } = useSuppliers();
+  const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
 
   const filtered = useMemo(
     () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
@@ -94,7 +97,7 @@ function OrdersOverview() {
                       <Eye className="size-3.5" /> Preview
                     </button>
                     <button
-                      onClick={() => downloadPurchaseOrderPdf(o)}
+                      onClick={() => downloadPurchaseOrdersBySupplier(o, contacts)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                       title="Download PO PDF"
                     >
@@ -118,20 +121,22 @@ function OrdersOverview() {
       </div>
 
       {previewOrder && (
-        <PdfPreviewModal order={previewOrder} onClose={() => setPreviewOrder(null)} />
+        <PdfPreviewModal order={previewOrder} contacts={contacts} onClose={() => setPreviewOrder(null)} />
       )}
     </div>
   );
 }
 
-function PdfPreviewModal({ order, onClose }: { order: Order; onClose: () => void }) {
+function PdfPreviewModal({ order, contacts, onClose }: { order: Order; contacts: ReturnType<typeof supplierContactMap>; onClose: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let objectUrl: string | null = null;
     try {
-      const doc = generatePurchaseOrderPdf(order);
+      const pdfs = generatePurchaseOrdersBySupplier(order, contacts);
+      const doc = pdfs[0]?.doc;
+      if (!doc) throw new Error("No PO to render");
       const blob = doc.output("blob");
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
@@ -171,7 +176,7 @@ function PdfPreviewModal({ order, onClose }: { order: Order; onClose: () => void
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => downloadPurchaseOrderPdf(order)}
+              onClick={() => downloadPurchaseOrdersBySupplier(order, contacts)}
               className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-md border hover:bg-accent"
             >
               <Download className="size-3.5" /> Download

@@ -2,7 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, FileText, Download, Package, Truck, CreditCard, MapPin, CheckCircle2 } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, STATUS_META, tierLabel, type Order } from "@/lib/orders";
-import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from "@/lib/po-pdf";
+import { downloadPurchaseOrdersBySupplier, openFirstPurchaseOrderPdf } from "@/lib/po-pdf";
+import { useSuppliers, supplierContactMap } from "@/lib/suppliers";
+import { useMemo } from "react";
 import { StatusPill } from "./orders";
 
 export const Route = createFileRoute("/procurement/orders/$orderId")({
@@ -19,6 +21,8 @@ function OrderDetail() {
   const { orders, advanceToDelivered } = useOrders();
   const navigate = useNavigate();
   const order = orders.find((o) => o.id === orderId);
+  const { data: suppliers } = useSuppliers();
+  const contacts = useMemo(() => supplierContactMap(suppliers), [suppliers]);
 
   if (!order) {
     return (
@@ -57,16 +61,17 @@ function OrderDetail() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => openPurchaseOrderPdf(order)}
+            onClick={() => openFirstPurchaseOrderPdf(order, contacts)}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm font-medium hover:bg-accent"
           >
             <FileText className="size-4" /> View PO
           </button>
           <button
-            onClick={() => downloadPurchaseOrderPdf(order)}
+            onClick={() => downloadPurchaseOrdersBySupplier(order, contacts)}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm font-medium hover:bg-accent"
+            title="Downloads one PDF per supplier"
           >
-            <Download className="size-4" /> Download
+            <Download className="size-4" /> Download PO{order.items.some((i) => i.supplier) ? "s" : ""}
           </button>
           {order.status === "ordered" && (
             <button
