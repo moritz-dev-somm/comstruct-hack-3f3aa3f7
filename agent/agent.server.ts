@@ -254,7 +254,7 @@ export async function classifyReply(args: {
         content:
           `ORIGINAL PURCHASE ORDER:\n${args.orderSummary}\n\n` +
           `SUPPLIER REPLY:\n${args.supplierReply}\n\n` +
-          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, suggested_outbound.`,
+          `Return JSON with keys: verdict, summary, summary_en, reply_language, lead_time, lead_time_days, shipping_cost_eur, wants_human, issues, checklist, missing_checklist, answerable_questions, unanswerable_questions, unclear_points, suggested_outbound.`,
       },
     ],
     response_format: { type: "json_object" },
