@@ -48,17 +48,29 @@ export const ensureAgentInbox = createServerFn({ method: "POST" })
 
 const FALLBACK_SUPPLIER_NAME = "Generisch";
 
+type SupplierLang = "en" | "de" | "fr" | "it";
+
 async function resolveSupplierContact(
   sb: ReturnType<typeof adminClient>,
   supplierName: string,
-): Promise<{ name: string; email: string; phone: string }> {
+): Promise<{ name: string; email: string; phone: string; language: SupplierLang }> {
   const { data } = await sb
     .from("suppliers")
-    .select("name,email,phone")
+    .select("name,email,phone,language")
     .eq("name", supplierName)
     .maybeSingle();
-  if (data) return data as { name: string; email: string; phone: string };
-  return { name: supplierName, email: HARDCODED_SUPPLIER_EMAIL, phone: "" };
+  if (data) {
+    const lang = (data as { language?: string }).language;
+    const language: SupplierLang =
+      lang === "de" || lang === "fr" || lang === "it" || lang === "en" ? lang : "en";
+    return {
+      name: (data as { name: string }).name,
+      email: (data as { email: string }).email,
+      phone: (data as { phone: string }).phone,
+      language,
+    };
+  }
+  return { name: supplierName, email: HARDCODED_SUPPLIER_EMAIL, phone: "", language: "en" };
 }
 
 /**
