@@ -15,6 +15,7 @@ export const Route = createFileRoute("/procurement/")({
 
 function ApprovalsInbox() {
   const { orders, approve, reject } = useOrders();
+  const startNegotiation = useServerFn(startNegotiationForOrder);
   const pending = orders.filter(
     (o) => o.status === "pending_pm" || o.status === "pending_central",
   );
@@ -22,6 +23,8 @@ function ApprovalsInbox() {
   const active = pending.find((o) => o.id === activeId) ?? null;
   const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [sending, setSending] = useState(false);
+
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl">
