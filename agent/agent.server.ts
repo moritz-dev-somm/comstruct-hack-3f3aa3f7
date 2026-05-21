@@ -507,7 +507,12 @@ export async function classifyReply(args: {
       msg?.content ??
       "{}";
     const parsed = JSON.parse(argsStr) as Partial<ReplyClassification> & { unclear_points_en?: string[] };
-    const checklist = normalizeChecklist(parsed.checklist);
+    const modelChecklist = normalizeChecklist(parsed.checklist);
+    const checklist: ReplyChecklist = {
+      order_confirmed: modelChecklist.order_confirmed || localSignals.checklist.order_confirmed,
+      delivery_date: modelChecklist.delivery_date ?? localSignals.checklist.delivery_date,
+      shipping_cost: modelChecklist.shipping_cost ?? localSignals.checklist.shipping_cost,
+    };
     // Anything the supplier already answered in prior turns stays answered, even
     // if the model's missing_checklist regresses it.
     const stillMissingByPriorAnswers = (f: ChecklistField) => !answeredChk.includes(f);
@@ -521,18 +526,15 @@ export async function classifyReply(args: {
       .filter((f) => checklist[f] == null)
       .filter(stillMissingByPriorAnswers);
     const summary = parsed.summary ?? "";
-    const parseNum = (v: unknown): number | null => {
-      if (v == null) return null;
-      if (typeof v === "number" && Number.isFinite(v)) return v;
-      const n = parseFloat(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
-      return Number.isFinite(n) ? n : null;
-    };
 
     // Sanitise answered/still open: must be a subset of priorOpenQuestions.
     const openSet = new Set(openQs);
-    const answeredOpen = Array.isArray(parsed.answered_open_questions)
+    const answeredOpen = Array.from(new Set([...
+      (Array.isArray(parsed.answered_open_questions)
       ? parsed.answered_open_questions.map(String).filter((q) => openSet.has(q))
-      : [];
+      : []),
+      ...localSignals.answered_open_questions,
+    ]));
     const answeredOpenSet = new Set(answeredOpen);
     const stillOpenModel = Array.isArray(parsed.still_open_questions)
       ? parsed.still_open_questions.map(String).filter((q) => openSet.has(q))
@@ -547,6 +549,7 @@ export async function classifyReply(args: {
       : [];
     const unclearPoints = unclearPointsRaw
       .filter((p) => !answeredOpenSet.has(p))
+      .filter((p) => !localSignals.answered_fields.some((field) => questionMentionsField(p, field)))
       .slice(0, 6);
     const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
       ? parsed.unclear_points_en.map(String).filter(Boolean)
@@ -562,8 +565,8 @@ export async function classifyReply(args: {
       summary_en: parsed.summary_en?.toString().trim() || summary,
       reply_language: parsed.reply_language?.toString().toLowerCase().slice(0, 5) || null,
       lead_time: parsed.lead_time ?? checklist.delivery_date ?? null,
-      lead_time_days: parseNum((parsed as { lead_time_days?: unknown }).lead_time_days),
-      shipping_cost_eur: parseNum((parsed as { shipping_cost_eur?: unknown }).shipping_cost_eur),
+      lead_time_days: parseNumberLike((parsed as { lead_time_days?: unknown }).lead_time_days) ?? localSignals.lead_time_days,
+      shipping_cost_eur: parseNumberLike((parsed as { shipping_cost_eur?: unknown }).shipping_cost_eur) ?? localSignals.shipping_cost_eur,
       wants_human: Boolean((parsed as { wants_human?: unknown }).wants_human),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       checklist,
