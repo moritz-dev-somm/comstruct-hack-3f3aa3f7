@@ -615,3 +615,171 @@ function Legend() {
     </div>
   );
 }
+
+function NeedsAttentionQueue({
+  items,
+  onChanged,
+}: {
+  items: NegotiationFull[];
+  onChanged: () => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="rounded-xl border border-brand/40 bg-brand/5 overflow-hidden">
+      <div className="px-4 sm:px-5 py-3 border-b border-brand/30 flex items-center gap-2">
+        <ShieldAlert className="size-4 text-brand" />
+        <h2 className="font-semibold text-sm text-brand">
+          Needs your attention
+          <span className="ml-2 text-xs font-normal text-brand/80">
+            {items.length} item{items.length === 1 ? "" : "s"}
+          </span>
+        </h2>
+      </div>
+      <ul className="divide-y divide-brand/20">
+        {items.map((n) => (
+          <NeedsAttentionRow key={n.id} neg={n} onChanged={onChanged} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function NeedsAttentionRow({
+  neg,
+  onChanged,
+}: {
+  neg: NegotiationFull;
+  onChanged: () => void;
+}) {
+  const [showReply, setShowReply] = useState(false);
+  const [draft, setDraft] = useState("");
+  const qc = useQueryClient();
+
+  const approveFn = useServerFn(approveNegotiation);
+  const declineFn = useServerFn(declineAndReplaceNegotiation);
+  const followupFn = useServerFn(humanFollowupNegotiation);
+
+  const after = () => {
+    qc.invalidateQueries({ queryKey: ["agent-negotiations"] });
+    onChanged();
+  };
+
+  const approve = useMutation({
+    mutationFn: () => approveFn({ data: { negotiationId: neg.id } }),
+    onSuccess: after,
+  });
+  const decline = useMutation({
+    mutationFn: () => declineFn({ data: { negotiationId: neg.id } }),
+    onSuccess: after,
+  });
+  const followup = useMutation({
+    mutationFn: () =>
+      followupFn({ data: { negotiationId: neg.id, message: draft.trim() } }),
+    onSuccess: () => {
+      setDraft("");
+      setShowReply(false);
+      after();
+    },
+  });
+
+  const busy = approve.isPending || decline.isPending || followup.isPending;
+  const summary =
+    neg.classification?.summary_en ||
+    neg.classification?.summary ||
+    neg.needs_user_reason ||
+    "Supplier reply needs your review.";
+
+  return (
+    <li className="p-4 sm:p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-semibold text-sm truncate">
+            {neg.supplier_name || neg.supplier_email}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            {neg.subject || `Order ${neg.order_id}`}
+          </div>
+        </div>
+        <div className="text-[11px] text-muted-foreground shrink-0 tabular-nums">
+          {neg.last_reply_at
+            ? new Date(neg.last_reply_at).toLocaleString()
+            : new Date(neg.sent_at).toLocaleString()}
+        </div>
+      </div>
+      <p className="text-sm">{summary}</p>
+      {neg.needs_user_reason && (
+        <p className="text-xs text-brand">{neg.needs_user_reason}</p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => approve.mutate()}
+          disabled={busy}
+          className="h-9 px-3 rounded-md bg-brand text-brand-foreground text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <CheckCircle2 className="size-4" />
+          Approve &amp; confirm
+        </button>
+        <button
+          onClick={() => decline.mutate()}
+          disabled={busy}
+          className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <XCircle className="size-4" />
+          Source elsewhere
+        </button>
+        <button
+          onClick={() => setShowReply((s) => !s)}
+          disabled={busy}
+          className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <UserRound className="size-4" />
+          Reply yourself
+        </button>
+      </div>
+
+      {showReply && (
+        <div className="space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={4}
+            placeholder="Write your reply to the supplier…"
+            className="w-full text-sm rounded-md border border-border p-2 bg-background"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowReply(false);
+                setDraft("");
+              }}
+              className="h-8 px-3 rounded-md border text-xs"
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => followup.mutate()}
+              disabled={busy || draft.trim().length === 0}
+              className="h-8 px-3 rounded-md bg-brand text-brand-foreground text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Send className="size-3.5" />
+              Send reply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(approve.data && !approve.data.ok) ||
+      (decline.data && !decline.data.ok) ||
+      (followup.data && !followup.data.ok) ? (
+        <p className="text-xs text-destructive">
+          {approve.data && !approve.data.ok && approve.data.error}
+          {decline.data && !decline.data.ok && decline.data.error}
+          {followup.data && !followup.data.ok && followup.data.error}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
