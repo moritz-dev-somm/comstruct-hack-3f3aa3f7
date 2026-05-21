@@ -160,21 +160,39 @@ export type ReplyClassification = {
 };
 
 const CLASSIFY_SYSTEM = `You analyse a supplier's email reply to a purchase order sent by a procurement agent.
+The reply may be in any language (commonly en, de, fr, it). Do NOT require English.
 
 Decide the verdict strictly:
 - "fully_confirmed": supplier accepts ALL items at the proposed prices AND raises NO issues, NO delays, NO price changes, NO partial availability, NO questions. The delivery date or shipping cost MAY be missing — that is handled separately via the checklist.
 - "confirmed_with_issue": supplier accepts but mentions ANY of: delay, longer lead time, partial availability, price change, substitution, shipping surcharge that exceeds expectations, stock issue, anything that procurement should review.
 - "declined": supplier refuses or cannot fulfil.
-- "needs_clarification": supplier asks us a question or requests info from us (e.g. asks for our VAT ID or delivery address).
+- "needs_clarification": supplier asks us a question or requests info from us (e.g. asks for our VAT ID, delivery address, payment terms, line-item details).
 - "unclear": you cannot tell.
 Be conservative: if in doubt between fully_confirmed and confirmed_with_issue, choose confirmed_with_issue.
 
-In addition, extract a structured checklist of the two fields our initial PO explicitly asked for:
-- delivery_date: the earliest committed delivery date or lead time the supplier states. Normalize to a short string like "2026-06-04" or "2 weeks". Null if not stated.
-- shipping_cost: how the supplier expressed shipping. Use "included" if they say shipping is included or free, "€0" if explicitly zero, or the literal stated amount (e.g. "CHF 45"). Null if not mentioned at all.
-- order_confirmed: true if the supplier accepts the order in some form (fully_confirmed or confirmed_with_issue), false otherwise.
+Extract the checklist:
+- delivery_date: earliest committed delivery date or lead time, normalised to "YYYY-MM-DD" or e.g. "2 weeks". Null if not stated.
+- shipping_cost: "included", "€0", or the literal amount (e.g. "CHF 45"). Null if not mentioned.
+- order_confirmed: true if the supplier accepts the order in some form, false otherwise.
+List any of ["delivery_date","shipping_cost"] still null in missing_checklist.
 
-Then list any of ["delivery_date", "shipping_cost"] that are still null/missing in missing_checklist.
+Always provide:
+- reply_language: ISO 639-1 of the supplier reply (e.g. "de", "fr", "it", "en"). Best guess.
+- summary: 1–2 sentences in the SUPPLIER'S language (or English if unknown).
+- summary_en: ALWAYS English, 1–2 sentences, for the procurement UI.
+
+If the supplier asks us questions, split them:
+- answerable_questions: questions we can answer from purchase-order data (delivery address, VAT ID, payment terms, line items, contact, project reference). Use the supplier's own wording, translated to English.
+- unanswerable_questions: questions that need a human (custom discounts, off-PO terms, anything we don't know).
+
+Finally pick suggested_outbound (the policy layer may still override):
+- "confirm" when fully_confirmed AND missing_checklist is empty AND no issues
+- "checklist_followup" when fully_confirmed but missing_checklist has fields
+- "answer_questions" when needs_clarification AND answerable_questions is non-empty
+- "request_clarification" when verdict is "unclear"
+- "acknowledge_decline" when declined
+- "acknowledge_issues" when confirmed_with_issue
+- "escalate_silent" otherwise
 
 Always reply with strict JSON matching the schema. No prose.`;
 
