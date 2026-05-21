@@ -156,16 +156,49 @@ function ApprovalsInbox() {
                       <X className="size-4" /> Reject
                     </button>
                     <button
-                      onClick={() => {
+                      disabled={sending}
+                      onClick={async () => {
                         const approver = active.tier === "pm" ? PM.name : CENTRAL.name;
-                        approve(active.id, approver);
-                        toast.success(`${active.id} approved — PO sent`);
-                        setActiveId(null);
+                        const orderToSend = active;
+                        setSending(true);
+                        approve(orderToSend.id, approver);
+                        const t = toast.loading(`${orderToSend.id}: contacting supplier…`);
+                        try {
+                          const res = (await startNegotiation({
+                            data: {
+                              order: {
+                                id: orderToSend.id,
+                                project: orderToSend.project,
+                                subtotal: orderToSend.subtotal,
+                                items: orderToSend.items.map((i) => ({
+                                  productId: i.productId,
+                                  name: i.name,
+                                  qty: i.qty,
+                                  price: i.price,
+                                  unit: i.unit,
+                                  category: i.category,
+                                })),
+                              },
+                            },
+                          })) as { ok: true; supplier: string } | { ok: false; error: string };
+                          if (res?.ok) {
+                            toast.success(`${orderToSend.id} approved · email sent to ${res.supplier}`, { id: t });
+                          } else {
+                            toast.error(`${orderToSend.id} approved but email failed: ${res?.error ?? "unknown error"}`, { id: t });
+                          }
+                        } catch (e) {
+                          console.error("approve send email failed:", e);
+                          toast.error(`${orderToSend.id} approved but email failed to start`, { id: t });
+                        } finally {
+                          setSending(false);
+                          setActiveId(null);
+                        }
                       }}
-                      className="flex-1 h-11 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"
+                      className="flex-1 h-11 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
                     >
-                      <Check className="size-4" /> Approve
+                      <Check className="size-4" /> {sending ? "Sending…" : "Approve & send"}
                     </button>
+
                   </div>
                 )}
               </div>
