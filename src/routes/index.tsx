@@ -928,6 +928,7 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
 /* -------------------------------------------------------------------------- */
 
 const PRODUCT_TOKEN_RE = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+const FOLLOWUPS_RE = /\[\[followups:([^\]]+)\]\]/;
 // Marker we inject as inline `code` so markdown parsing preserves it.
 const TOKEN_PREFIX = "§§PROD§§";
 
