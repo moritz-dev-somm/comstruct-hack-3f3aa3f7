@@ -903,9 +903,11 @@ function ConversationView({
         {/* suggestions */}
         {!streaming && lastAssistant && (
           <div className="flex flex-wrap gap-2 pt-1">
-            <SuggestionButton onClick={() => onSuggestion("Add the bundle to cart")}>
-              Add the bundle to cart
-            </SuggestionButton>
+            {recommendedProducts.length > 0 && (
+              <SuggestionButton onClick={onAddBundle}>
+                Add the bundle to cart
+              </SuggestionButton>
+            )}
             {followups.map((f) => (
               <SuggestionButton key={f} onClick={() => onSuggestion(f)}>
                 {f}
