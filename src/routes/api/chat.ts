@@ -232,7 +232,7 @@ async function retrieveRelevant(
           const { data, error } = await sb.rpc("hybrid_search_materials", {
             user_embedding: embedding as unknown as string,
             category_filter: intent.category_filter,
-            keyword_filters: [intent.q],
+            keyword_filters: [intent.q.toLowerCase()],
             match_count: 5,
           });
           if (!error && Array.isArray(data) && data.length) {
