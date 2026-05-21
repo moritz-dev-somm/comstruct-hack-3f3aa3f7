@@ -469,6 +469,7 @@ function Home() {
                     category: product.category,
                     unit: product.unit,
                     qty: 1,
+                    supplier: product.supplier,
                   });
                   added++;
                 }
