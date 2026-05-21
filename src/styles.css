@@ -54,64 +54,65 @@
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
-  /* Warm off-white canvas (#F5F2ED) */
-  --background: oklch(0.961 0.008 80);
-  /* Near-black with blue undertone (#161A1F) */
+  /* Near-white canvas, SubBase-inspired */
+  --background: oklch(0.985 0.003 60);
+  /* Near-black foreground */
   --foreground: oklch(0.196 0.012 250);
 
-  --card: oklch(0.987 0.005 80);
+  --card: oklch(1 0 0);
   --card-foreground: oklch(0.196 0.012 250);
-  --popover: oklch(0.987 0.005 80);
+  --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.196 0.012 250);
 
-  /* Bold warm red (#C8281E) */
-  --primary: oklch(0.555 0.196 28);
+  /* Deep wine red (#791615) */
+  --primary: oklch(0.355 0.143 28);
   --primary-foreground: oklch(1 0 0);
 
-  /* Muted warm gray secondary (#C9C5BD) */
-  --secondary: oklch(0.81 0.008 80);
+  /* Soft warm-tinted gray secondary */
+  --secondary: oklch(0.94 0.005 60);
   --secondary-foreground: oklch(0.196 0.012 250);
 
-  --muted: oklch(0.92 0.006 80);
+  --muted: oklch(0.955 0.004 60);
   --muted-foreground: oklch(0.485 0.008 250);
 
-  --accent: oklch(0.94 0.006 80);
-  --accent-foreground: oklch(0.196 0.012 250);
+  --accent: oklch(0.94 0.012 28);
+  --accent-foreground: oklch(0.355 0.143 28);
 
-  /* Destructive: steel blue (#1D4F9E) — red is reserved for CTAs */
+  /* Destructive: steel blue (red is reserved for brand) */
   --destructive: oklch(0.46 0.15 258);
   --destructive-foreground: oklch(1 0 0);
 
-  --border: oklch(0.885 0.006 80);
-  --input: oklch(0.885 0.006 80);
-  --ring: oklch(0.555 0.196 28);
+  --border: oklch(0.9 0.005 60);
+  --input: oklch(0.9 0.005 60);
+  --ring: oklch(0.355 0.143 28);
 
-  --chart-1: oklch(0.5 0.15 258);   /* steel blue */
-  --chart-2: oklch(0.58 0.19 28);   /* warm red */
-  --chart-3: oklch(0.5 0.12 150);   /* forest green */
-  --chart-4: oklch(0.7 0.16 60);    /* amber */
-  --chart-5: oklch(0.45 0.1 310);   /* muted purple */
+  --chart-1: oklch(0.355 0.143 28);   /* brand red */
+  --chart-2: oklch(0.55 0.16 28);     /* lighter red */
+  --chart-3: oklch(0.5 0.12 150);     /* forest green */
+  --chart-4: oklch(0.7 0.16 60);      /* amber */
+  --chart-5: oklch(0.45 0.1 310);     /* muted purple */
 
-  --sidebar: oklch(0.945 0.006 80);
+  --sidebar: oklch(0.97 0.004 60);
   --sidebar-foreground: oklch(0.196 0.012 250);
-  --sidebar-primary: oklch(0.555 0.196 28);
+  --sidebar-primary: oklch(0.355 0.143 28);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.006 80);
-  --sidebar-accent-foreground: oklch(0.196 0.012 250);
-  --sidebar-border: oklch(0.885 0.006 80);
-  --sidebar-ring: oklch(0.555 0.196 28);
+  --sidebar-accent: oklch(0.94 0.012 28);
+  --sidebar-accent-foreground: oklch(0.355 0.143 28);
+  --sidebar-border: oklch(0.9 0.005 60);
+  --sidebar-ring: oklch(0.355 0.143 28);
 
-  /* Brand mark — collapses onto primary red so existing bg-brand usages re-skin. */
-  --brand: oklch(0.555 0.196 28);
+  /* Brand mark collapses onto primary red */
+  --brand: oklch(0.355 0.143 28);
   --brand-foreground: oklch(1 0 0);
 
-  /* Swiss modernism: one family, weight + tracking do the work. */
+  /* Raw brand RGB for dot patterns / overlays */
+  --brand-rgb: 121 22 21;
+
   --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  /* Overlay-based elevation (used in lieu of shadows) */
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 }
@@ -124,12 +125,10 @@
 @layer base {
   * {
     border-color: var(--color-border);
-    /* Zero box shadows everywhere — borders and overlays only. */
     box-shadow: none !important;
   }
 
   html {
-    /* Bump base font size for outdoor / glove use. */
     font-size: 18px;
   }
   @media (min-width: 1024px) {
@@ -144,9 +143,16 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
+    /* SubBase-style dot field, brand-tinted */
+    background-image: radial-gradient(
+      rgba(var(--brand-rgb), 0.10) 1.1px,
+      transparent 1.2px
+    );
+    background-size: 22px 22px;
+    background-position: 0 0;
+    background-attachment: fixed;
   }
 
-  /* Glove-friendly minimum tap target: 48px on any interactive control. */
   button, a, [role="button"], input, select, textarea {
     min-height: 48px;
   }
@@ -154,3 +160,25 @@
     min-height: 0;
   }
 }
+
+@layer utilities {
+  /* Denser/lighter alternative — useful for hero panels */
+  .dot-bg {
+    background-image: radial-gradient(
+      rgba(var(--brand-rgb), 0.12) 1.1px,
+      transparent 1.2px
+    );
+    background-size: 18px 18px;
+  }
+  .dot-bg-strong {
+    background-image: radial-gradient(
+      rgba(var(--brand-rgb), 0.22) 1.4px,
+      transparent 1.5px
+    );
+    background-size: 16px 16px;
+  }
+  .no-dots {
+    background-image: none;
+  }
+}
+
