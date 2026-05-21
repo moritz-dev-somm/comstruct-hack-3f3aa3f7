@@ -705,6 +705,7 @@ function ConversationView({
   onClearCategory,
   onResetRecommendations,
   onSuggestion,
+  followups,
   allProducts,
   onRunSearch,
   searching,
