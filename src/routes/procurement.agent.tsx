@@ -132,58 +132,146 @@ type Verdict =
   | "needs_clarification"
   | "unclear";
 
-type VerdictInfo = {
-  verdict: Verdict;
-  replyMessageId: string | null;
-  lastReplyAt: string | null;
-};
+/** Operational status: what is happening right now with this negotiation. */
+type NegStatus =
+  | "sent"
+  | "awaiting_reply"
+  | "following_up"
+  | "clarifying"
+  | "answering_questions"
+  | "confirmed"
+  | "needs_user"
+  | "declined_replaced";
 
-type NegotiationLite = {
+type NegotiationFull = {
   id: string;
+  order_id: string;
+  project: string | null;
   thread_id: string | null;
   reply_message_id: string | null;
+  message_id: string | null;
   last_reply_at: string | null;
-  classification: { verdict?: Verdict } | null;
+  sent_at: string;
+  status: NegStatus | string | null;
+  supplier_name: string | null;
+  supplier_email: string | null;
+  supplier_language: string | null;
+  subject: string | null;
+  needs_user_reason: string | null;
+  inbox_id: string | null;
+  classification: {
+    verdict?: Verdict;
+    summary_en?: string;
+    summary?: string;
+    lead_time?: string | null;
+    shipping_cost_eur?: number | null;
+    last_action?: string;
+    last_action_reason?: string | null;
+  } | null;
 };
 
-const VERDICT_META: Record<Verdict, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
-  fully_confirmed: {
-    label: "Approved",
-    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
-    Icon: CheckCircle2,
+const STATUS_META: Record<
+  NegStatus,
+  { label: string; cls: string; Icon: typeof CheckCircle2 }
+> = {
+  sent: {
+    label: "Sent",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Send,
   },
-  confirmed_with_issue: {
-    label: "Partial",
-    cls: "border-amber-500/40 bg-amber-500/10 text-amber-700",
-    Icon: AlertTriangle,
+  awaiting_reply: {
+    label: "Waiting on supplier",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Clock,
   },
-  declined: {
-    label: "Declined",
-    cls: "border-destructive/40 bg-destructive/10 text-destructive",
-    Icon: XCircle,
+  following_up: {
+    label: "Following up",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: Send,
   },
-  needs_clarification: {
-    label: "Question",
+  clarifying: {
+    label: "Clarifying",
     cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
     Icon: HelpCircle,
   },
-  unclear: {
-    label: "Unclear",
+  answering_questions: {
+    label: "Answered questions",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: HelpCircle,
+  },
+  confirmed: {
+    label: "Confirmed",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+    Icon: CheckCircle2,
+  },
+  needs_user: {
+    label: "Needs you",
+    cls: "border-brand/40 bg-brand/10 text-brand",
+    Icon: ShieldAlert,
+  },
+  declined_replaced: {
+    label: "Sourced elsewhere",
     cls: "border-border bg-muted text-muted-foreground",
-    Icon: Circle,
+    Icon: XCircle,
   },
 };
 
-function VerdictPill({ verdict, size = "sm" }: { verdict: Verdict; size?: "sm" | "md" }) {
-  const m = VERDICT_META[verdict];
+function statusOf(s: string | null | undefined): NegStatus {
+  if (!s) return "sent";
+  if (s in STATUS_META) return s as NegStatus;
+  return "awaiting_reply";
+}
+
+function StatusPill({ status, size = "sm" }: { status: NegStatus; size?: "sm" | "md" }) {
+  const m = STATUS_META[status];
   const h = size === "md" ? "h-6 text-[11px]" : "h-5 text-[10px]";
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 ${h} rounded-full border font-semibold ${m.cls}`}>
+    <span className={`inline-flex items-center gap-1 px-2 ${h} rounded-full border font-semibold ${m.cls}`}>
       <m.Icon className="size-3" />
       {m.label}
     </span>
   );
 }
+
+/** Per-message annotation: was this inbound the trigger for the current verdict? */
+const VERDICT_META: Record<Verdict, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
+  fully_confirmed: {
+    label: "Supplier confirmed",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+    Icon: CheckCircle2,
+  },
+  confirmed_with_issue: {
+    label: "Confirmed with issue",
+    cls: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+    Icon: AlertTriangle,
+  },
+  declined: {
+    label: "Supplier declined",
+    cls: "border-destructive/40 bg-destructive/10 text-destructive",
+    Icon: XCircle,
+  },
+  needs_clarification: {
+    label: "Asked a question",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-700",
+    Icon: HelpCircle,
+  },
+  unclear: {
+    label: "Unclear reply",
+    cls: "border-border bg-muted text-muted-foreground",
+    Icon: Circle,
+  },
+};
+
+function VerdictPill({ verdict }: { verdict: Verdict }) {
+  const m = VERDICT_META[verdict];
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full border font-semibold text-[10px] ${m.cls}`}>
+      <m.Icon className="size-3" />
+      {m.label}
+    </span>
+  );
+}
+
 
 
 function AgentPage() {
