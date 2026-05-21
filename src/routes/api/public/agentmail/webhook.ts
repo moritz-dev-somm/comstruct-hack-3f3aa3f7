@@ -6,7 +6,7 @@ import {
   getAgentSettings,
   verifySvixSignature,
 } from "../../../../../agent/agent.server";
-import type { ReplyClassification } from "../../../../../agent/agent.server";
+import type { ReplyClassification, ThreadContext } from "../../../../../agent/agent.server";
 import {
   composeAnswerQuestionsEmail,
   composeClarificationRequestEmail,
@@ -24,6 +24,20 @@ import {
   senderMatchesNegotiation,
 } from "../../../../../agent/email-match";
 import type { Order } from "@/lib/orders";
+
+// English labels for the two checklist questions — used as canonical strings
+// in the classifier's "OPEN QUESTION FROM AGENT" list.
+const CHECKLIST_LABEL_EN: Record<ChecklistField, string> = {
+  delivery_date: "Earliest delivery date you can commit to",
+  shipping_cost: "Shipping costs (or confirm shipping is included)",
+};
+
+type NegotiationClassification = Partial<ReplyClassification> & {
+  answered_checklist?: ChecklistField[];
+  reply_count?: number;
+  open_questions?: string[];
+  prior_answers?: string[];
+};
 
 type NegotiationRow = {
   id: string;
@@ -78,14 +92,14 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         }
 
         const message = payload.message as Record<string, unknown> | undefined;
-        const thread = payload.thread as Record<string, unknown> | undefined;
+        const threadPayload = payload.thread as Record<string, unknown> | undefined;
         if (!message) return new Response("no message", { status: 200 });
 
         const threadId = String(
           (message.thread_id as string | undefined) ??
             (message.threadId as string | undefined) ??
-            (thread?.thread_id as string | undefined) ??
-            (thread?.threadId as string | undefined) ??
+            (threadPayload?.thread_id as string | undefined) ??
+            (threadPayload?.threadId as string | undefined) ??
             "",
         );
         const inboxId = String(
@@ -213,21 +227,39 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           order.items.map((i) => `- ${i.qty} × ${i.name} @ ${i.price} EUR`).join("\n") +
           `\nSubtotal: ${order.subtotal} EUR`;
 
-        const cls = await classifyReply({ orderSummary, supplierReply: replyText });
+        const prevClassification = (neg.classification ?? {}) as NegotiationClassification;
+        const prevAnswered = Array.isArray(prevClassification.answered_checklist)
+          ? (prevClassification.answered_checklist as ChecklistField[])
+          : [];
+        const prevOpenQuestions = Array.isArray(prevClassification.open_questions)
+          ? (prevClassification.open_questions as string[]).filter(Boolean)
+          : [];
+        const prevAnswers = Array.isArray(prevClassification.prior_answers)
+          ? (prevClassification.prior_answers as string[]).filter(Boolean)
+          : [];
+
+        const thread: ThreadContext = {
+          priorOpenQuestions: prevOpenQuestions,
+          priorAnsweredChecklist: prevAnswered,
+          priorAnswersSummary: prevAnswers,
+        };
+
+        const cls = await classifyReply({ orderSummary, supplierReply: replyText, thread });
 
         const followupCount = Number(neg.followup_count ?? 0);
         const clarificationCount = Number(neg.clarification_count ?? 0);
-        const prevAnswered = Array.isArray(
-          (neg.classification as { answered_checklist?: ChecklistField[] } | null)?.answered_checklist,
-        )
-          ? ((neg.classification as { answered_checklist: ChecklistField[] }).answered_checklist as ChecklistField[])
-          : [];
         const answeredChecklist = mergeAnsweredChecklist(prevAnswered, cls);
-        const prevReplyCount = Number(
-          (neg.classification as { reply_count?: number } | null)?.reply_count ?? 0,
-        );
+        const prevReplyCount = Number(prevClassification.reply_count ?? 0);
         const replyCount = prevReplyCount + 1;
         const lang = pickLang(cls.reply_language, (neg.order_snapshot as { supplier_language?: string })?.supplier_language);
+
+        // Accumulate concise "facts already given" so future classifications
+        // never re-flag them. Cap at 20 to keep prompt bounded.
+        const newAnswers: string[] = [];
+        if (cls.checklist?.delivery_date) newAnswers.push(`delivery_date: ${cls.checklist.delivery_date}`);
+        if (cls.checklist?.shipping_cost) newAnswers.push(`shipping_cost: ${cls.checklist.shipping_cost}`);
+        for (const ans of cls.answered_open_questions ?? []) newAnswers.push(`answered: ${ans}`);
+        const mergedAnswers = Array.from(new Set([...prevAnswers, ...newAnswers])).slice(-20);
 
         /* -------- 5. Decide + execute -------- */
         const state: CounterState = {
@@ -258,22 +290,29 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           }
         };
 
+        // Track the exact open questions this outbound asks. After a confirm/
+        // escalate/no_op we leave it as still_open (model carries forward).
+        let nextOpenQuestions: string[] = cls.still_open_questions ?? [];
+
         switch (action.kind) {
           case "send_confirmation": {
             await reply(composeConfirmationEmail(order, { leadTime: cls.lead_time }, lang));
             nextStatus = "confirmed";
+            nextOpenQuestions = [];
             break;
           }
           case "send_checklist_followup": {
             await reply(composeFollowupEmail(order, action.fields, lang));
             nextStatus = "following_up";
             nextFollowup = followupCount + 1;
+            nextOpenQuestions = action.fields.map((f) => CHECKLIST_LABEL_EN[f]);
             break;
           }
           case "send_answer_questions": {
             const qa = buildAnswersFromOrder(order, action.questions);
             await reply(composeAnswerQuestionsEmail(order, qa, lang));
             nextStatus = "answering_questions";
+            // We answered them; carry forward anything still open from the supplier-facing side.
             break;
           }
           case "send_clarification_request": {
@@ -281,6 +320,10 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             await reply(composeClarificationRequestEmail(order, lang, points, action.pendingChecklist));
             nextStatus = "clarifying";
             nextClarification = clarificationCount + 1;
+            // The exact bullets we just sent ARE the next open questions.
+            nextOpenQuestions = points.length
+              ? points
+              : action.pendingChecklist.map((f) => CHECKLIST_LABEL_EN[f]);
             break;
           }
           case "escalate_silent": {
@@ -300,7 +343,17 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           .from("negotiations")
           .update({
             status: nextStatus,
-            classification: { ...cls, followup_count: nextFollowup, clarification_count: nextClarification, reply_count: replyCount, answered_checklist: answeredChecklist, last_action: action.kind, last_action_reason: (action as { reason?: string }).reason ?? null },
+            classification: {
+              ...cls,
+              followup_count: nextFollowup,
+              clarification_count: nextClarification,
+              reply_count: replyCount,
+              answered_checklist: answeredChecklist,
+              open_questions: nextOpenQuestions,
+              prior_answers: mergedAnswers,
+              last_action: action.kind,
+              last_action_reason: (action as { reason?: string }).reason ?? null,
+            },
             reply_excerpt: replyText.slice(0, 1000),
             reply_message_id: replyMessageId,
             needs_user_reason: needsUserReason,
