@@ -1139,9 +1139,12 @@ function InlineProductBubble({
         className="inline-flex align-middle items-center gap-2 my-0.5 mx-0.5 max-w-full rounded-full border border-brand/40 bg-brand/5 hover:bg-brand/10 hover:border-brand transition-colors cursor-pointer pr-1 pl-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         title={`${product.sku} — ${product.name}`}
       >
-        <span className="shrink-0 size-7 rounded-full bg-muted grid place-items-center text-base">
-          📦
-        </span>
+        <ProductImage
+          src={product.imageUrl}
+          alt={product.name}
+          className="shrink-0 size-7 rounded-full overflow-hidden"
+          fallbackClassName="shrink-0 size-7 rounded-full bg-muted text-base"
+        />
         <span className="font-semibold text-[13px] leading-tight truncate max-w-[14rem] sm:max-w-[20rem]">
           {product.name}
         </span>
