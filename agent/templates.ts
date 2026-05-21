@@ -532,38 +532,69 @@ function bilingual(
 }
 
 /* ---------- Clarification request ---------- */
-const CLARIFY: Record<SupplierLanguage, SimpleStrings> = {
+const CLARIFY: Record<SupplierLanguage, { subject: string; greeting: string; intro: (id: string) => string; outro: string; sign: string }> = {
   en: {
     subject: "Clarification needed",
     greeting: "Hello,",
-    body: (id) =>
-      `Thank you for your reply on order ${id}. We were not able to determine clearly whether you can fulfil the order, or what changes you propose. Could you confirm in one short line whether you accept the order as sent, and flag any delays, price changes, or unavailable items?`,
+    intro: (id) => `Thank you for your reply on order ${id}. To finalise on our side, could you confirm the following specific point(s)?`,
+    outro: "A short line per point is enough — no need to repeat the rest of the order.",
     sign: "Thanks,",
   },
   de: {
     subject: "Klärung benötigt",
     greeting: "Guten Tag,",
-    body: (id) =>
-      `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Wir konnten nicht eindeutig erkennen, ob Sie die Bestellung wie versendet annehmen oder welche Änderungen Sie vorschlagen. Könnten Sie uns kurz bestätigen, ob die Bestellung angenommen wird, und allfällige Verzögerungen, Preisänderungen oder nicht verfügbare Artikel angeben?`,
+    intro: (id) => `Vielen Dank für Ihre Antwort zur Bestellung ${id}. Für den finalen Abschluss bitten wir Sie um Bestätigung der folgenden konkreten Punkte:`,
+    outro: "Eine kurze Zeile pro Punkt genügt — die übrige Bestellung muss nicht wiederholt werden.",
     sign: "Vielen Dank,",
   },
   fr: {
     subject: "Clarification nécessaire",
     greeting: "Bonjour,",
-    body: (id) =>
-      `Merci pour votre réponse concernant la commande ${id}. Nous n'avons pas pu déterminer clairement si vous pouvez l'honorer telle quelle ou quelles modifications vous proposez. Pourriez-vous nous confirmer en une ligne si la commande est acceptée et signaler tout retard, changement de prix ou article indisponible ?`,
+    intro: (id) => `Merci pour votre réponse concernant la commande ${id}. Pour finaliser de notre côté, pourriez-vous confirmer les points précis suivants ?`,
+    outro: "Une ligne par point suffit — inutile de répéter le reste de la commande.",
     sign: "Merci,",
   },
   it: {
     subject: "Chiarimento necessario",
     greeting: "Salve,",
-    body: (id) =>
-      `Grazie per la risposta sull'ordine ${id}. Non siamo riusciti a capire chiaramente se potete evadere l'ordine così come inviato o quali modifiche proponete. Potreste confermarci in una riga se l'ordine è accettato e segnalare eventuali ritardi, variazioni di prezzo o articoli non disponibili?`,
+    intro: (id) => `Grazie per la risposta sull'ordine ${id}. Per finalizzarlo dalla nostra parte, potreste confermare i seguenti punti specifici?`,
+    outro: "Una riga per punto è sufficiente — non serve ripetere il resto dell'ordine.",
     sign: "Grazie,",
   },
 };
-export function composeClarificationRequestEmail(order: Order, language: SupplierLanguage = "en"): ComposedEmail {
-  return bilingual(order, language, (s) => s.subject, CLARIFY);
+
+function renderClarifyBlock(s: (typeof CLARIFY)[SupplierLanguage], orderId: string, points: string[]): string {
+  const bullets = points.length ? points.map((p) => `- ${p}`).join("\n") : "- (please reply with concrete details on availability, price, and delivery)";
+  return [s.greeting, ``, s.intro(orderId), bullets, ``, s.outro, ``, s.sign, COMPANY.agentName, `${COMPANY.contact} · ${COMPANY.phone}`].join("\n");
+}
+function renderClarifyHtml(s: (typeof CLARIFY)[SupplierLanguage], orderId: string, points: string[]): string {
+  const items = (points.length ? points : ["(please reply with concrete details on availability, price, and delivery)"])
+    .map((p) => `<li>${escapeHtml(p)}</li>`)
+    .join("");
+  return `<p>${escapeHtml(s.greeting)}</p><p>${escapeHtml(s.intro(orderId))}</p><ul>${items}</ul><p>${escapeHtml(s.outro)}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+}
+
+export function composeClarificationRequestEmail(
+  order: Order,
+  language: SupplierLanguage = "en",
+  points: string[] = [],
+): ComposedEmail {
+  const primary = CLARIFY[language];
+  const english = CLARIFY.en;
+  const isBi = language !== "en";
+  const subject = isBi
+    ? `Re: [${order.id}] ${primary.subject} / ${english.subject}`
+    : `Re: [${order.id}] ${primary.subject}`;
+  const sep = "\n\n-------------------- English --------------------\n\n";
+  const text =
+    renderClarifyBlock(primary, order.id, points) +
+    (isBi ? sep + renderClarifyBlock(english, order.id, points) : "") +
+    `\n\n--\n${AGENT_DISCLOSURE_TEXT}`;
+  const htmlSep = isBi
+    ? `<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb"/><p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.05em">English</p>`
+    : "";
+  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#161A1F;font-size:14px;line-height:1.55">${renderClarifyHtml(primary, order.id, points)}${htmlSep}${isBi ? renderClarifyHtml(english, order.id, points) : ""}${AGENT_DISCLOSURE_HTML}</div>`;
+  return { subject, text, html };
 }
 
 /* ---------- Decline acknowledgment ---------- */
