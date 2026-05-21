@@ -504,7 +504,7 @@ export const Route = createFileRoute("/api/chat")({
             : lastUserText.trim()
               ? [{ q: lastUserText.trim().slice(0, 80), category_filter: null, requested_quantity: null }]
               : [];
-          let items = await retrieveRelevant(effective);
+          let items = await retrieveRelevant(effective, apiKey);
 
           // Phase 2b: if direct retrieval found nothing, ask an LLM to brainstorm
           // concrete C-material product keywords (e.g. "PPE for new hire" →
@@ -512,7 +512,7 @@ export const Route = createFileRoute("/api/chat")({
           if (items.length === 0 && lastUserText.trim()) {
             const expanded = await expandQueryToKeywords(lastUserText, apiKey);
             if (expanded.length) {
-              items = await retrieveRelevant(expanded);
+              items = await retrieveRelevant(expanded, apiKey);
             }
           }
 
