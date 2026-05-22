@@ -637,14 +637,10 @@ export async function classifyReply(args: {
         keptIdx.push(i);
         return p;
       });
-    const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
-      ? parsed.unclear_points_en.map(String).filter(Boolean)
-      : [];
-    // Align EN array to native array length when model returns mismatched arrays.
-    const unclearPointsEn =
-      unclearPointsEnRaw.length === unclearPoints.length
-        ? unclearPointsEnRaw
-        : unclearPoints.map((p, i) => unclearPointsEnRaw[i] ?? p);
+    // Align EN array to filtered native array using indices we kept.
+    const unclearPointsEn = keptIdx.map(
+      (i) => unclearPointsEnRawAligned[i] ?? unclearPointsRaw[i] ?? "",
+    );
 
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],
