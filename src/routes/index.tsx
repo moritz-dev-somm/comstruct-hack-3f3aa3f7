@@ -36,6 +36,7 @@ import { ScanButton } from "@/components/ScanButton";
 import { ProductImage } from "@/components/ProductImage";
 import { HoldButton } from "@/components/HoldButton";
 import { QtyInput } from "@/components/QtyInput";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
@@ -512,6 +513,7 @@ function Home() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <LanguageSelector />
             <Link
               to="/orders"
               aria-label="My orders"
