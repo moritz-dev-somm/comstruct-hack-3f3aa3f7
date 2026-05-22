@@ -90,10 +90,50 @@ export function InteractiveDotField() {
       else dirty = true;
     };
 
-    const mouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const isOverBackground = (x: number, y: number) => {
+      // Temporarily allow elementFromPoint to see through the canvas
+      const prevPE = canvas.style.pointerEvents;
+      canvas.style.pointerEvents = "none";
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      canvas.style.pointerEvents = prevPE;
+      if (!el) return true;
+      let node: HTMLElement | null = el;
+      while (node && node !== document.body && node !== document.documentElement) {
+        if (node.dataset?.dotField === "allow") return true;
+        if (node.dataset?.dotField === "block") return false;
+        const tag = node.tagName;
+        if (
+          tag === "BUTTON" ||
+          tag === "A" ||
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          tag === "LABEL" ||
+          node.getAttribute("role") === "button"
+        ) {
+          return false;
+        }
+        const bg = getComputedStyle(node).backgroundColor;
+        const m = bg.match(/rgba?\(([^)]+)\)/);
+        if (m) {
+          const parts = m[1].split(",").map((s) => parseFloat(s.trim()));
+          const alpha = parts.length === 4 ? parts[3] : 1;
+          if (alpha > 0.01) return false;
+        }
+        node = node.parentElement;
+      }
+      return true;
+    };
+
+    const mouseMove = (e: MouseEvent) => {
+      if (!isOverBackground(e.clientX, e.clientY)) return onLeave();
+      onMove(e.clientX, e.clientY);
+    };
     const touchMove = (e: TouchEvent) => {
       const t = e.touches[0];
-      if (t) onMove(t.clientX, t.clientY);
+      if (!t) return;
+      if (!isOverBackground(t.clientX, t.clientY)) return onLeave();
+      onMove(t.clientX, t.clientY);
     };
 
     window.addEventListener("resize", resize);
