@@ -23,7 +23,7 @@ const COMPANY = {
   // Used only as a last-resort fallback. The live agent inbox address
   // (from `agent_settings.inbox_address`) should always be injected via
   // the `agentEmail` arg on the compose functions below.
-  contact: "procurement@comstruct.example",
+  contact: "comstruct-procurement@agentmail.to",
   phone: "+41 61 555 01 23",
   street: "Bahnhofstrasse 12",
   city: "4051 Basel, Switzerland",
@@ -377,13 +377,13 @@ function invoiceLine(
   }
   switch (lang) {
     case "de":
-      return `Falls möglich, antworten Sie uns bitte mit angehängter Rechnung (oder senden Sie sie an ${contact}).`;
+      return `Bitte Rechnung anhängen oder an ${contact} senden.`;
     case "fr":
-      return `Si possible, merci de répondre avec la facture en pièce jointe (ou de l'envoyer à ${contact}).`;
+      return `Merci de joindre la facture ou de l'envoyer à ${contact}.`;
     case "it":
-      return `Se possibile, vi preghiamo di rispondere allegando la fattura (oppure inviarla a ${contact}).`;
+      return `Allegate la fattura o inviatela a ${contact}.`;
     default:
-      return `If possible, please reply with the invoice attached (or send it to ${contact}).`;
+      return `Please attach the invoice or send it to ${contact}.`;
   }
 }
 
@@ -416,10 +416,10 @@ function confirmBody(
 function etaLine(lang: SupplierLanguage, leadTime: string | null | undefined): string {
   if (!leadTime) return "";
   switch (lang) {
-    case "de": return `Liefertermin notiert: ${leadTime}.`;
-    case "fr": return `Livraison notée : ${leadTime}.`;
-    case "it": return `Consegna annotata: ${leadTime}.`;
-    default:   return `Noted delivery: ${leadTime}.`;
+    case "de": return `Lieferung notiert für ${leadTime}.`;
+    case "fr": return `Livraison notée pour le ${leadTime}.`;
+    case "it": return `Consegna annotata per il ${leadTime}.`;
+    default:   return `Delivery noted for ${leadTime}.`;
   }
 }
 

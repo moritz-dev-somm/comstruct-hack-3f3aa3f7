@@ -17,7 +17,7 @@ const BUYER = {
   street: "Bahnhofstrasse 12",
   city: "4051 Basel, Switzerland",
   vat: "CHE-123.456.789 MWST",
-  email: "procurement@comstruct.example",
+  email: "comstruct-procurement@agentmail.to",
   phone: "+41 61 555 01 23",
 };
 
