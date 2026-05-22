@@ -612,14 +612,31 @@ export async function classifyReply(args: {
     const stillOpen = openQs.filter((q) => !answeredOpenSet.has(q));
     const finalStillOpen = stillOpen.length ? stillOpen : stillOpenModel;
 
-    // Drop unclear_points that just repeat a question the supplier just answered.
+    // Drop unclear_points that just repeat a question the supplier just answered,
+    // OR that ask the supplier about information WE already gave them in the PO
+    // (delivery address, project, VAT, payment terms, line items, contact, prices).
+    const PO_INFO_RE =
+      /(delivery address|shipping address|ship to|site address|where (?:to|do).{0,20}(?:deliver|ship)|adresse|lieferadresse|adresse de livraison|indirizzo di consegna|project (?:name|reference|number)|projektnummer|référence (?:du )?projet|riferimento progetto|vat (?:id|number)|ust-id|umsatzsteuer|numéro de tva|partita iva|payment terms|zahlungsbedingungen|conditions de paiement|termini di pagamento|line items?|item list|positionen|articles?|articoli|quantit|menge|unit price|stückpreis|prix unitaire|prezzo unitario|contact|ansprechpartner|interlocuteur|referente)/i;
     const unclearPointsRaw = Array.isArray(parsed.unclear_points)
       ? parsed.unclear_points.map(String).filter(Boolean)
       : [];
+    const unclearPointsEnRawAligned = Array.isArray(parsed.unclear_points_en)
+      ? parsed.unclear_points_en.map(String)
+      : [];
+    const keptIdx: number[] = [];
     const unclearPoints = unclearPointsRaw
-      .filter((p) => !answeredOpenSet.has(p))
-      .filter((p) => !localSignals.answered_fields.some((field) => questionMentionsField(p, field)))
-      .slice(0, 6);
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => !answeredOpenSet.has(p))
+      .filter(({ p }) => !localSignals.answered_fields.some((field) => questionMentionsField(p, field)))
+      .filter(({ p, i }) => {
+        const en = unclearPointsEnRawAligned[i] ?? p;
+        return !PO_INFO_RE.test(p) && !PO_INFO_RE.test(en);
+      })
+      .slice(0, 6)
+      .map(({ p, i }) => {
+        keptIdx.push(i);
+        return p;
+      });
     const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
       ? parsed.unclear_points_en.map(String).filter(Boolean)
       : [];
