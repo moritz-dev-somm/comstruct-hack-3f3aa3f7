@@ -117,7 +117,10 @@ export type OrderEmailContext = {
   items: Order["items"];
   subtotal: number;
   language?: SupplierLanguage;
+  /** Live agent inbox address — replaces the COMPANY.contact placeholder. */
+  agentEmail?: string;
 };
+
 
 type OrderStrings = {
   subjectPrefix: string;
