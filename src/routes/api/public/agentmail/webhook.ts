@@ -26,6 +26,7 @@ import {
   type CounterState,
 } from "../../../../../agent/conditions";
 import type { ChecklistField } from "../../../../../agent/agent.server";
+import { resolveDeliveryDate } from "../../../../../agent/delivery-date";
 import {
   extractOrderIdFromSubject,
   parseEmailAddress,
