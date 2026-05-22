@@ -460,12 +460,13 @@ function OrderRow({
       </button>
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
-          {hasDeliveryGrid && (
+          {hasDelivery && (
             <div className="grid sm:grid-cols-2 gap-3">
-              {hasDelivery && <DeliveryBlock delivery={delivery} />}
-              {hasShipping && <ShippingBlock shipping={shipping} />}
+              <DeliveryBlock delivery={delivery} />
             </div>
           )}
+
+
 
           {list.length > 0 && <SuppliersStatusBlock negotiations={list} />}
           <div>
