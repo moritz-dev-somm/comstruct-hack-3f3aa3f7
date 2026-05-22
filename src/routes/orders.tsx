@@ -46,19 +46,53 @@ export const Route = createFileRoute("/orders")({
 type AttentionStage = "decide" | "rejected";
 
 type AttentionInfo = {
-  /**
-   * `decide` – the supplier reply is potentially acceptable (price change,
-   * delivery slip, clarification). The foreman must confirm or decline.
-   * `rejected` – the supplier flat-out cannot fulfil the order, or the
-   * foreman has just declined a `decide` item. Only path forward is to
-   * cancel or look for alternatives.
-   */
   stage: AttentionStage;
-  title: string;
+  /** Short one-line label of the issue (e.g. "Long shipping (21 days)"). */
   problem: string;
   /** Negotiation row to act on when stage = "decide". */
   negotiationId?: string;
 };
+
+/**
+ * Compress a long supplier-feedback string into a tight one-liner the foreman
+ * can read at a glance. Pattern-matches the common cases (delivery delay,
+ * price increase, out-of-stock, MOQ) and otherwise returns the first sentence
+ * capped at ~60 chars.
+ */
+function shortReason(raw: string): string {
+  const text = (raw || "").trim();
+  if (!text) return "Needs your input";
+  const lower = text.toLowerCase();
+
+  // Delivery / shipping delay — try to surface the day count.
+  const dayMatch = text.match(/(\d+)\s*(?:business\s+)?(?:day|days|werktage|tage)/i);
+  if (/(ship|deliver|lead\s*time|liefer|versand)/i.test(lower) && dayMatch) {
+    return `Long shipping (${dayMatch[1]} days)`;
+  }
+  if (/(ship|deliver|lead\s*time|liefer|versand)/i.test(lower) && /(delay|late|longer|wait)/i.test(lower)) {
+    return "Long shipping";
+  }
+
+  // Price change.
+  const pctMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (/(price|cost|preis|kosten)/i.test(lower) && /(increase|higher|up|raise|raised)/i.test(lower)) {
+    return pctMatch ? `Price up ${pctMatch[1]}%` : "Price increased";
+  }
+
+  // Stock.
+  if (/(out\s*of\s*stock|no\s*stock|unavailable|sold\s*out|nicht\s*verf)/i.test(lower)) {
+    return "Out of stock";
+  }
+
+  // Minimum order quantity.
+  if (/(minimum\s*order|moq|mindestbestell)/i.test(lower)) {
+    return "Minimum order not met";
+  }
+
+  // Fallback: first sentence, trimmed.
+  const firstSentence = text.split(/(?<=[.!?])\s/)[0] ?? text;
+  return firstSentence.length > 70 ? `${firstSentence.slice(0, 67)}…` : firstSentence;
+}
 
 function computeAttention(
   order: Order,
@@ -69,6 +103,8 @@ function computeAttention(
   if (order.status === "rejected") return null;
 
   const list = negotiations ?? [];
+
+  // 1. Supplier reply that needs the user to decide (potentially acceptable).
   const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
   if (needsUserNeg) {
     const verdict = (needsUserNeg.classification?.verdict || "").toLowerCase();
@@ -76,35 +112,46 @@ function computeAttention(
       needsUserNeg.needs_user_reason ||
       needsUserNeg.classification?.summary_en ||
       needsUserNeg.classification?.summary ||
-      "Supplier raised a point the agent can't resolve on its own.";
+      "";
 
     // Hard "declined" verdicts skip the confirm/decline step.
     if (verdict === "declined") {
-      return {
-        stage: "rejected",
-        title: `${needsUserNeg.supplier_name} declined the order`,
-        problem: reason,
-      };
+      return { stage: "rejected", problem: shortReason(reason) || "Supplier declined" };
     }
     return {
       stage: "decide",
-      title: `${needsUserNeg.supplier_name} needs your decision`,
-      problem: reason,
+      problem: shortReason(reason),
       negotiationId: needsUserNeg.id,
     };
   }
+
+  // 2. Any negotiation with a "declined" verdict, even if status isn't needs_user.
+  const declinedNeg = list.find(
+    (n) => (n.classification?.verdict || "").toLowerCase() === "declined",
+  );
+  if (declinedNeg) {
+    const reason =
+      declinedNeg.needs_user_reason ||
+      declinedNeg.classification?.summary_en ||
+      declinedNeg.classification?.summary ||
+      "";
+    return { stage: "rejected", problem: shortReason(reason) || "Supplier declined" };
+  }
+
+  // 3. RFQ exhausted — no supplier could fulfil.
   if (order.status === "rfq_failed") {
     return {
       stage: "rejected",
-      title: "No supplier could fulfil this order",
-      problem:
+      problem: shortReason(
         _rfq?.escalation_reason ||
-        order.rejectionReason ||
-        "The agent contacted alternative suppliers but none could match the requested items.",
+          order.rejectionReason ||
+          "",
+      ) || "No supplier available",
     };
   }
   return null;
 }
+
 
 
 function OrdersPage() {
