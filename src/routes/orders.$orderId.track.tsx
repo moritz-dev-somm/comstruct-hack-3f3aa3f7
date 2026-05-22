@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Check, Mail, Package, Truck, ClipboardCheck, PackageCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Mail, Package, Truck, ClipboardCheck, PackageCheck, Loader2, LogOut } from "lucide-react";
 import { useOrders, type Order, type OrderStatus } from "@/lib/orders";
 import { formatEUR } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { useRole } from "@/lib/role";
+import { useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/orders/$orderId/track")({
   component: TrackPage,
@@ -202,6 +204,9 @@ function TrackPage() {
 }
 
 function Header() {
+  const { logout } = useRole();
+  const navigate = useNavigate();
+
   return (
     <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
       <div className="mx-auto max-w-2xl px-4 h-14 flex items-center gap-3">
@@ -216,6 +221,17 @@ function Header() {
           <h1 className="font-semibold text-sm">Track order</h1>
           <p className="text-xs text-muted-foreground">Live status updates</p>
         </div>
+        <button
+          onClick={() => {
+            logout();
+            navigate({ to: "/login" });
+          }}
+          aria-label="Switch user"
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 h-9 text-xs font-medium hover:bg-accent transition-colors"
+        >
+          <LogOut className="size-4" />
+          <span className="hidden sm:inline">Switch user</span>
+        </button>
       </div>
     </header>
   );
