@@ -105,12 +105,17 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
     type: "function",
     function: {
       name: "save_products",
-      description: "Save extracted product rows from the PDF supplier catalog.",
+      description: "Save extracted product rows from the PDF supplier catalog, plus the catalog-level supplier name.",
       parameters: {
         type: "object",
         additionalProperties: false,
         required: ["rows"],
         properties: {
+          supplier: {
+            type: "string",
+            description:
+              "The supplier / vendor / manufacturer / brand name for this catalog as a whole. Look at the page header, footer, cover page, logo caption, letterhead, or 'Lieferant'/'Hersteller'/'Vendor' labels. Leave empty only if truly nowhere on the document.",
+          },
           rows: {
             type: "array",
             items: {
@@ -119,11 +124,19 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
               required: ["name"],
               properties: {
                 name: { type: "string" },
-                sku: { type: "string" },
+                sku: {
+                  type: "string",
+                  description:
+                    "Unique product identifier. The column header may be 'SKU', 'Art.-Nr.', 'Artikelnummer', 'Art Nr', 'Art-Nr', 'Code', 'Product Code', 'Ref', 'Reference', 'Item No', 'Item #', 'Bestellnr', 'Bestellnummer', 'EAN', 'GTIN', 'Mat-Nr', 'Material', or similar. Pick the most specific identifier column for each row.",
+                },
                 category: { type: "string" },
                 unit: { type: "string" },
                 price_eur: { type: "number" },
-                supplier: { type: "string" },
+                supplier: {
+                  type: "string",
+                  description:
+                    "Per-row supplier if different from the catalog-level supplier (multi-brand catalogs). Otherwise omit and the catalog-level supplier will be used.",
+                },
                 description: { type: "string" },
               },
             },
@@ -144,7 +157,15 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
           content: [
             {
               type: "text",
-              text: "Extract every product listed in this supplier catalog PDF into structured rows. Include SKU, price (EUR), unit, category, and supplier when visible. Return as many rows as the document contains.",
+              text: [
+                "Extract every product listed in this supplier catalog PDF into structured rows.",
+                "",
+                "SUPPLIER: First identify the supplier / vendor / manufacturer this catalog belongs to. It is often shown only ONCE — on the cover, in the page header/footer, in a logo caption, or as letterhead — NOT repeated on every row. Return it as the top-level `supplier` field. Only set per-row `supplier` for multi-brand catalogs where each row's brand differs.",
+                "",
+                "SKU: Every catalog uses a different column name for the product identifier (SKU, Art.-Nr., Artikelnummer, Code, Product Code, Ref, Item No, Bestellnummer, EAN, GTIN, Mat-Nr, ...). Detect the identifier column for each table and map it to `sku`. Preserve the original code exactly (keep dashes, slashes, leading zeros). If a row has multiple codes (e.g. internal + EAN), prefer the manufacturer's article number.",
+                "",
+                "Return as many rows as the document contains. Include price (EUR), unit, category, description when visible.",
+              ].join("\n"),
             },
             {
               type: "file",
@@ -163,6 +184,7 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
   const call = data.choices?.[0]?.message?.tool_calls?.[0];
   if (!call) return [];
   const args = JSON.parse(call.function.arguments);
+  const catalogSupplier = args.supplier ? String(args.supplier).trim() || null : null;
   const rows = (args.rows as ParsedRow[]) || [];
   return rows.filter((r) => r && r.name).map((r) => ({
     name: String(r.name).trim(),
@@ -170,7 +192,7 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
     category: r.category ? String(r.category).trim() : null,
     unit: r.unit ? String(r.unit).trim() : null,
     price_eur: typeof r.price_eur === "number" ? r.price_eur : null,
-    supplier: r.supplier ? String(r.supplier).trim() : null,
+    supplier: (r.supplier ? String(r.supplier).trim() : null) || catalogSupplier,
     description: r.description ? String(r.description).trim() : null,
   }));
 }
