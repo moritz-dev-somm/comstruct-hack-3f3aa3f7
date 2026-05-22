@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import {
   Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send,
   Inbox as InboxIcon, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Circle,
-  Clock, UserRound, ShieldAlert,
+  Clock, UserRound, ShieldAlert, Phone,
 } from "lucide-react";
 import {
   listInboxMessages,
