@@ -25,8 +25,10 @@ import {
   X,
   Zap,
   LogOut,
+  Menu,
   type LucideIcon,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useRole } from "@/lib/role";
 import { useProducts, formatEUR, type Product } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
