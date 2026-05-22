@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -7,7 +7,11 @@ import {
   ArrowLeft,
   ShoppingCart,
   Truck,
+  ShieldAlert,
+  Search,
+  XCircle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
