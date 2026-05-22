@@ -598,6 +598,30 @@ function Home() {
                 toast.info("No matching products found in catalog");
               }
             }}
+            onAddTemplate={(items) => {
+              let added = 0;
+              for (const it of items) {
+                const product = products.find((p) => p.sku === it.sku);
+                if (product) {
+                  cart.add({
+                    productId: product.sku,
+                    name: product.name,
+                    price: product.price,
+                    category: product.category,
+                    unit: product.unit,
+                    qty: it.qty,
+                    supplier: product.supplier,
+                  });
+                  added++;
+                }
+              }
+              if (added > 0) {
+                toast.success(`Added ${added} item${added === 1 ? "" : "s"} to cart`);
+                setCartOpen(true);
+              } else {
+                toast.info("No matching products found in catalog");
+              }
+            }}
             products={products}
           />
         ) : (
