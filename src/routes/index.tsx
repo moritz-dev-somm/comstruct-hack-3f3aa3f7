@@ -939,55 +939,6 @@ function ConversationView({
           </div>
         )}
 
-        {/* Auto-refreshing hybrid catalog search — re-runs after every assistant turn */}
-        {(searching || searchResults) && (
-          <div className="pt-3">
-            <div className="flex items-end justify-between mb-3 border-b-2 border-brand/70 pb-2">
-              <h2 className="text-lg font-bold text-brand">Catalog matches</h2>
-              <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-                {searching ? (
-                  <>
-                    <Loader2 className="size-3 animate-spin" />
-                    Refining…
-                  </>
-                ) : (
-                  <>top {Math.min(searchResults?.length ?? 0, 5)} · cheapest first</>
-                )}
-              </span>
-            </div>
-            {searchExtracted && !searching && (
-              <p className="mb-3 text-xs text-muted-foreground">
-                Query: <span className="font-medium text-foreground">{searchExtracted.semantic_search_string}</span>
-                {searchExtracted.extracted_category && (
-                  <> · in <span className="font-medium">{searchExtracted.extracted_category}</span></>
-                )}
-                {searchExtracted.extracted_keywords.length > 0 && (
-                  <> · {searchExtracted.extracted_keywords.slice(0, 6).join(" · ")}</>
-                )}
-              </p>
-            )}
-            {searchResults && searchResults.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">
-                No matches found.
-              </p>
-            ) : searchResults ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {searchResults.slice(0, 5).map((r) => {
-                  const product =
-                    allProducts.find((p) => p.sku === r.sku) ?? hybridResultToProduct(r);
-                  return (
-                    <ProductCard
-                      key={r.sku}
-                      product={product}
-                      recommended={recSet.has(r.sku)}
-                      dimmed={false}
-                    />
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        )}
       </div>
 
 
