@@ -247,32 +247,11 @@ function AttentionBanner({
 }
 
 function CancelButton({ onConfirm }: { onConfirm: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  if (confirming) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Cancel for good?</span>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => {
-            setConfirming(false);
-            onConfirm();
-          }}
-        >
-          Yes, cancel
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-          Keep open
-        </Button>
-      </div>
-    );
-  }
   return (
     <Button
       size="sm"
       variant="outline"
-      onClick={() => setConfirming(true)}
+      onClick={onConfirm}
       className="gap-1.5"
     >
       <XCircle className="size-3.5" />
@@ -280,6 +259,7 @@ function CancelButton({ onConfirm }: { onConfirm: () => void }) {
     </Button>
   );
 }
+
 
 function OrderRow({
   order,
