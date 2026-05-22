@@ -62,7 +62,6 @@ export const Route = createFileRoute("/")({
   component: Home,
   validateSearch: (search: Record<string, unknown>) => ({
     prefill: typeof search.prefill === "string" ? search.prefill : undefined,
-    restoreFromOrder: typeof search.restoreFromOrder === "string" ? search.restoreFromOrder : undefined,
   }),
   head: () => ({
     meta: [
