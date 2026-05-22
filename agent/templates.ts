@@ -20,6 +20,9 @@ export type ComposedEmail = {
 
 const COMPANY = {
   name: "comstruct Bau GmbH",
+  // Used only as a last-resort fallback. The live agent inbox address
+  // (from `agent_settings.inbox_address`) should always be injected via
+  // the `agentEmail` arg on the compose functions below.
   contact: "procurement@comstruct.example",
   phone: "+41 61 555 01 23",
   street: "Bahnhofstrasse 12",
@@ -27,6 +30,13 @@ const COMPANY = {
   site: "Erlenmatt B3 site office, Basel, CH",
   agentName: "comstruct procurement agent",
 };
+
+/** Resolve the contact email a template should print. Prefer the live agent inbox. */
+function resolveContact(agentEmail?: string | null): string {
+  const e = (agentEmail ?? "").trim();
+  return e && e.includes("@") ? e : COMPANY.contact;
+}
+
 
 export type SupplierLanguage = "en" | "de" | "fr" | "it";
 
