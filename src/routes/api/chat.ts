@@ -98,12 +98,10 @@ type SearchIntent = {
 };
 
 async function extractIntents(userMessage: string, apiKey: string): Promise<SearchIntent[]> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
+  const url = "https://api.openai.com/v1/chat/completions";
+  const model = "gpt-5.4-mini";
+
+
 
   const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
 Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
