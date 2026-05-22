@@ -38,7 +38,7 @@ function ProcurementLayout() {
     { to: "/procurement/agent", label: "Supplier agent", icon: Bot },
     { to: "/procurement/analytics", label: "Analytics", icon: BarChart3 },
     { to: "/procurement/catalog", label: "Catalog", icon: Package },
-    { to: "/procurement/catalog/manage", label: "Manage database", icon: Database, indent: true },
+    { to: "/procurement/catalog/manage", label: "Manage database", icon: Database },
     { to: "/procurement/settings", label: "Approval rules", icon: SlidersHorizontal },
   ] as const;
 
