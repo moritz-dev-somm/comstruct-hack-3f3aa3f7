@@ -2,9 +2,38 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 
 export type Role = "foreman" | "supervisor" | null;
 
+export type DemoUser = {
+  role: Exclude<Role, null>;
+  username: string;
+  password: string;
+  displayName: string;
+};
+
+// Hardcoded demo credentials — this is a demo app with no real backend auth.
+// Both roles share the same password for convenience during reviews.
+export const DEMO_USERS: Record<Exclude<Role, null>, DemoUser> = {
+  foreman: {
+    role: "foreman",
+    username: "marco.foreman",
+    password: "comstruct-demo",
+    displayName: "Marco (Foreman)",
+  },
+  supervisor: {
+    role: "supervisor",
+    username: "lena.supervisor",
+    password: "comstruct-demo",
+    displayName: "Lena (Supervisor)",
+  },
+};
+
+type SignInResult =
+  | { ok: true; role: Exclude<Role, null> }
+  | { ok: false };
+
 type RoleCtx = {
   role: Role;
   setRole: (r: Exclude<Role, null>) => void;
+  signIn: (username: string, password: string) => SignInResult;
   logout: () => void;
 };
 
@@ -28,11 +57,22 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem(KEY);
   }, [role, hydrated]);
 
+  function signIn(username: string, password: string): SignInResult {
+    const u = username.trim().toLowerCase();
+    const match = Object.values(DEMO_USERS).find(
+      (user) => user.username.toLowerCase() === u && user.password === password,
+    );
+    if (!match) return { ok: false };
+    setRoleState(match.role);
+    return { ok: true, role: match.role };
+  }
+
   return (
     <Ctx.Provider
       value={{
         role,
         setRole: (r) => setRoleState(r),
+        signIn,
         logout: () => setRoleState(null),
       }}
     >
