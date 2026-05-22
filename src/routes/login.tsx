@@ -92,10 +92,10 @@ function LoginPage() {
   const demo = DEMO_USERS[tab];
 
   return (
-    <div className="min-h-screen bg-background text-foreground grid md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:grid md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
       {/* ─── Brand panel ─────────────────────────────────────────── */}
       <aside
-        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-8 md:p-12 lg:p-16 min-h-[260px] md:min-h-screen"
+        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-5 md:p-12 lg:p-16 md:min-h-screen"
         style={{
           backgroundImage:
             "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px)",
@@ -116,18 +116,15 @@ function LoginPage() {
           <img
             src={comstructLogo}
             alt="comstruct"
-            className="h-9 w-auto brightness-0 invert"
+            className="h-7 md:h-9 w-auto brightness-0 invert"
           />
         </div>
 
-        <div className="relative mt-auto pt-12 md:pt-0">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-brand-foreground/70">
-            Construction procurement
-          </p>
-          <h1 className="mt-4 text-3xl md:text-4xl lg:text-5xl font-semibold leading-[1.05] tracking-tight max-w-[18ch]">
+        <div className="relative mt-3 md:mt-auto md:pt-0">
+          <h1 className="text-xl md:text-4xl lg:text-5xl font-semibold leading-[1.1] tracking-tight max-w-[18ch]">
             Order C-materials in plain language.
           </h1>
-          <p className="mt-4 text-sm md:text-base text-brand-foreground/75 max-w-[36ch]">
+          <p className="hidden md:block mt-4 text-sm md:text-base text-brand-foreground/75 max-w-[36ch]">
             One assistant for the whole site — from the first voice note to the
             delivery slip.
           </p>
@@ -158,23 +155,13 @@ function LoginPage() {
       </aside>
 
       {/* ─── Auth panel ─────────────────────────────────────────── */}
-      <main className="dot-bg flex items-center justify-center px-5 py-10 md:py-12">
-        <div className="w-full max-w-sm">
-          <div className="mb-8">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-              Welcome back
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Sign in</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {tabMeta[tab].description}
-            </p>
-          </div>
-
+      <main className="dot-bg flex-1 flex items-center justify-center px-5 py-5 md:py-12">
+        <div className="w-full max-w-sm flex flex-col">
           {/* Segmented role control */}
           <div
             role="tablist"
             aria-label="Role"
-            className="relative grid grid-cols-2 rounded-full border bg-muted/50 p-1 mb-6"
+            className="relative grid grid-cols-2 rounded-full border bg-muted/50 p-1 mb-4"
           >
             {(["foreman", "supervisor"] as Tab[]).map((t) => {
               const active = tab === t;
@@ -200,7 +187,7 @@ function LoginPage() {
             })}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-3" noValidate>
             <div className="space-y-1.5">
               <Label
                 htmlFor="username"
@@ -274,20 +261,6 @@ function LoginPage() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 flex items-center justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-[11px] text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-brand" />
-              Demo creds prefilled —
-              <span className="font-mono text-foreground/80">
-                {demo.username} / {demo.password}
-              </span>
-            </div>
-          </div>
-
-          <p className="mt-8 text-center text-[11px] text-muted-foreground">
-            comstruct — construction procurement, simplified.
-          </p>
         </div>
       </main>
     </div>
