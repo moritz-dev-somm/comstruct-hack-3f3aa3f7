@@ -7,7 +7,7 @@ import {
   Anchor,
   ArrowUp,
   Bolt,
-  
+  Bookmark,
   Check,
   ClipboardList,
   Clock,
@@ -21,6 +21,7 @@ import {
   Search,
   
   ShoppingCart,
+  Trash2,
   X,
   Zap,
   LogOut,
@@ -29,6 +30,7 @@ import {
 import { useRole } from "@/lib/role";
 import { useProducts, formatEUR, type Product } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
+import { useTemplates, type TemplateItem } from "@/lib/templates";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
