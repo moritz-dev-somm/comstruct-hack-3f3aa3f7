@@ -436,41 +436,32 @@ function Home() {
     }
   }
 
-  // --- Voice mode (Vapi) transcript bridge ---------------------------------
-  // Mirror live voice turns into the same `messages` state the typed flow
-  // uses, so the on-screen transcript stays in sync with what was said.
-  function appendVoiceUserTurn(text: string) {
-    const t = text.trim();
-    if (!t) return;
-    setMessages((prev) => [...prev, { role: "user", content: t }]);
-  }
-  function appendVoiceAssistantTurn(text: string) {
-    const t = text.trim();
-    if (!t) return;
-    // Re-use the product-token detection so any [[product:SKU:QTY]] markers
-    // the voice agent emits still surface as recommended pills.
-    const re = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
-    const found: { sku: string; qty: number }[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(t)) !== null) {
-      found.push({ sku: m[1], qty: m[2] ? parseInt(m[2], 10) : 1 });
+  // --- Spoken playback for voice-dictated turns ----------------------------
+  // When the user dictates with the mic, read the assistant's reply out loud
+  // using the browser's built-in SpeechSynthesis. No UI changes.
+  const speakNextReplyRef = useRef(false);
+  function speakAssistantText(raw: string) {
+    if (typeof window === "undefined") return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    // Strip product tokens and markdown so the spoken output is clean.
+    const clean = raw
+      .replace(/\[\[product:[^\]]+\]\]/g, "")
+      .replace(/[`*_#>]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return;
+    try {
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(clean);
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      synth.speak(u);
+    } catch {
+      /* ignore */
     }
-    if (found.length) {
-      setRecommendedIds((prev) => {
-        const set = new Set(prev);
-        const add = found.map((f) => f.sku).filter((s) => !set.has(s));
-        return add.length ? [...prev, ...add] : prev;
-      });
-      setRecommendedQty((prev) => {
-        const next = { ...prev };
-        for (const f of found) next[f.sku] = f.qty;
-        return next;
-      });
-    }
-    setMessages((prev) => [...prev, { role: "assistant", content: t }]);
   }
 
-  // voice handled by <VoiceButton /> and <VoiceModeButton />.
 
   function reset() {
     setMessages([]);
