@@ -426,7 +426,7 @@ function OrderRow({
 
   const hasDelivery = delivery.iso != null || delivery.needsClarification;
   const hasShipping = shipping.amountEur != null;
-  const hasDeliveryGrid = hasDelivery || hasShipping;
+
 
   // Roll shipping into the headline total so the foreman sees the real
   // amount they'll pay, not just the goods subtotal. Shipping is still
