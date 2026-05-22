@@ -84,11 +84,13 @@ function OrdersPage() {
 function OrderRow({
   order,
   negotiations,
+  rfq,
   open,
   onToggle,
 }: {
   order: Order;
   negotiations: NegotiationRow[] | undefined;
+  rfq: RfqRow | null;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -97,6 +99,7 @@ function OrderRow({
   const delivery = pickDeliveryForOrder(negotiations);
   const shipping = pickShippingForOrder(negotiations);
   const list = negotiations ?? [];
+  const timeline = buildOrderTimeline(order, negotiations, rfq);
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
