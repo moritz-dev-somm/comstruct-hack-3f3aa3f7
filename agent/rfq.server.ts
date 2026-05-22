@@ -27,7 +27,6 @@ import {
 
 export const RFQ_THRESHOLD_EUR = 200;
 export const RFQ_DEADLINE_HOURS = 24;
-const MAX_RFQ_SUPPLIERS = 3;
 
 type SupportedLang = SupplierLanguage;
 
@@ -35,11 +34,10 @@ type SupplierContact = {
   name: string;
   email: string;
   language: SupportedLang;
-  productsInCategory: number;
 };
 
 /* ============================================================ */
-/* Supplier discovery                                           */
+/* Supplier discovery — strict "exact same product" matching    */
 /* ============================================================ */
 
 function dominantCategory(order: Order): string | null {
@@ -57,92 +55,171 @@ function dominantCategory(order: Order): string | null {
   return winner;
 }
 
+/** Normalize a product name so different casing / spacing collapse to the same key. */
+function normalizeProductKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const SUPPORTED_LANGS: SupportedLang[] = ["en", "de", "fr", "it"];
+function normLang(s: string | null | undefined): SupportedLang {
+  const v = (s || "").toLowerCase().slice(0, 2) as SupportedLang;
+  return SUPPORTED_LANGS.includes(v) ? v : "en";
+}
+
 /**
- * Pick up to MAX_RFQ_SUPPLIERS suppliers eligible to bid:
- *  1. Always include the original supplier-of-record first (defending bid).
- *  2. Then top suppliers in the dominant category by catalog size.
- *  3. Must have a contactable email in the `suppliers` table.
+ * Decide whether an order qualifies for a discount RFQ and, if so, which
+ * suppliers and which items to ask.
  *
- * Returns [] when nothing usable exists — caller escalates.
+ * Rules (strict):
+ *  1. At least TWO different catalog suppliers must list the EXACT same
+ *     product (matched by normalized product name).
+ *  2. The subtotal of those shared items (qty × order-price) must be
+ *     ≥ RFQ_THRESHOLD_EUR.
+ *  3. Only suppliers that carry every one of the shared items are invited
+ *     — never the original supplier-of-record unless it also passes that
+ *     bar, and never "filler" suppliers from the same category that don't
+ *     carry the items.
+ *
+ * Returns `qualifies: false` when no such pair (or larger set) exists.
  */
 export async function pickRfqSuppliers(order: Order): Promise<{
+  qualifies: boolean;
   suppliers: SupplierContact[];
+  items: Order["items"];
+  subtotal: number;
   dominantCategory: string | null;
+  reason?: string;
 }> {
   const sb = adminClient();
   const cat = dominantCategory(order);
 
-  // Candidate supplier names (from products in this category).
-  const candidates = new Map<string, number>();
-  if (cat) {
-    const { data } = await sb
-      .from("products")
-      .select("supplier")
-      .eq("category", cat)
-      .not("supplier", "is", null);
-    for (const row of (data ?? []) as Array<{ supplier: string | null }>) {
-      const s = (row.supplier || "").trim();
-      if (!s) continue;
-      candidates.set(s, (candidates.get(s) ?? 0) + 1);
+  // 1. Look up every catalog row whose name matches one of the order's items
+  //    (exact match after normalization). Pulls supplier + name only.
+  const rawNames = Array.from(new Set(order.items.map((i) => i.name)));
+  if (rawNames.length === 0) {
+    return { qualifies: false, suppliers: [], items: [], subtotal: 0, dominantCategory: cat, reason: "no_items" };
+  }
+  const { data: rows } = await sb
+    .from("products")
+    .select("name, supplier")
+    .in("name", rawNames);
+
+  // Also fold in any matches that only differ by casing/whitespace by doing
+  // a normalized comparison on the client. (DB names are mostly canonical so
+  // the IN() above already gets ~all of them.)
+  type Row = { name: string; supplier: string | null };
+  const catalog = (rows ?? []) as Row[];
+
+  // Map: normalized order-item name -> Set<supplier names> that carry it.
+  const suppliersByItemKey = new Map<string, Set<string>>();
+  for (const it of order.items) {
+    const key = normalizeProductKey(it.name);
+    const set = suppliersByItemKey.get(key) ?? new Set<string>();
+    for (const r of catalog) {
+      if (!r.supplier) continue;
+      if (normalizeProductKey(r.name) === key) set.add(r.supplier.trim());
+    }
+    suppliersByItemKey.set(key, set);
+  }
+
+  // 2. Keep only items that are carried by ≥ 2 suppliers (the "comparable" set).
+  const comparable = order.items.filter((it) => {
+    const s = suppliersByItemKey.get(normalizeProductKey(it.name));
+    return s !== undefined && s.size >= 2;
+  });
+  if (comparable.length === 0) {
+    return { qualifies: false, suppliers: [], items: [], subtotal: 0, dominantCategory: cat, reason: "no_shared_product" };
+  }
+
+  // 3. Search for the best supplier set: for every pair of suppliers, compute
+  //    the items both carry and their subtotal. Best = highest subtotal that
+  //    clears the threshold. Then try to extend the pair with any supplier
+  //    that also covers the same items (so we invite as many bidders as
+  //    possible, but only ones offering exactly the comparable bundle).
+  const allSuppliers = new Set<string>();
+  for (const s of suppliersByItemKey.values()) for (const n of s) allSuppliers.add(n);
+  const supplierList = Array.from(allSuppliers);
+
+  function coveredItems(suppliers: string[]): { items: Order["items"]; subtotal: number } {
+    const items = comparable.filter((it) => {
+      const carriers = suppliersByItemKey.get(normalizeProductKey(it.name))!;
+      return suppliers.every((s) => carriers.has(s));
+    });
+    const subtotal = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+    return { items, subtotal };
+  }
+
+  let best: { suppliers: string[]; items: Order["items"]; subtotal: number } | null = null;
+  for (let i = 0; i < supplierList.length; i++) {
+    for (let j = i + 1; j < supplierList.length; j++) {
+      const pair = [supplierList[i], supplierList[j]];
+      const cov = coveredItems(pair);
+      if (cov.subtotal < RFQ_THRESHOLD_EUR) continue;
+      if (!best || cov.subtotal > best.subtotal) {
+        best = { suppliers: pair, items: cov.items, subtotal: cov.subtotal };
+      }
     }
   }
 
-  // Always include original supplier-of-record from the order itself.
-  const originals = new Set<string>();
-  for (const it of order.items) {
-    const s = (it.supplier || "").trim();
-    if (s) originals.add(s);
-  }
-  for (const orig of originals) {
-    if (!candidates.has(orig)) candidates.set(orig, 0);
+  if (!best) {
+    return { qualifies: false, suppliers: [], items: [], subtotal: 0, dominantCategory: cat, reason: "below_threshold" };
   }
 
-  if (candidates.size === 0) return { suppliers: [], dominantCategory: cat };
+  // Extend the winning pair with any extra supplier that also carries every
+  // item in `best.items` — they're a legitimate additional bidder.
+  for (const extra of supplierList) {
+    if (best.suppliers.includes(extra)) continue;
+    const trySet = [...best.suppliers, extra];
+    const cov = coveredItems(trySet);
+    if (cov.items.length === best.items.length) {
+      best.suppliers = trySet;
+    }
+  }
 
-  // Look up contact info for each candidate.
-  const names = Array.from(candidates.keys());
+  // 4. Hydrate contact info (email + language). Suppliers without a
+  //    contactable email are dropped — if that leaves fewer than 2, the
+  //    order no longer qualifies.
   const { data: contactRows } = await sb
     .from("suppliers")
     .select("name,email,language")
-    .in("name", names);
+    .in("name", best.suppliers);
   const contacts = new Map<string, { email: string | null; language: string | null }>();
   for (const r of (contactRows ?? []) as Array<{ name: string; email: string | null; language: string | null }>) {
     contacts.set(r.name, { email: r.email, language: r.language });
   }
 
-  const SUPPORTED: SupportedLang[] = ["en", "de", "fr", "it"];
-  const normLang = (s: string | null): SupportedLang => {
-    const v = (s || "").toLowerCase().slice(0, 2) as SupportedLang;
-    return SUPPORTED.includes(v) ? v : "en";
-  };
-
-  const enriched: SupplierContact[] = names
+  const enriched: SupplierContact[] = best.suppliers
     .map((name) => {
       const c = contacts.get(name);
       const email = c?.email && c.email.trim() ? c.email.trim() : HARDCODED_SUPPLIER_EMAIL;
-      return {
-        name,
-        email,
-        language: normLang(c?.language ?? null),
-        productsInCategory: candidates.get(name) ?? 0,
-        isOriginal: originals.has(name),
-      };
-    })
-    // Original first, then by catalog depth in category.
-    .sort((a, b) => {
-      if (a.isOriginal !== b.isOriginal) return a.isOriginal ? -1 : 1;
-      return b.productsInCategory - a.productsInCategory;
-    })
-    .slice(0, MAX_RFQ_SUPPLIERS)
-    .map(({ name, email, language, productsInCategory }) => ({
-      name,
-      email,
-      language,
-      productsInCategory,
-    }));
+      return { name, email, language: normLang(c?.language ?? null) };
+    });
 
-  return { suppliers: enriched, dominantCategory: cat };
+  if (enriched.length < 2) {
+    return {
+      qualifies: false,
+      suppliers: [],
+      items: [],
+      subtotal: 0,
+      dominantCategory: cat,
+      reason: "not_enough_contactable_suppliers",
+    };
+  }
+
+  return {
+    qualifies: true,
+    suppliers: enriched,
+    items: best.items,
+    subtotal: best.subtotal,
+    dominantCategory: cat,
+  };
 }
+
 
 /* ============================================================ */
 /* RFQ email template (bilingual EN + native)                   */
