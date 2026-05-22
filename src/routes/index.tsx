@@ -751,9 +751,26 @@ function Home() {
             searching={searching}
             searchResults={searchResults}
             searchExtracted={searchExtracted}
+            followupBar={
+              <div className="flex items-end gap-2">
+                <div className="flex-1 min-w-0">
+                  <ChatInput
+                    value={input}
+                    onChange={setInput}
+                    onSend={() => send(input)}
+                    disabled={streaming}
+                    inputRef={inputRef}
+                    placeholder="Ask a follow-up…"
+                  />
+                </div>
+                <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
+                <VoiceButton size="compact" onTranscript={(t) => send(t, { speak: true })} />
+              </div>
+            }
           />
 
         )}
+
       </main>
 
       {/* Fixed close-chat button — always visible at top-left while in a conversation */}
@@ -767,26 +784,6 @@ function Home() {
         </button>
       )}
 
-      {/* Fixed bottom bar in conversation mode: chat input + separate, distinct voice button */}
-      {inConversation && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto max-w-3xl px-4 py-3 flex items-end gap-3">
-            <div className="flex-1">
-              <ChatInput
-                value={input}
-                onChange={setInput}
-                onSend={() => send(input)}
-                disabled={streaming}
-                inputRef={inputRef}
-                placeholder="Ask a follow-up…"
-              />
-            </div>
-            <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
-            <VoiceButton size="compact" onTranscript={(t) => send(t, { speak: true })} />
-
-          </div>
-        </div>
-      )}
 
       {/* Approval banner — driven by budget/rules decision */}
       <ApprovalBanner />
@@ -1082,6 +1079,7 @@ function ConversationView({
   searchResults,
   searchExtracted,
   categoryTiles,
+  followupBar,
 }: {
   messages: ChatMessage[];
   streaming: boolean;
@@ -1102,6 +1100,7 @@ function ConversationView({
   searchResults: HybridSearchResult[] | null;
   searchExtracted: HybridExtracted | null;
   categoryTiles: CategoryTileData[];
+  followupBar?: React.ReactNode;
 }) {
   const recSet = new Set(recommendedIds);
   const lastAssistant = messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1] : null;
@@ -1117,7 +1116,7 @@ function ConversationView({
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl px-4 py-6 space-y-4 pb-32">
+      <div className="mx-auto max-w-3xl px-4 py-6 space-y-4 pb-6">
         {messages.map((m, i) => (
           <MessageBubble key={i} msg={m} products={allProducts} />
         ))}
@@ -1145,6 +1144,18 @@ function ConversationView({
         )}
 
       </div>
+
+      {/* Follow-up input — inline between conversation and catalog results */}
+      {followupBar && (
+        <div className="border-t bg-background">
+          <div className="mx-auto max-w-3xl px-4 py-3">
+            {followupBar}
+          </div>
+        </div>
+      )}
+
+
+
 
       {/* Hybrid catalog search results — refreshed after every assistant turn */}
       {(searching || (searchResults && searchResults.length > 0)) && (
