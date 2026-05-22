@@ -684,9 +684,11 @@ function NeedsAttentionQueue({
 
 function NeedsAttentionRow({
   neg,
+  phone,
   onChanged,
 }: {
   neg: NegotiationFull;
+  phone: string | null;
   onChanged: () => void;
 }) {
   const [showReply, setShowReply] = useState(false);
