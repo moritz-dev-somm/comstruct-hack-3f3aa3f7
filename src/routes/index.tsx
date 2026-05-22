@@ -63,7 +63,9 @@ export const Route = createFileRoute("/")({
   component: Home,
   validateSearch: (search: Record<string, unknown>) => ({
     prefill: typeof search.prefill === "string" ? search.prefill : undefined,
+    autoSend: search.autoSend === true || search.autoSend === "true",
   }),
+
   head: () => ({
     meta: [
       { title: "comstruct — order C-materials in plain language" },
