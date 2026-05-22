@@ -260,9 +260,12 @@ function Home() {
   useEffect(() => {
     if (!prefill) return;
     setInput(prefill);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    const isTouch = typeof window !== "undefined"
+      && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    if (!isTouch) setTimeout(() => inputRef.current?.focus(), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
+
 
 
 
