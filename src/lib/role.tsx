@@ -32,10 +32,12 @@ type SignInResult =
 
 type RoleCtx = {
   role: Role;
+  hydrated: boolean;
   setRole: (r: Exclude<Role, null>) => void;
   signIn: (username: string, password: string) => SignInResult;
   logout: () => void;
 };
+
 
 const Ctx = createContext<RoleCtx | null>(null);
 const KEY = "comstruct-role";
@@ -71,7 +73,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider
       value={{
         role,
+        hydrated,
         setRole: (r) => setRoleState(r),
+
         signIn,
         logout: () => setRoleState(null),
       }}
