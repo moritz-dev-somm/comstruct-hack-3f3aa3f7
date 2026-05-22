@@ -1039,6 +1039,53 @@ function ConversationView({
 
       </div>
 
+      {/* Hybrid catalog search results — refreshed after every assistant turn */}
+      {(searching || (searchResults && searchResults.length > 0)) && (
+        <div className="border-t bg-muted/20">
+          <div className="mx-auto max-w-5xl px-4 py-6">
+            <div className="flex items-end justify-between mb-4 border-b-2 border-brand/70 pb-2 gap-3">
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold text-brand flex items-center gap-2">
+                  <Search className="size-5" />
+                  Matching catalog items
+                  {searching && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+                </h2>
+                {searchExtracted && (searchExtracted.extracted_category || searchExtracted.extracted_keywords?.length) && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {searchExtracted.extracted_category && (
+                      <span className="font-medium">{searchExtracted.extracted_category}</span>
+                    )}
+                    {searchExtracted.extracted_category && searchExtracted.extracted_keywords?.length ? " · " : ""}
+                    {searchExtracted.extracted_keywords?.slice(0, 6).join(", ")}
+                  </p>
+                )}
+              </div>
+              {searchResults && (
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  Top {Math.min(searchResults.length, 6)}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(searchResults ?? []).slice(0, 6).map((r) => {
+                const live = allProducts.find((p) => p.sku === r.sku);
+                const product = live ?? hybridResultToProduct(r);
+                return (
+                  <ProductCard
+                    key={r.sku}
+                    product={product}
+                    recommended={recSet.has(r.sku)}
+                    dimmed={false}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
 
 
 
