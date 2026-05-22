@@ -462,10 +462,7 @@ export function composeConfirmationEmail(
   });
 }
 
-    htmlEn: renderConfirmHtml(en, GREETING.en, SIGN.en, order.id, etaEn),
-    htmlNative: renderConfirmHtml(native, GREETING[language], SIGN[language], order.id, etaNative),
-  });
-}
+
 
 /* ============================================================
    3. Nudge (silent supplier) — only used by the manual nudge fn
