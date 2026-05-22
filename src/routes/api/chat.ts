@@ -717,14 +717,8 @@ export const Route = createFileRoute("/api/chat")({
                       content: result,
                     });
                   } else {
-                    // Forward client-side tools (add_to_cart, flag_as_a_material) to the UI
+                    // Forward client-side tools (flag_as_a_material) to the UI
                     send({ type: "tool", name: t.name, args });
-                    if (t.name === "add_to_cart" && typeof args.sku === "string") {
-                      if (!recommended.has(args.sku)) {
-                        recommended.add(args.sku);
-                        send({ type: "recommend", skus: [args.sku] });
-                      }
-                    }
                     convo.push({
                       role: "tool",
                       tool_call_id: tcPayload[i].id,
