@@ -12,6 +12,8 @@ import {
   type DerivedStatus,
   type OrderDelivery,
 } from "@/lib/order-status";
+import { SwitchUserButton } from "@/components/SwitchUserButton";
+
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
@@ -37,6 +39,7 @@ function OrdersPage() {
             <h1 className="font-semibold text-sm">My orders</h1>
             <p className="text-xs text-muted-foreground">Project: Erlenmatt B3 · Marco Bianchi</p>
           </div>
+          <SwitchUserButton compact />
         </div>
       </header>
 
