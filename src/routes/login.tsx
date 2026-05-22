@@ -156,9 +156,10 @@ function LoginPage() {
       </aside>
 
       {/* ─── Auth panel ─────────────────────────────────────────── */}
-      <main className="dot-bg flex-1 flex items-center justify-center px-5 py-5 md:py-12">
+      <main className="dot-bg flex-1 flex items-start md:items-center justify-center px-5 pt-5 pb-8 md:py-12">
         <div className="w-full max-w-sm flex flex-col">
-          <h2 className="text-lg font-semibold tracking-tight mb-3">Sign in</h2>
+          <h2 className="text-xl md:text-lg font-semibold tracking-tight mb-4">Sign in</h2>
+
 
           {/* Segmented role control */}
           <div
