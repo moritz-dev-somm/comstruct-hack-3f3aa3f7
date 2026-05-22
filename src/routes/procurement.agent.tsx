@@ -413,6 +413,7 @@ function AgentPage() {
 
       <NeedsAttentionQueue
         items={needsAttention}
+        phoneByEmail={phoneByEmail}
         onChanged={() => {
           negotiationsQ.refetch();
           messagesQ.refetch();
