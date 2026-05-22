@@ -66,49 +66,50 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.196 0.012 250);
 
-  /* Deep wine red (#791615) */
-  --primary: oklch(0.355 0.143 28);
-  --primary-foreground: oklch(1 0 0);
+  /* Primary: warm yellow (#F7D163) — main CTAs */
+  --primary: oklch(0.87 0.13 88);
+  --primary-foreground: oklch(0.196 0.012 250);
 
-  /* Soft warm-tinted gray secondary */
-  --secondary: oklch(0.94 0.005 60);
-  --secondary-foreground: oklch(0.196 0.012 250);
+  /* Secondary: teal-blue (#3E6777) — secondary buttons, accents, dot pattern */
+  --secondary: oklch(0.46 0.05 230);
+  --secondary-foreground: oklch(1 0 0);
 
   --muted: oklch(0.955 0.004 60);
   --muted-foreground: oklch(0.485 0.008 250);
 
-  --accent: oklch(0.94 0.012 28);
-  --accent-foreground: oklch(0.355 0.143 28);
+  --accent: oklch(0.93 0.03 230);
+  --accent-foreground: oklch(0.46 0.05 230);
 
-  /* Destructive: steel blue (red is reserved for brand) */
+  /* Destructive: steel blue (kept distinct) */
   --destructive: oklch(0.46 0.15 258);
   --destructive-foreground: oklch(1 0 0);
 
   --border: oklch(0.9 0.005 60);
   --input: oklch(0.9 0.005 60);
-  --ring: oklch(0.355 0.143 28);
+  --ring: oklch(0.46 0.05 230);
 
-  --chart-1: oklch(0.355 0.143 28);   /* brand red */
-  --chart-2: oklch(0.55 0.16 28);     /* lighter red */
+  --chart-1: oklch(0.46 0.05 230);    /* secondary teal */
+  --chart-2: oklch(0.87 0.13 88);     /* primary yellow */
   --chart-3: oklch(0.5 0.12 150);     /* forest green */
   --chart-4: oklch(0.7 0.16 60);      /* amber */
   --chart-5: oklch(0.45 0.1 310);     /* muted purple */
 
   --sidebar: oklch(0.97 0.004 60);
   --sidebar-foreground: oklch(0.196 0.012 250);
-  --sidebar-primary: oklch(0.355 0.143 28);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.012 28);
-  --sidebar-accent-foreground: oklch(0.355 0.143 28);
+  --sidebar-primary: oklch(0.87 0.13 88);
+  --sidebar-primary-foreground: oklch(0.196 0.012 250);
+  --sidebar-accent: oklch(0.93 0.03 230);
+  --sidebar-accent-foreground: oklch(0.46 0.05 230);
   --sidebar-border: oklch(0.9 0.005 60);
-  --sidebar-ring: oklch(0.355 0.143 28);
+  --sidebar-ring: oklch(0.46 0.05 230);
 
-  /* Brand mark collapses onto primary red */
-  --brand: oklch(0.355 0.143 28);
+  /* Brand mark uses secondary teal for headlines, borders, accents */
+  --brand: oklch(0.46 0.05 230);
   --brand-foreground: oklch(1 0 0);
 
-  /* Raw brand RGB for dot patterns / overlays */
-  --brand-rgb: 121 22 21;
+  /* Raw secondary RGB for dot patterns / overlays / background circles */
+  --brand-rgb: 62 103 119;
+
 
   --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
