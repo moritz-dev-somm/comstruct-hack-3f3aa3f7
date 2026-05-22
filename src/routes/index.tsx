@@ -35,6 +35,7 @@ import { VoiceButton } from "@/components/VoiceButton";
 import { ScanButton } from "@/components/ScanButton";
 import { ProductImage } from "@/components/ProductImage";
 import { HoldButton } from "@/components/HoldButton";
+import { QtyInput } from "@/components/QtyInput";
 
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
@@ -1256,7 +1257,11 @@ function InlineProductBubble({
             >
               −
             </HoldButton>
-            <span className="px-1.5 text-xs font-bold tabular-nums">{inCart.qty}</span>
+            <QtyInput
+              value={inCart.qty}
+              onChange={(n) => cart.setQty(product.sku, n)}
+              className="w-7 px-1 text-xs"
+            />
             <HoldButton
               onTick={() => cart.adjust(product.sku, +addQty)}
               stopPropagation
@@ -1439,7 +1444,11 @@ function ProductCard({
                 >
                   −
                 </HoldButton>
-                <span className="px-3 text-base font-bold tabular-nums">{inCart.qty}</span>
+                <QtyInput
+                  value={inCart.qty}
+                  onChange={(n) => cart.setQty(product.sku, n)}
+                  className="w-12 px-2 text-base"
+                />
                 <HoldButton
                   onTick={() => cart.adjust(product.sku, +1)}
                   stopPropagation
@@ -1544,7 +1553,11 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
                     className="w-12 h-full grid place-items-center hover:bg-accent text-2xl font-semibold"
                     aria-label="Decrease"
                   >−</HoldButton>
-                  <span className="px-4 text-lg font-bold tabular-nums">{inCart.qty}</span>
+                  <QtyInput
+                    value={inCart.qty}
+                    onChange={(n) => cart.setQty(product.sku, n)}
+                    className="w-14 px-3 text-lg"
+                  />
                   <HoldButton
                     onTick={() => cart.adjust(product.sku, +1)}
                     className="w-12 h-full grid place-items-center hover:bg-accent text-2xl font-semibold"
@@ -1795,7 +1808,11 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
                     className="w-10 h-full grid place-items-center hover:bg-accent text-lg font-semibold"
                     aria-label="Decrease"
                   >−</HoldButton>
-                  <span className="px-3 text-base font-bold tabular-nums min-w-[2.5rem] text-center">{i.qty}</span>
+                  <QtyInput
+                    value={i.qty}
+                    onChange={(n) => cart.setQty(i.productId, n)}
+                    className="w-12 px-2 text-base"
+                  />
                   <HoldButton
                     onTick={() => cart.adjust(i.productId, +1)}
                     className="w-10 h-full grid place-items-center hover:bg-accent text-lg font-semibold"
