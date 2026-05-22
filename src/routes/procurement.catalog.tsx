@@ -1,8 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Upload, Check, ExternalLink } from "lucide-react";
+import { Upload, Check, ExternalLink, Loader2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatEUR, useProducts } from "@/lib/catalog";
 import { ProductImage } from "@/components/ProductImage";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  parseFile,
+  applyMapping,
+  type ColumnTarget,
+  type Mapping,
+  type NormalizedRow,
+} from "@/lib/catalog-import";
 
 export const Route = createFileRoute("/procurement/catalog")({
   component: CatalogAdmin,
@@ -30,7 +40,7 @@ function CatalogAdmin() {
           </Link>
           <button
             onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-brand text-brand-foreground text-sm font-semibold hover:bg-brand/90"
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
           >
             <Upload className="size-4" /> Import catalog
           </button>
@@ -86,127 +96,240 @@ function CatalogAdmin() {
   );
 }
 
-const DETECTED = [
-  { header: "Artikelnummer", target: "SKU" },
-  { header: "Bezeichnung", target: "Description" },
-  { header: "Preis", target: "Price" },
-  { header: "Einheit", target: "Unit" },
-  { header: "Gruppe", target: "Category" },
+/* -------------------------------------------------------------------------- */
+
+const TARGET_OPTIONS: ColumnTarget[] = [
+  "sku",
+  "name",
+  "price_eur",
+  "unit",
+  "category",
+  "supplier",
+  "description",
+  "ignore",
 ];
 
-const PREVIEW = [
-  {
-    sku: "WR-4540",
-    name: "Wood screws Torx 4.5×40 (box of 200)",
-    price: "€12.50",
-    unit: "box",
-    cat: "Fasteners",
-  },
-  {
-    sku: "WR-3535",
-    name: "Drywall screws 3.5×35 (box of 500)",
-    price: "€8.90",
-    unit: "box",
-    cat: "Fasteners",
-  },
-  {
-    sku: "WR-CT200",
-    name: "Cable ties 200mm (bag of 100)",
-    price: "€6.20",
-    unit: "bag",
-    cat: "Other",
-  },
-  { sku: "WR-GLV-L", name: "Safety gloves L", price: "€4.80", unit: "pair", cat: "Safety" },
-  { sku: "WR-FFP2", name: "Dust masks FFP2", price: "€2.10", unit: "piece", cat: "Safety" },
-];
+const TARGET_LABEL: Record<ColumnTarget, string> = {
+  sku: "SKU",
+  name: "Name",
+  price_eur: "Price (EUR)",
+  unit: "Unit",
+  category: "Category",
+  supplier: "Supplier",
+  description: "Description",
+  ignore: "— Ignore —",
+};
+
+type Stage =
+  | { name: "pick" }
+  | { name: "parsing" }
+  | { name: "mapping"; headers: string[]; rows: string[][]; mapping: Mapping }
+  | { name: "preview"; rows: NormalizedRow[] }
+  | { name: "importing"; total: number; done: number }
+  | { name: "error"; message: string };
 
 function ImportModal({ onClose }: { onClose: () => void }) {
-  const [step, setStep] = useState(1);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const qc = useQueryClient();
+  const [stage, setStage] = useState<Stage>({ name: "pick" });
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const chooseFile = (file?: File) => {
-    if (file) setSelectedFile(file);
-  };
+  async function handleFile(file?: File) {
+    if (!file) return;
+    setStage({ name: "parsing" });
+    try {
+      const parsed = await parseFile(file);
+
+      if (parsed.kind === "tabular") {
+        // Ask AI to map columns
+        const sample = parsed.rows.slice(0, 5);
+        const res = await fetch("/api/catalog-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "map", headers: parsed.headers, sample }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(error || "Column mapping failed");
+        }
+        const { mapping } = (await res.json()) as { mapping: Mapping };
+        setStage({
+          name: "mapping",
+          headers: parsed.headers,
+          rows: parsed.rows,
+          mapping: { ...mapping },
+        });
+      } else {
+        // PDF → ask AI to extract structured rows directly
+        const res = await fetch("/api/catalog-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "pdf", text: parsed.text, fileName: file.name }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(error || "PDF extraction failed");
+        }
+        const { rows } = (await res.json()) as { rows: NormalizedRow[] };
+        const cleaned: NormalizedRow[] = rows
+          .filter((r) => r.sku && r.name)
+          .map((r) => ({
+            sku: String(r.sku),
+            name: String(r.name),
+            price_eur: Number(r.price_eur) || 0,
+            unit: r.unit || "Stk",
+            category: r.category || "Other",
+            supplier: r.supplier ?? null,
+            description: r.description ?? null,
+          }));
+        if (cleaned.length === 0) throw new Error("No products could be extracted from the PDF");
+        setStage({ name: "preview", rows: cleaned });
+      }
+    } catch (e) {
+      setStage({ name: "error", message: e instanceof Error ? e.message : "Import failed" });
+    }
+  }
+
+  function updateMapping(header: string, target: ColumnTarget) {
+    if (stage.name !== "mapping") return;
+    setStage({ ...stage, mapping: { ...stage.mapping, [header]: target } });
+  }
+
+  function continueFromMapping() {
+    if (stage.name !== "mapping") return;
+    const normalized = applyMapping(stage.headers, stage.rows, stage.mapping);
+    if (normalized.length === 0) {
+      toast.error("No usable rows found — check that SKU and Name are mapped");
+      return;
+    }
+    setStage({ name: "preview", rows: normalized });
+  }
+
+  async function confirmImport() {
+    if (stage.name !== "preview") return;
+    const rows = stage.rows;
+    setStage({ name: "importing", total: rows.length, done: 0 });
+    try {
+      // Insert in batches of 100 so the request stays small
+      const CHUNK = 100;
+      let done = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const slice = rows.slice(i, i + CHUNK);
+        const { error } = await supabase
+          .from("products")
+          .upsert(slice, { onConflict: "sku", ignoreDuplicates: false });
+        if (error) throw new Error(error.message);
+        done += slice.length;
+        setStage({ name: "importing", total: rows.length, done });
+      }
+      toast.success(`Imported ${rows.length} products`);
+      await qc.invalidateQueries({ queryKey: ["products"] });
+      onClose();
+    } catch (e) {
+      setStage({ name: "error", message: e instanceof Error ? e.message : "Insert failed" });
+    }
+  }
+
+  const stepNum =
+    stage.name === "pick" || stage.name === "parsing"
+      ? 1
+      : stage.name === "mapping"
+        ? 2
+        : 3;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4">
       <div className="bg-card rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden">
         <div className="px-5 h-12 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Import catalog — Step {step} of 3</h3>
+          <h3 className="font-semibold">Import catalog — Step {stepNum} of 3</h3>
           <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
             Cancel
           </button>
         </div>
-        <div className="p-5">
-          {step === 1 && (
-            <div>
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  chooseFile(e.dataTransfer.files?.[0]);
-                }}
-                className={`w-full border-2 border-dashed rounded-xl p-8 text-center bg-muted/30 transition-colors hover:bg-accent/40 ${
-                  dragOver ? "border-brand bg-brand/10" : "border-border"
-                }`}
-              >
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(e) => chooseFile(e.target.files?.[0])}
-                />
-                <Upload className="size-8 mx-auto mb-2 text-muted-foreground" />
-                {selectedFile ? (
-                  <>
-                    <div className="text-sm font-semibold">{selectedFile.name}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {(selectedFile.size / 1024).toFixed(0)} KB · ready to import
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-sm font-semibold">Drop a supplier catalog here</div>
-                    <div className="text-xs text-muted-foreground mt-1">PDF, Excel or CSV</div>
-                  </>
-                )}
-              </button>
-            </div>
+
+        <div className="p-5 max-h-[60vh] overflow-y-auto">
+          {stage.name === "pick" && (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                handleFile(e.dataTransfer.files?.[0]);
+              }}
+              className={`w-full border-2 border-dashed rounded-xl p-8 text-center bg-muted/30 transition-colors hover:bg-accent/40 ${
+                dragOver ? "border-primary bg-primary/10" : "border-border"
+              }`}
+            >
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden"
+                onChange={(e) => handleFile(e.target.files?.[0])}
+              />
+              <Upload className="size-8 mx-auto mb-2 text-muted-foreground" />
+              <div className="text-sm font-semibold">Drop a supplier catalog here</div>
+              <div className="text-xs text-muted-foreground mt-1">PDF, Excel or CSV</div>
+            </button>
           )}
-          {step === 2 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-3">
-                We auto-mapped the columns — adjust if needed.
-              </p>
-              <div className="rounded-lg border divide-y">
-                {DETECTED.map((r) => (
-                  <div key={r.header} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
-                      {r.header}
-                    </span>
-                    <span className="text-muted-foreground">→</span>
-                    <span className="font-semibold">{r.target}</span>
-                    <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/40 rounded-full px-2 py-0.5">
-                      <Check className="size-3" /> AI auto-mapped
-                    </span>
-                  </div>
-                ))}
+
+          {stage.name === "parsing" && (
+            <div className="py-10 text-center">
+              <Loader2 className="size-6 mx-auto animate-spin text-muted-foreground" />
+              <div className="text-sm text-muted-foreground mt-3">
+                Parsing file and detecting columns…
               </div>
             </div>
           )}
-          {step === 3 && (
+
+          {stage.name === "mapping" && (
             <div>
-              <p className="text-xs text-muted-foreground mb-3">Preview of 5 imported items.</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                AI auto-mapped the columns — adjust any if needed.
+              </p>
+              <div className="rounded-lg border divide-y">
+                {stage.headers.map((h) => {
+                  const target = stage.mapping[h] ?? "ignore";
+                  return (
+                    <div key={h} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded max-w-[180px] truncate">
+                        {h || "(unnamed)"}
+                      </span>
+                      <span className="text-muted-foreground">→</span>
+                      <select
+                        value={target}
+                        onChange={(e) => updateMapping(h, e.target.value as ColumnTarget)}
+                        className="text-sm bg-background border rounded px-2 h-8"
+                      >
+                        {TARGET_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {TARGET_LABEL[opt]}
+                          </option>
+                        ))}
+                      </select>
+                      {target !== "ignore" && (
+                        <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-500/15 border border-emerald-500/40 rounded-full px-2 py-0.5">
+                          <Check className="size-3" /> Mapped
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {stage.name === "preview" && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Preview of {Math.min(stage.rows.length, 10)} of {stage.rows.length} extracted items.
+              </p>
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr>
@@ -217,32 +340,69 @@ function ImportModal({ onClose }: { onClose: () => void }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {PREVIEW.map((p) => (
-                    <tr key={p.sku} className="border-t">
+                  {stage.rows.slice(0, 10).map((p, i) => (
+                    <tr key={`${p.sku}-${i}`} className="border-t">
                       <td className="py-1.5 font-mono text-xs">{p.sku}</td>
                       <td className="py-1.5">{p.name}</td>
-                      <td className="py-1.5 text-right tabular-nums font-semibold">{p.price}</td>
-                      <td className="py-1.5 pl-2 text-muted-foreground">{p.cat}</td>
+                      <td className="py-1.5 text-right tabular-nums font-semibold">
+                        {formatEUR(p.price_eur)}
+                      </td>
+                      <td className="py-1.5 pl-2 text-muted-foreground">{p.category}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+
+          {stage.name === "importing" && (
+            <div className="py-10 text-center">
+              <Loader2 className="size-6 mx-auto animate-spin text-muted-foreground" />
+              <div className="text-sm text-muted-foreground mt-3">
+                Importing {stage.done} / {stage.total}…
+              </div>
+            </div>
+          )}
+
+          {stage.name === "error" && (
+            <div className="py-8 text-center">
+              <AlertCircle className="size-6 mx-auto text-destructive" />
+              <div className="text-sm font-semibold mt-2">Import failed</div>
+              <div className="text-xs text-muted-foreground mt-1 px-4">{stage.message}</div>
+            </div>
+          )}
         </div>
+
         <div className="px-5 py-3 border-t flex justify-between bg-muted/30">
           <button
-            onClick={() => (step > 1 ? setStep(step - 1) : onClose())}
-            className="px-3 h-9 rounded-md border text-sm font-medium hover:bg-accent"
+            onClick={() => {
+              if (stage.name === "preview" || stage.name === "mapping" || stage.name === "error") {
+                setStage({ name: "pick" });
+              } else {
+                onClose();
+              }
+            }}
+            disabled={stage.name === "parsing" || stage.name === "importing"}
+            className="px-3 h-9 rounded-md border text-sm font-medium hover:bg-accent disabled:opacity-50"
           >
-            {step > 1 ? "Back" : "Cancel"}
+            {stage.name === "pick" ? "Cancel" : "Back"}
           </button>
           <button
-            onClick={() => (step < 3 ? setStep(step + 1) : onClose())}
-            disabled={step === 1 && !selectedFile}
-            className="px-4 h-9 rounded-md bg-brand text-brand-foreground text-sm font-semibold disabled:pointer-events-none disabled:opacity-50"
+            onClick={() => {
+              if (stage.name === "mapping") continueFromMapping();
+              else if (stage.name === "preview") confirmImport();
+            }}
+            disabled={
+              stage.name === "pick" ||
+              stage.name === "parsing" ||
+              stage.name === "importing" ||
+              stage.name === "error"
+            }
+            className="px-4 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:pointer-events-none disabled:opacity-50"
           >
-            {step < 3 ? "Continue" : "Confirm import"}
+            {stage.name === "preview"
+              ? `Import ${stage.rows.length} items`
+              : "Continue"}
           </button>
         </div>
       </div>
