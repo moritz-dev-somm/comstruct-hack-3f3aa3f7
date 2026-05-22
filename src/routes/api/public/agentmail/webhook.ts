@@ -485,6 +485,14 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           case "escalate_silent": {
             nextStatus = "needs_user";
             needsUserReason = action.reason;
+            // When the reason is the hard reply cap, send a polite handover
+            // notice so the supplier knows a human is taking over and doesn't
+            // keep replying into the void.
+            if (action.reason.startsWith(REPLY_LIMIT_REACHED_PREFIX)) {
+              const email = composeHandoverNoticeEmail(order, lang);
+              await reply(email);
+              outboundText = email.text;
+            }
             break;
           }
           case "no_op": {
