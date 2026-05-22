@@ -741,6 +741,7 @@ function HeroView({
   categoryTiles: CategoryTileData[];
   products: Product[];
 }) {
+  const { templates, hydrated: tplHydrated, remove: removeTemplate } = useTemplates();
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-2xl">
