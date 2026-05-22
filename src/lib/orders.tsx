@@ -38,6 +38,14 @@ export type OrderEvent = {
   actor?: string;
 };
 
+export type ChatSnapshot = {
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  recommendedIds: string[];
+  recommendedQty: Record<string, number>;
+  /** Last user-typed query at the time the order was placed. */
+  lastQuery?: string;
+};
+
 export type Order = {
   id: string; // ORD-####
   createdAt: string;
@@ -50,6 +58,9 @@ export type Order = {
   approver?: string;
   rejectionReason?: string;
   history: OrderEvent[];
+  /** Chat thread + recommendations that produced this order. Used by
+   * "Find alternatives" to restore the original search context. */
+  searchSnapshot?: ChatSnapshot;
 };
 
 export const FOREMAN = {
@@ -113,7 +124,7 @@ type OrdersCtx = {
    * gets its own ID, subtotal, tier and status — this mirrors procurement
    * reality (one PO per supplier).
    */
-  createFromCart: (items: CartItem[]) => Order[];
+  createFromCart: (items: CartItem[], snapshot?: ChatSnapshot) => Order[];
   approve: (id: string, actor: string) => void;
   reject: (id: string, actor: string, reason: string) => void;
   advanceToDelivered: (id: string) => void;
@@ -209,7 +220,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(KEY, JSON.stringify(orders));
   }, [orders, hydrated]);
 
-  const createFromCart = useCallback<OrdersCtx["createFromCart"]>((items) => {
+  const createFromCart = useCallback<OrdersCtx["createFromCart"]>((items, snapshot) => {
     // Group items by supplier (case-insensitive, trimmed). Items without
     // a supplier land in a single "Unassigned" bucket so they still get
     // routed somewhere visible.
@@ -260,6 +271,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
           status,
           approver: tierApprover(tier),
           history,
+          searchSnapshot: snapshot,
         };
         running = [order, ...running];
         newOnes.push(order);

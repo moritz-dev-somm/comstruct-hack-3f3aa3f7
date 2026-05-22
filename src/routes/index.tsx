@@ -249,10 +249,13 @@ function Home() {
 
   // Prefill the chat input when arriving from another tab (e.g. the orders
   // page wants to find alternatives for items the agent couldn't source).
+  // The /orders "Find alternatives" handler also rewrites `comstruct-chat`
+  // beforehand so the prior search context is already loaded by the effect
+  // above — here we only seed a clear follow-up turn for the foreman.
   const { prefill } = Route.useSearch();
   useEffect(() => {
     if (!prefill) return;
-    setInput(`Find alternatives for: ${prefill}`);
+    setInput(prefill);
     setTimeout(() => inputRef.current?.focus(), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
@@ -1843,7 +1846,24 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
 
   async function submit() {
     if (cart.items.length === 0) return;
-    const createdOrders = orders.createFromCart(cart.items);
+    // Snapshot the current chat thread so /orders → "Find alternatives"
+    // can restore the exact context that produced this order.
+    let snapshot: import("@/lib/orders").ChatSnapshot | undefined;
+    try {
+      const raw = localStorage.getItem("comstruct-chat");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const msgs = Array.isArray(parsed?.messages) ? parsed.messages : [];
+        const lastUser = [...msgs].reverse().find((m: { role: string }) => m?.role === "user");
+        snapshot = {
+          messages: msgs,
+          recommendedIds: Array.isArray(parsed?.recommendedIds) ? parsed.recommendedIds : [],
+          recommendedQty: typeof parsed?.recommendedQty === "object" && parsed.recommendedQty ? parsed.recommendedQty : {},
+          lastQuery: typeof lastUser?.content === "string" ? lastUser.content : undefined,
+        };
+      }
+    } catch {}
+    const createdOrders = orders.createFromCart(cart.items, snapshot);
     cart.clear();
     onClose();
     if (createdOrders.length === 0) return;

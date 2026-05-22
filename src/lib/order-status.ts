@@ -74,7 +74,7 @@ export const DERIVED_STATUS_META: Record<
   answering_questions: { label: "Answering supplier questions",short: "Q&A",          hint: "Agent is answering supplier's questions",        tone: "cyan",    Icon: HelpCircle },
   issues_raised:       { label: "Issues raised",               short: "Issues",       hint: "Supplier flagged problems with the order",       tone: "red",     Icon: AlertTriangle },
   declined:            { label: "Supplier declined",           short: "Declined",     hint: "Supplier cannot fulfil this order",              tone: "rose",    Icon: XCircle },
-  action_required:     { label: "Needs your input",            short: "Needs you",    hint: "Agent can't proceed without you",                tone: "fuchsia", Icon: ShieldAlert },
+  action_required:     { label: "Needs input",                  short: "Needs input",  hint: "Action required to move this order forward",     tone: "fuchsia", Icon: ShieldAlert },
   partially_confirmed: { label: "Partially confirmed",         short: "Part. conf.",  hint: "Some suppliers confirmed, others pending",       tone: "lime",    Icon: CircleDashed },
   confirmed:           { label: "Confirmed by supplier",       short: "Confirmed",    hint: "Supplier confirmed the full order",              tone: "emerald", Icon: CheckCircle2 },
   delivered:           { label: "Delivered",                   short: "Delivered",    hint: "Materials received on site",                     tone: "green",   Icon: PackageCheck },

@@ -41,12 +41,99 @@ export const Route = createFileRoute("/orders")({
   }),
 });
 
+type AttentionInfo = {
+  kind: "needs_user" | "rfq_failed";
+  title: string;
+  problem: string;
+};
+
+function computeAttention(
+  order: Order,
+  negotiations: NegotiationRow[] | undefined,
+  rfq: RfqRow | null,
+): AttentionInfo | null {
+  const list = negotiations ?? [];
+  const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
+  if (needsUserNeg) {
+    const reason =
+      needsUserNeg.needs_user_reason ||
+      needsUserNeg.classification?.summary_en ||
+      needsUserNeg.classification?.summary ||
+      "Supplier raised a point the agent can't resolve on its own.";
+    return {
+      kind: "needs_user",
+      title: `${needsUserNeg.supplier_name} is blocked — needs your decision`,
+      problem: reason,
+    };
+  }
+  if (order.status === "rfq_failed") {
+    return {
+      kind: "rfq_failed",
+      title: "No supplier could fulfil this order",
+      problem:
+        rfq?.escalation_reason ||
+        order.rejectionReason ||
+        "The agent contacted alternative suppliers but none could match the requested items.",
+    };
+  }
+  return null;
+}
+
 function OrdersPage() {
   const { orders, reject } = useOrders();
   const [openId, setOpenId] = useState<string | null>(orders[0]?.id ?? null);
   const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
   const negotiationsByOrder = useNegotiationsByOrder(orderIds);
   const rfqsByOrder = useRfqsByOrder(orderIds);
+  const navigate = useNavigate();
+
+  // Aggregate every open order that needs the foreman's input so we can
+  // surface them in a single banner at the very top of the page.
+  const attentions = useMemo(() => {
+    return orders
+      .map((o) => {
+        const negs = negotiationsByOrder[o.id];
+        const rfq = rfqsByOrder[o.id]?.rfq ?? null;
+        const info = computeAttention(o, negs, rfq);
+        return info ? { order: o, info } : null;
+      })
+      .filter((x): x is { order: Order; info: AttentionInfo } => x !== null);
+  }, [orders, negotiationsByOrder, rfqsByOrder]);
+
+  function handleFindAlternatives(order: Order) {
+    // Restore the chat context that produced this order, then send the user
+    // to the home chat with a focused follow-up prompt. We also cancel the
+    // original order so the attention alert clears automatically.
+    if (order.searchSnapshot) {
+      try {
+        localStorage.setItem(
+          "comstruct-chat",
+          JSON.stringify({
+            messages: order.searchSnapshot.messages,
+            recommendedIds: order.searchSnapshot.recommendedIds,
+            recommendedQty: order.searchSnapshot.recommendedQty,
+          }),
+        );
+      } catch {}
+    }
+    reject(order.id, "Marco Bianchi", "Replaced — searching for alternatives");
+    const blockedItems = order.items.map((i) => i.name).join(", ");
+    const original = order.searchSnapshot?.lastQuery;
+    const prompt = original
+      ? `Original request: "${original}". These products didn't work: ${blockedItems}. Suggest alternatives that fit the same job.`
+      : `Suggest alternatives to: ${blockedItems}.`;
+    navigate({ to: "/", search: { prefill: prompt } });
+  }
+
+  function handleCancel(order: Order, info: AttentionInfo) {
+    reject(
+      order.id,
+      "Marco Bianchi",
+      info.kind === "rfq_failed"
+        ? "Cancelled by foreman — no alternative supplier"
+        : "Cancelled by foreman",
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -64,6 +151,14 @@ function OrdersPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 space-y-3">
+        {attentions.length > 0 && (
+          <AttentionBanner
+            items={attentions}
+            onFindAlternatives={handleFindAlternatives}
+            onCancel={handleCancel}
+            onOpen={(id) => setOpenId(id)}
+          />
+        )}
         {orders.length === 0 && (
           <div className="text-center py-20 text-sm text-muted-foreground">
             <ShoppingCart className="size-8 mx-auto mb-3 opacity-40" />
@@ -78,11 +173,107 @@ function OrdersPage() {
             rfq={rfqsByOrder[o.id]?.rfq ?? null}
             open={openId === o.id}
             onToggle={() => setOpenId(openId === o.id ? null : o.id)}
-            onCancel={(reason) => reject(o.id, "Marco Bianchi", reason)}
           />
         ))}
       </main>
     </div>
+  );
+}
+
+function AttentionBanner({
+  items,
+  onFindAlternatives,
+  onCancel,
+  onOpen,
+}: {
+  items: Array<{ order: Order; info: AttentionInfo }>;
+  onFindAlternatives: (order: Order) => void;
+  onCancel: (order: Order, info: AttentionInfo) => void;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <section
+      aria-label="Action required"
+      className="rounded-xl border-2 border-brand bg-brand/10 p-4 space-y-3"
+    >
+      <div className="flex items-center gap-2.5">
+        <div className="grid place-items-center size-8 rounded-md bg-brand text-brand-foreground shrink-0">
+          <ShieldAlert className="size-4" />
+        </div>
+        <div>
+          <div className="text-sm font-bold text-brand uppercase tracking-wide">
+            Action required — {items.length} order{items.length === 1 ? "" : "s"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            These orders are paused until you decide how to continue.
+          </div>
+        </div>
+      </div>
+      <ul className="space-y-3">
+        {items.map(({ order, info }) => (
+          <li
+            key={order.id}
+            className="rounded-lg border border-brand/30 bg-background p-3 space-y-2"
+          >
+            <button
+              type="button"
+              onClick={() => onOpen(order.id)}
+              className="block w-full text-left"
+            >
+              <div className="text-xs font-mono text-muted-foreground">{order.id}</div>
+              <div className="text-sm font-semibold text-brand">{info.title}</div>
+              <p className="text-sm text-foreground/85 mt-0.5">{info.problem}</p>
+            </button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => onFindAlternatives(order)}
+                className="gap-1.5"
+              >
+                <Search className="size-3.5" />
+                Find alternatives
+              </Button>
+              <CancelButton onConfirm={() => onCancel(order, info)} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CancelButton({ onConfirm }: { onConfirm: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  if (confirming) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Cancel for good?</span>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => {
+            setConfirming(false);
+            onConfirm();
+          }}
+        >
+          Yes, cancel
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+          Keep open
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => setConfirming(true)}
+      className="gap-1.5"
+    >
+      <XCircle className="size-3.5" />
+      Cancel order
+    </Button>
   );
 }
 
@@ -92,16 +283,13 @@ function OrderRow({
   rfq,
   open,
   onToggle,
-  onCancel,
 }: {
   order: Order;
   negotiations: NegotiationRow[] | undefined;
   rfq: RfqRow | null;
   open: boolean;
   onToggle: () => void;
-  onCancel: (reason: string) => void;
 }) {
-  const navigate = useNavigate();
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const derived = deriveOrderStatus(order, negotiations);
   const delivery = pickDeliveryForOrder(negotiations);
@@ -113,30 +301,10 @@ function OrderRow({
   const hasShipping = shipping.amountEur != null;
   const hasDeliveryGrid = hasDelivery || hasShipping;
 
-  // Attention: either the agent flagged a supplier as needs_user, OR the RFQ
-  // failed (no alternative offer found). Both block the order without input.
-  const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
-  const rfqFailed = order.status === "rfq_failed";
-  const attention: AttentionInfo | null = needsUserNeg
-    ? {
-        kind: "needs_user",
-        title: `${needsUserNeg.supplier_name} needs your input`,
-        reason:
-          needsUserNeg.needs_user_reason ||
-          needsUserNeg.classification?.summary_en ||
-          needsUserNeg.classification?.summary ||
-          "Supplier raised a point the agent can't resolve on its own.",
-      }
-    : rfqFailed
-      ? {
-          kind: "rfq_failed",
-          title: "No alternative supplier found",
-          reason:
-            rfq?.escalation_reason ||
-            order.rejectionReason ||
-            "The agent contacted other suppliers but none could offer the exact same products.",
-        }
-      : null;
+  // Roll shipping into the headline total so the foreman sees the real
+  // amount they'll pay, not just the goods subtotal. Shipping is still
+  // broken out separately in the expanded view.
+  const totalWithShipping = order.subtotal + (shipping.amountEur ?? 0);
 
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
@@ -148,36 +316,23 @@ function OrderRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-sm font-mono">{order.id}</span>
             <StatusPill status={derived} />
-            {hasDelivery && <DeliveryPill delivery={delivery} />}
-            {hasShipping && <ShippingPill shipping={shipping} />}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
           </div>
         </div>
         <div className="text-right">
-          <div className="font-bold tabular-nums">{formatEUR(order.subtotal)}</div>
+          <div className="font-bold tabular-nums">{formatEUR(totalWithShipping)}</div>
+          {hasShipping && (
+            <div className="text-[10px] text-muted-foreground tabular-nums">
+              incl. {formatEUR(shipping.amountEur!)} shipping
+            </div>
+          )}
         </div>
         {open ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
       </button>
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
-          {attention && (
-            <AttentionBlock
-              info={attention}
-              onFindAlternatives={() => {
-                const q = order.items.map((i) => i.name).join(", ");
-                navigate({ to: "/", search: { prefill: q } });
-              }}
-              onCancel={() =>
-                onCancel(
-                  attention.kind === "rfq_failed"
-                    ? "Cancelled by foreman — no alternative supplier"
-                    : "Cancelled by foreman",
-                )
-              }
-            />
-          )}
           {hasDeliveryGrid && (
             <div className="grid sm:grid-cols-2 gap-3">
               {hasDelivery && <DeliveryBlock delivery={delivery} />}
@@ -231,29 +386,6 @@ function OrderRow({
   );
 }
 
-function DeliveryPill({ delivery }: { delivery: OrderDelivery }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[delivery.tone]}`}
-      title={delivery.raw ? `Supplier said: "${delivery.raw}"` : undefined}
-    >
-      <CalendarDays className="size-3" />
-      {delivery.label}
-    </span>
-  );
-}
-
-function ShippingPill({ shipping }: { shipping: OrderShipping }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[shipping.tone]}`}
-      title={shipping.supplier ? `From ${shipping.supplier}` : undefined}
-    >
-      <Truck className="size-3" />
-      {shipping.label}
-    </span>
-  );
-}
 
 function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
   return (
@@ -372,77 +504,4 @@ function dotForTone(tone: StatusTone): string {
   return TONE_DOT[tone] ?? TONE_DOT.neutral;
 }
 
-type AttentionInfo = {
-  kind: "needs_user" | "rfq_failed";
-  title: string;
-  reason: string;
-};
-
-function AttentionBlock({
-  info,
-  onFindAlternatives,
-  onCancel,
-}: {
-  info: AttentionInfo;
-  onFindAlternatives: () => void;
-  onCancel: () => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <div className="rounded-lg border border-brand/40 bg-brand/5 p-3.5">
-      <div className="flex items-start gap-3">
-        <div className="grid place-items-center size-9 rounded-md bg-brand text-brand-foreground shrink-0">
-          <ShieldAlert className="size-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-brand">{info.title}</div>
-          <p className="mt-1 text-sm text-foreground/85">{info.reason}</p>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {info.kind === "rfq_failed"
-              ? "Pick replacement items from the catalog, or cancel this order."
-              : "Decide how to proceed — find an alternative or cancel."}
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          onClick={onFindAlternatives}
-          className="gap-1.5"
-        >
-          <Search className="size-3.5" />
-          Find alternatives
-        </Button>
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Cancel order for good?</span>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                setConfirming(false);
-                onCancel();
-              }}
-            >
-              Yes, cancel
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-              Keep open
-            </Button>
-          </div>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setConfirming(true)}
-            className="gap-1.5"
-          >
-            <XCircle className="size-3.5" />
-            Cancel order
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
 
