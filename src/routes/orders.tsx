@@ -10,27 +10,29 @@ import {
   ShieldAlert,
   Search,
   XCircle,
+  CheckCircle2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatEUR } from "@/lib/catalog";
+import { supabase } from "@/integrations/supabase/client";
+
 import { useOrders, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
 import { useRfqsByOrder, type RfqRow } from "@/lib/rfqs";
 import {
   DERIVED_STATUS_META,
   STATUS_TONE_CLASS,
-  VERDICT_META,
   buildOrderTimeline,
   deriveOrderStatus,
-  negotiationToDerived,
   pickDeliveryForOrder,
   pickShippingForOrder,
   type DerivedStatus,
   type OrderDelivery,
   type OrderShipping,
   type StatusTone,
-  type Verdict,
 } from "@/lib/order-status";
+
 import { SwitchUserButton } from "@/components/SwitchUserButton";
 
 
@@ -41,47 +43,69 @@ export const Route = createFileRoute("/orders")({
   }),
 });
 
+type AttentionStage = "decide" | "rejected";
+
 type AttentionInfo = {
-  kind: "needs_user" | "rfq_failed";
+  /**
+   * `decide` – the supplier reply is potentially acceptable (price change,
+   * delivery slip, clarification). The foreman must confirm or decline.
+   * `rejected` – the supplier flat-out cannot fulfil the order, or the
+   * foreman has just declined a `decide` item. Only path forward is to
+   * cancel or look for alternatives.
+   */
+  stage: AttentionStage;
   title: string;
   problem: string;
+  /** Negotiation row to act on when stage = "decide". */
+  negotiationId?: string;
 };
 
 function computeAttention(
   order: Order,
   negotiations: NegotiationRow[] | undefined,
-  rfq: RfqRow | null,
+  _rfq: RfqRow | null,
 ): AttentionInfo | null {
   // Cancelled / rejected orders are no longer actionable.
   if (order.status === "rejected") return null;
 
-
   const list = negotiations ?? [];
   const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
   if (needsUserNeg) {
+    const verdict = (needsUserNeg.classification?.verdict || "").toLowerCase();
     const reason =
       needsUserNeg.needs_user_reason ||
       needsUserNeg.classification?.summary_en ||
       needsUserNeg.classification?.summary ||
       "Supplier raised a point the agent can't resolve on its own.";
+
+    // Hard "declined" verdicts skip the confirm/decline step.
+    if (verdict === "declined") {
+      return {
+        stage: "rejected",
+        title: `${needsUserNeg.supplier_name} declined the order`,
+        problem: reason,
+      };
+    }
     return {
-      kind: "needs_user",
-      title: `${needsUserNeg.supplier_name} is blocked — needs your decision`,
+      stage: "decide",
+      title: `${needsUserNeg.supplier_name} needs your decision`,
       problem: reason,
+      negotiationId: needsUserNeg.id,
     };
   }
   if (order.status === "rfq_failed") {
     return {
-      kind: "rfq_failed",
+      stage: "rejected",
       title: "No supplier could fulfil this order",
       problem:
-        rfq?.escalation_reason ||
+        _rfq?.escalation_reason ||
         order.rejectionReason ||
         "The agent contacted alternative suppliers but none could match the requested items.",
     };
   }
   return null;
 }
+
 
 function OrdersPage() {
   const { orders, reject } = useOrders();
@@ -129,15 +153,23 @@ function OrdersPage() {
     navigate({ to: "/", search: { prefill: prompt } });
   }
 
-  function handleCancel(order: Order, info: AttentionInfo) {
-    reject(
-      order.id,
-      "Marco Bianchi",
-      info.kind === "rfq_failed"
-        ? "Cancelled by foreman — no alternative supplier"
-        : "Cancelled by foreman",
-    );
+  function handleCancel(order: Order, _info: AttentionInfo) {
+    reject(order.id, "Marco Bianchi", "Cancelled by foreman");
   }
+
+  async function handleConfirmSupplier(order: Order, info: AttentionInfo) {
+    if (!info.negotiationId) return;
+    const { error } = await supabase
+      .from("negotiations")
+      .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+      .eq("id", info.negotiationId);
+    if (error) {
+      toast.error("Could not confirm supplier reply");
+      return;
+    }
+    toast.success("Supplier confirmed");
+  }
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -160,9 +192,11 @@ function OrdersPage() {
             items={attentions}
             onFindAlternatives={handleFindAlternatives}
             onCancel={handleCancel}
+            onConfirmSupplier={handleConfirmSupplier}
             onOpen={(id) => setOpenId(id)}
           />
         )}
+
         {orders.length === 0 && (
           <div className="text-center py-20 text-sm text-muted-foreground">
             <ShoppingCart className="size-8 mx-auto mb-3 opacity-40" />
@@ -188,11 +222,13 @@ function AttentionBanner({
   items,
   onFindAlternatives,
   onCancel,
+  onConfirmSupplier,
   onOpen,
 }: {
   items: Array<{ order: Order; info: AttentionInfo }>;
   onFindAlternatives: (order: Order) => void;
   onCancel: (order: Order, info: AttentionInfo) => void;
+  onConfirmSupplier: (order: Order, info: AttentionInfo) => void;
   onOpen: (id: string) => void;
 }) {
   return (
@@ -215,50 +251,103 @@ function AttentionBanner({
       </div>
       <ul className="space-y-3">
         {items.map(({ order, info }) => (
-          <li
+          <AttentionItem
             key={order.id}
-            className="rounded-lg border border-brand/30 bg-background p-3 space-y-2"
-          >
-            <button
-              type="button"
-              onClick={() => onOpen(order.id)}
-              className="block w-full text-left"
-            >
-              <div className="text-xs font-mono text-muted-foreground">{order.id}</div>
-              <div className="text-sm font-semibold text-brand">{info.title}</div>
-              <p className="text-sm text-foreground/85 mt-0.5">{info.problem}</p>
-            </button>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() => onFindAlternatives(order)}
-                className="gap-1.5"
-              >
-                <Search className="size-3.5" />
-                Find alternatives
-              </Button>
-              <CancelButton onConfirm={() => onCancel(order, info)} />
-            </div>
-          </li>
+            order={order}
+            info={info}
+            onOpen={onOpen}
+            onFindAlternatives={onFindAlternatives}
+            onCancel={onCancel}
+            onConfirmSupplier={onConfirmSupplier}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-function CancelButton({ onConfirm }: { onConfirm: () => void }) {
+function AttentionItem({
+  order,
+  info,
+  onOpen,
+  onFindAlternatives,
+  onCancel,
+  onConfirmSupplier,
+}: {
+  order: Order;
+  info: AttentionInfo;
+  onOpen: (id: string) => void;
+  onFindAlternatives: (order: Order) => void;
+  onCancel: (order: Order, info: AttentionInfo) => void;
+  onConfirmSupplier: (order: Order, info: AttentionInfo) => void;
+}) {
+  // Local override so a foreman who clicks "Decline" on a `decide` item
+  // moves straight into the cancel / find-alternatives stage without
+  // waiting for a server round-trip.
+  const [declined, setDeclined] = useState(false);
+  const effectiveStage: AttentionStage =
+    info.stage === "decide" && declined ? "rejected" : info.stage;
+
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={onConfirm}
-      className="gap-1.5"
-    >
-      <XCircle className="size-3.5" />
-      Cancel order
-    </Button>
+    <li className="rounded-lg border border-brand/30 bg-background p-3 space-y-2">
+      <button
+        type="button"
+        onClick={() => onOpen(order.id)}
+        className="block w-full text-left"
+      >
+        <div className="text-xs font-mono text-muted-foreground">{order.id}</div>
+        <div className="text-sm font-semibold text-brand">{info.title}</div>
+        <p className="text-sm text-foreground/85 mt-0.5">{info.problem}</p>
+      </button>
+      <div className="flex flex-wrap gap-2">
+        {effectiveStage === "decide" ? (
+          <>
+            <Button
+              size="sm"
+              onClick={() => onConfirmSupplier(order, info)}
+              className="gap-1.5"
+            >
+              <CheckCircle2 className="size-3.5" />
+              Confirm
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDeclined(true)}
+              className="gap-1.5"
+            >
+              <XCircle className="size-3.5" />
+              Decline
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              onClick={() => onFindAlternatives(order)}
+              className="gap-1.5"
+            >
+              <Search className="size-3.5" />
+              Find alternatives
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onCancel(order, info)}
+              className="gap-1.5"
+            >
+              <XCircle className="size-3.5" />
+              Cancel order
+            </Button>
+          </>
+        )}
+      </div>
+    </li>
   );
 }
+
+
+
 
 
 function OrderRow({
@@ -399,7 +488,9 @@ function ShippingBlock({ shipping }: { shipping: OrderShipping }) {
 }
 
 /**
- * Compact per-supplier status — just a status tag per supplier, no timeline.
+ * Per-supplier list — supplier name only. The single status tag at the top
+ * of the order represents the order's overall state; we don't repeat status
+ * or verdict tags per supplier here.
  */
 function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[] }) {
   const sorted = [...negotiations].sort((a, b) =>
@@ -411,27 +502,16 @@ function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[]
         Suppliers
       </h4>
       <ul className="space-y-1.5">
-        {sorted.map((n) => {
-          const status = negotiationToDerived(n);
-          const verdict = n.classification?.verdict as Verdict | undefined;
-          // Hide verdict pill when it duplicates the status pill.
-          const showVerdict =
-            verdict &&
-            verdict !== "fully_confirmed" &&
-            verdict !== "declined" &&
-            !(verdict === "needs_clarification" && status === "clarifying");
-          return (
-            <li key={n.id} className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium truncate">{n.supplier_name}</span>
-              <StatusPill status={status} />
-              {showVerdict && <VerdictPill verdict={verdict!} />}
-            </li>
-          );
-        })}
+        {sorted.map((n) => (
+          <li key={n.id} className="text-sm font-medium truncate">
+            {n.supplier_name}
+          </li>
+        ))}
       </ul>
     </div>
   );
 }
+
 
 /**
  * Compact, icon-led status pill. The icon does most of the visual work so the
@@ -451,18 +531,7 @@ export function StatusPill({ status }: { status: DerivedStatus }) {
   );
 }
 
-function VerdictPill({ verdict }: { verdict: Verdict }) {
-  const m = VERDICT_META[verdict];
-  const Icon = m.Icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border pl-1.5 pr-2 py-0.5 text-[10px] font-semibold ${STATUS_TONE_CLASS[m.tone]}`}
-    >
-      <Icon className="size-3" />
-      {m.label}
-    </span>
-  );
-}
+
 
 const TONE_DOT: Record<StatusTone, string> = {
   neutral: "bg-muted-foreground/40",
