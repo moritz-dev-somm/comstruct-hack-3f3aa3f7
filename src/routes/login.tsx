@@ -96,7 +96,7 @@ function LoginPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col md:grid md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
       {/* ─── Brand panel ─────────────────────────────────────────── */}
       <aside
-        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-5 md:p-12 lg:p-16 md:min-h-screen"
+        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-5 pb-4 md:p-12 lg:p-16 md:min-h-screen"
         style={{
           backgroundImage:
             "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px)",
@@ -122,7 +122,7 @@ function LoginPage() {
         </div>
 
         <div className="relative mt-3 md:mt-auto md:pt-0">
-          <h1 className="text-xl md:text-4xl lg:text-5xl font-semibold leading-[1.1] tracking-tight max-w-[18ch]">
+          <h1 className="text-lg md:text-4xl lg:text-5xl font-semibold leading-[1.1] tracking-tight max-w-[18ch]">
             Order C-materials in plain language.
           </h1>
           <p className="hidden md:block mt-4 text-sm md:text-base text-brand-foreground/75 max-w-[36ch]">
@@ -156,9 +156,10 @@ function LoginPage() {
       </aside>
 
       {/* ─── Auth panel ─────────────────────────────────────────── */}
-      <main className="dot-bg flex-1 flex items-center justify-center px-5 py-5 md:py-12">
+      <main className="dot-bg flex-1 flex items-start md:items-center justify-center px-5 pt-5 pb-8 md:py-12">
         <div className="w-full max-w-sm flex flex-col">
-          <h2 className="text-lg font-semibold tracking-tight mb-3">Sign in</h2>
+          <h2 className="text-xl md:text-lg font-semibold tracking-tight mb-4">Sign in</h2>
+
 
           {/* Segmented role control */}
           <div
