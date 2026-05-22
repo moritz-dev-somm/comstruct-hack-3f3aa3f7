@@ -13,6 +13,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
   validateSearch: (search: Record<string, unknown>) => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+    as:
+      search.as === "foreman" || search.as === "supervisor"
+        ? (search.as as Tab)
+        : undefined,
   }),
   head: () => ({
     meta: [
@@ -25,13 +29,20 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useRole();
-  const { redirect } = Route.useSearch();
+  const { redirect, as } = Route.useSearch();
 
-  const [tab, setTab] = useState<Tab>("foreman");
-  const [username, setUsername] = useState(DEMO_USERS.foreman.username);
-  const [password, setPassword] = useState(DEMO_USERS.foreman.password);
+  const initial: Tab = as ?? "foreman";
+  const [tab, setTab] = useState<Tab>(initial);
+  const [username, setUsername] = useState(DEMO_USERS[initial].username);
+  const [password, setPassword] = useState(DEMO_USERS[initial].password);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // If `?as=` changes (e.g. user clicks Switch user again), follow it.
+  useEffect(() => {
+    if (as && as !== tab) setTab(as);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [as]);
 
   useEffect(() => {
     const u = DEMO_USERS[tab];
