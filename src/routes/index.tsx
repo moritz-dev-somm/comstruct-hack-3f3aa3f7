@@ -1103,6 +1103,7 @@ function ConversationView({
   searchResults: HybridSearchResult[] | null;
   searchExtracted: HybridExtracted | null;
   categoryTiles: CategoryTileData[];
+  followupBar?: React.ReactNode;
 }) {
   const recSet = new Set(recommendedIds);
   const lastAssistant = messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1] : null;
