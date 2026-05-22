@@ -1734,6 +1734,18 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const tier = tierFor(cart.subtotal);
   const startNegotiation = useServerFn(startNegotiationForOrder);
+  const { save: saveTemplate } = useTemplates();
+
+  function handleSaveTemplate() {
+    if (cart.items.length === 0) return;
+    const name = window.prompt("Name this template (e.g. 'PPE refresh', 'Drywall starter')");
+    if (!name) return;
+    const tpl = saveTemplate(
+      name,
+      cart.items.map((i) => ({ sku: i.productId, qty: i.qty })),
+    );
+    toast.success(`Saved "${tpl.name}" — reuse it from the home screen`);
+  }
 
   async function submit() {
     if (cart.items.length === 0) return;
