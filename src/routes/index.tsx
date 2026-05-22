@@ -1917,6 +1917,14 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           >
             {ctaLabel}
           </button>
+          <button
+            disabled={cart.items.length === 0}
+            onClick={handleSaveTemplate}
+            className="w-full h-10 rounded-lg border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+          >
+            <Bookmark className="size-4" />
+            Save as quick-buy template
+          </button>
         </div>
       </div>
     </div>
