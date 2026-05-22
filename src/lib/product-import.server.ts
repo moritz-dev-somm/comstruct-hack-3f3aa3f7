@@ -98,8 +98,8 @@ export function parseCsv(base64: string): ParsedRow[] {
 }
 
 export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing");
 
   const tool = {
     type: "function",
