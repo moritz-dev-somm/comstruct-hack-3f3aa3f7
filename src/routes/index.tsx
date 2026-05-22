@@ -1808,7 +1808,11 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
                     className="w-10 h-full grid place-items-center hover:bg-accent text-lg font-semibold"
                     aria-label="Decrease"
                   >−</HoldButton>
-                  <span className="px-3 text-base font-bold tabular-nums min-w-[2.5rem] text-center">{i.qty}</span>
+                  <QtyInput
+                    value={i.qty}
+                    onChange={(n) => cart.setQty(i.productId, n)}
+                    className="w-12 px-2 text-base"
+                  />
                   <HoldButton
                     onTick={() => cart.adjust(i.productId, +1)}
                     className="w-10 h-full grid place-items-center hover:bg-accent text-lg font-semibold"
