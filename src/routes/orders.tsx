@@ -490,7 +490,9 @@ function ShippingBlock({ shipping }: { shipping: OrderShipping }) {
 }
 
 /**
- * Compact per-supplier status — just a status tag per supplier, no timeline.
+ * Per-supplier list — supplier name only. The single status tag at the top
+ * of the order represents the order's overall state; we don't repeat status
+ * or verdict tags per supplier here.
  */
 function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[] }) {
   const sorted = [...negotiations].sort((a, b) =>
@@ -502,27 +504,16 @@ function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[]
         Suppliers
       </h4>
       <ul className="space-y-1.5">
-        {sorted.map((n) => {
-          const status = negotiationToDerived(n);
-          const verdict = n.classification?.verdict as Verdict | undefined;
-          // Hide verdict pill when it duplicates the status pill.
-          const showVerdict =
-            verdict &&
-            verdict !== "fully_confirmed" &&
-            verdict !== "declined" &&
-            !(verdict === "needs_clarification" && status === "clarifying");
-          return (
-            <li key={n.id} className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium truncate">{n.supplier_name}</span>
-              <StatusPill status={status} />
-              {showVerdict && <VerdictPill verdict={verdict!} />}
-            </li>
-          );
-        })}
+        {sorted.map((n) => (
+          <li key={n.id} className="text-sm font-medium truncate">
+            {n.supplier_name}
+          </li>
+        ))}
       </ul>
     </div>
   );
 }
+
 
 /**
  * Compact, icon-led status pill. The icon does most of the visual work so the
