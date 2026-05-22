@@ -158,6 +158,8 @@ function LoginPage() {
       {/* ─── Auth panel ─────────────────────────────────────────── */}
       <main className="dot-bg flex-1 flex items-center justify-center px-5 py-5 md:py-12">
         <div className="w-full max-w-sm flex flex-col">
+          <h2 className="text-lg font-semibold tracking-tight mb-3">Sign in</h2>
+
           {/* Segmented role control */}
           <div
             role="tablist"
