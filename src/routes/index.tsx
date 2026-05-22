@@ -473,20 +473,15 @@ function Home() {
   }
 
   // --- Spoken playback for voice-dictated turns ----------------------------
-  // When the user dictates with the mic, read the assistant's reply out loud
-  // using the browser's built-in SpeechSynthesis. No UI changes.
+  // Reads the assistant's reply out loud using ElevenLabs (ultra-realistic,
+  // construction-worker-ish voice) with a browser SpeechSynthesis fallback.
   const speakNextReplyRef = useRef(false);
-  function speakAssistantText(raw: string) {
+  const currentTtsAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  function speakWithBrowser(clean: string) {
     if (typeof window === "undefined") return;
     const synth = window.speechSynthesis;
     if (!synth) return;
-    // Strip product tokens and markdown so the spoken output is clean.
-    const clean = raw
-      .replace(/\[\[product:[^\]]+\]\]/g, "")
-      .replace(/[`*_#>]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!clean) return;
     try {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(clean);
@@ -495,6 +490,77 @@ function Home() {
       synth.speak(u);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function speakAssistantText(raw: string) {
+    if (typeof window === "undefined") return;
+    const clean = raw
+      .replace(/\[\[product:[^\]]+\]\]/g, "")
+      .replace(/\[\[followups:[^\]]+\]\]/g, "")
+      .replace(/[`*_#>]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return;
+
+    // Stop any in-flight playback
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {}
+    if (currentTtsAudioRef.current) {
+      try {
+        currentTtsAudioRef.current.pause();
+      } catch {}
+      currentTtsAudioRef.current = null;
+    }
+
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+
+      const ct = res.headers.get("Content-Type") || "";
+      if (!res.ok || ct.includes("application/json")) {
+        // Fallback envelope from server (missing key / upstream error)
+        if (ct.includes("application/json")) {
+          const info = await res.json().catch(() => ({}));
+          console.warn("TTS fallback:", info);
+        } else {
+          console.warn("TTS http error:", res.status);
+        }
+        speakWithBrowser(clean);
+        return;
+      }
+
+      const blob = await res.blob();
+      if (!blob.size) {
+        speakWithBrowser(clean);
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentTtsAudioRef.current = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (currentTtsAudioRef.current === audio) currentTtsAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        speakWithBrowser(clean);
+      };
+      try {
+        await audio.play();
+      } catch (err) {
+        // Autoplay blocked — fall back to browser TTS (which is usually allowed
+        // because it follows a recent user gesture)
+        console.warn("Audio.play() blocked:", err);
+        speakWithBrowser(clean);
+      }
+    } catch (err) {
+      console.error("TTS request failed:", err);
+      speakWithBrowser(clean);
     }
   }
 
