@@ -310,14 +310,22 @@ function AgentPage() {
     queryKey: ["agent-inbox", inbox?.inboxId],
     enabled: !!inbox,
     queryFn: () => listFn({ data: { inboxId: inbox!.inboxId, limit: 50 } }),
-    refetchInterval: 15_000,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    staleTime: 0,
   });
 
   const negotiationsQ = useQuery({
     queryKey: ["agent-negotiations", inbox?.inboxId],
     enabled: !!inbox,
     queryFn: () => negFn({ data: { inboxId: inbox!.inboxId } }),
-    refetchInterval: 15_000,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    staleTime: 0,
   });
 
   const messageMut = useMutation({
