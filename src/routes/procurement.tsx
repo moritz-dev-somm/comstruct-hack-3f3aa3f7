@@ -143,9 +143,10 @@ function ProcurementLayout() {
           <SwitchRoleButton />
         </div>
       </aside>
-      <main className="flex-1 min-w-0 md:pt-0 pt-12">
+      <main className="flex-1 min-w-0 md:pt-0 pt-[5.5rem]">
         <Outlet />
       </main>
+
     </div>
   );
 }
