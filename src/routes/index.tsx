@@ -249,10 +249,13 @@ function Home() {
 
   // Prefill the chat input when arriving from another tab (e.g. the orders
   // page wants to find alternatives for items the agent couldn't source).
+  // The /orders "Find alternatives" handler also rewrites `comstruct-chat`
+  // beforehand so the prior search context is already loaded by the effect
+  // above — here we only seed a clear follow-up turn for the foreman.
   const { prefill } = Route.useSearch();
   useEffect(() => {
     if (!prefill) return;
-    setInput(`Find alternatives for: ${prefill}`);
+    setInput(prefill);
     setTimeout(() => inputRef.current?.focus(), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
