@@ -1805,7 +1805,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           <button
             disabled={cart.items.length === 0}
             onClick={submit}
-            className="w-full h-12 rounded-lg bg-brand text-brand-foreground font-semibold disabled:opacity-40"
+            className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold disabled:opacity-40"
           >
             {ctaLabel}
           </button>
