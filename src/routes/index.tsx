@@ -316,6 +316,8 @@ function Home() {
 
   async function send(text: string, opts?: { speak?: boolean }) {
     if (!text.trim() || streaming) return;
+    speakNextReplyRef.current = !!opts?.speak;
+
     const userMsg: ChatMessage = { role: "user", content: text };
     const newHistory = [...messages, userMsg];
     setMessages([...newHistory, { role: "assistant", content: "" }]);
