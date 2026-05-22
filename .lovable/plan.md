@@ -1,44 +1,28 @@
-# Keep "Switch user" visible on every procurement tab
+# Declutter foreman top header
 
-## Root cause
+## Goal
+The foreman page header (`src/routes/index.tsx`) is overcrowded. Move the project/site dropdown (Rämistrasse etc.), the Orders link, and the Switch user button into a left-side foldout drawer triggered by a burger icon. Keep only: burger, logo, language selector, and cart in the top bar.
 
-In `src/routes/procurement.tsx` the procurement layout is:
-
+## New top bar layout
 ```text
-<div min-h-screen flex>
-  <aside hidden md:flex flex-col>   ← sidebar
-    [logo + project picker]
-    <nav flex-1>...links...</nav>
-    [Switch user]                    ← pinned to bottom of the sidebar
-  </aside>
-  <main flex-1>...page...</main>
-</div>
+[≡] [logo]                                    [lang] [🛒 cart]
 ```
 
-The outer flex row has no bounded height, so it stretches to fit `main`. On tabs whose content is taller than the viewport — Orders (long table), Analytics (charts), Approval rules — the aside grows with it. The Switch user block sits at the bottom of that grown aside, which is now below the fold. Pages with short content (Approvals, Agent, Catalog) happen to fit the viewport, so the button stays visible. That's why it looks like it "disappears in some tabs".
+## Drawer (slides in from left)
+Opens when burger is tapped. Contains, stacked vertically:
 
-## Fix
+- "Current site" label + site dropdown (same `Select` with the 5 Strasse options)
+- "My orders" link (navigates to `/orders`)
+- "Switch user" button (calls `logout()` then navigates to `/login`)
 
-Make the sidebar viewport-bounded and sticky so its bottom stays in view regardless of how tall the page is.
+Drawer auto-closes after selecting a site, clicking Orders, or switching user.
 
-In `src/routes/procurement.tsx`, change the `<aside>` className from:
-
-```
-w-60 shrink-0 border-r bg-card hidden md:flex flex-col
-```
-
-to:
-
-```
-w-60 shrink-0 border-r bg-card hidden md:flex flex-col sticky top-0 h-screen
-```
-
-And add `overflow-y-auto` to the inner `<nav>` so a very long nav list scrolls inside the sidebar instead of pushing the footer off-screen.
-
-That's the entire change. No layout shift on short pages, and on long pages the Switch user button is always pinned to the bottom of the viewport.
-
-## Out of scope
-
-- No changes to roles, auth, or the SwitchUserButton component itself.
-- No changes to mobile (the mobile header already keeps the button in a fixed top bar).
-- No changes to child route files — they don't render their own headers and aren't responsible for the bug.
+## Implementation notes (technical)
+- Use existing shadcn `Sheet` component (`@/components/ui/sheet`) with `side="left"` — already in the project (`src/components/ui/sheet.tsx`).
+- Add local `const [menuOpen, setMenuOpen] = useState(false)` in `FloEntryInner`.
+- Replace the current header block (lines ~506–568 in `src/routes/index.tsx`):
+  - Left cluster: burger `<Button variant="ghost" size="icon">` with `Menu` icon from lucide + logo button.
+  - Right cluster: `<LanguageSelector />` + cart button only.
+- Move the site `Select` and Orders/Switch-user buttons into `<SheetContent side="left">`.
+- No business logic changes — same handlers, same state (`project`, `setProject`, `logout`, `navigate`).
+- Scope: only the foreman header in `src/routes/index.tsx`. Other roles' headers (procurement, agent) untouched.
