@@ -42,6 +42,7 @@ function OrdersPage() {
   const [openId, setOpenId] = useState<string | null>(orders[0]?.id ?? null);
   const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
   const negotiationsByOrder = useNegotiationsByOrder(orderIds);
+  const rfqsByOrder = useRfqsByOrder(orderIds);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -70,6 +71,7 @@ function OrdersPage() {
             key={o.id}
             order={o}
             negotiations={negotiationsByOrder[o.id]}
+            rfq={rfqsByOrder[o.id]?.rfq ?? null}
             open={openId === o.id}
             onToggle={() => setOpenId(openId === o.id ? null : o.id)}
           />
