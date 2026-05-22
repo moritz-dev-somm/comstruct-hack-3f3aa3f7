@@ -117,6 +117,12 @@ type OrdersCtx = {
   approve: (id: string, actor: string) => void;
   reject: (id: string, actor: string, reason: string) => void;
   advanceToDelivered: (id: string) => void;
+  applyRfqResult: (
+    id: string,
+    result:
+      | { kind: "decided"; winner: string; total: number }
+      | { kind: "escalated"; reason: string },
+  ) => void;
 };
 
 const Ctx = createContext<OrdersCtx | null>(null);
