@@ -755,6 +755,11 @@ function Home() {
             </div>
             <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
             <VoiceButton size="compact" onTranscript={(t) => send(t)} />
+            <VoiceModeButton
+              size="compact"
+              onUserTranscript={appendVoiceUserTurn}
+              onAssistantTranscript={appendVoiceAssistantTurn}
+            />
           </div>
         </div>
       )}
@@ -837,6 +842,11 @@ function HeroView({
         {/* Primary action CTAs — voice (brand) + scan (grey), visually distinct */}
         <div className="mt-8 flex justify-center items-start gap-8">
           <VoiceButton size="hero" onTranscript={(t) => send(t)} />
+          <VoiceModeButton
+            size="hero"
+            onUserTranscript={appendVoiceUserTurn}
+            onAssistantTranscript={appendVoiceAssistantTurn}
+          />
           <ScanButton size="hero" onResult={(prompt) => send(prompt)} />
         </div>
 
