@@ -153,12 +153,6 @@ function OrderRow({
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
-            {list.length > 0 && (
-              <>
-                {" · "}
-                {list.length} supplier{list.length === 1 ? "" : "s"}
-              </>
-            )}
           </div>
         </div>
         <div className="text-right">
@@ -262,29 +256,12 @@ function ShippingPill({ shipping }: { shipping: OrderShipping }) {
 }
 
 function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
-  const confidenceLabel: Record<OrderDelivery["confidence"], string> = {
-    high: "high confidence",
-    medium: "medium confidence",
-    low: "low confidence",
-    unresolved: "unknown",
-  };
   return (
     <div className="rounded-md border bg-background px-3 py-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Delivery date
-        </h4>
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {confidenceLabel[delivery.confidence]}
-        </span>
-      </div>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Delivery date
+      </h4>
       <div className="mt-1 text-sm font-semibold">{delivery.longLabel}</div>
-      {delivery.raw && (
-        <div className="mt-1 text-xs text-muted-foreground">
-          Supplier said: <span className="italic">"{delivery.raw}"</span>
-          {delivery.supplier ? <span> · {delivery.supplier}</span> : null}
-        </div>
-      )}
       {delivery.needsClarification && (
         <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
           Asked supplier to confirm an exact calendar date.
@@ -297,15 +274,10 @@ function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
 function ShippingBlock({ shipping }: { shipping: OrderShipping }) {
   return (
     <div className="rounded-md border bg-background px-3 py-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Delivery costs
-        </h4>
-      </div>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Delivery costs
+      </h4>
       <div className="mt-1 text-sm font-semibold">{shipping.longLabel}</div>
-      {shipping.supplier && (
-        <div className="mt-1 text-xs text-muted-foreground">From {shipping.supplier}</div>
-      )}
     </div>
   );
 }
@@ -326,11 +298,17 @@ function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[]
         {sorted.map((n) => {
           const status = negotiationToDerived(n);
           const verdict = n.classification?.verdict as Verdict | undefined;
+          // Hide verdict pill when it duplicates the status pill.
+          const showVerdict =
+            verdict &&
+            verdict !== "fully_confirmed" &&
+            verdict !== "declined" &&
+            !(verdict === "needs_clarification" && status === "clarifying");
           return (
             <li key={n.id} className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium truncate">{n.supplier_name}</span>
               <StatusPill status={status} />
-              {verdict && <VerdictPill verdict={verdict} />}
+              {showVerdict && <VerdictPill verdict={verdict!} />}
             </li>
           );
         })}
