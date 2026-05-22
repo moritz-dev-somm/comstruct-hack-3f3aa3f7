@@ -119,3 +119,156 @@ export const STATUS_TONE_CLASS: Record<StatusTone, string> = {
   teal: "bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/40",
   red: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40",
 };
+
+/* ------------------------------------------------------------------ */
+/*  Delivery date display helpers                                     */
+/* ------------------------------------------------------------------ */
+
+export type OrderDelivery = {
+  /** Best estimated delivery date in `YYYY-MM-DD`, or null if unknown. */
+  iso: string | null;
+  /** Range end if the supplier gave a window; equals `iso` for point dates. */
+  isoEnd: string | null;
+  confidence: "high" | "medium" | "low" | "unresolved";
+  /** True when the supplier mentioned delivery but we couldn't pin a date. */
+  needsClarification: boolean;
+  /** Original supplier wording. */
+  raw: string | null;
+  /** Supplier the delivery date came from (when known). */
+  supplier: string | null;
+  /** Tone class key matching STATUS_TONE_CLASS. */
+  tone: StatusTone;
+  /** Short label e.g. "Tue 2 Jun", "27–29 May", "Asking supplier", "TBD". */
+  label: string;
+  /** Long label for the expanded view, e.g. "Tuesday, 2 June 2026". */
+  longLabel: string;
+};
+
+/**
+ * Pick the most relevant delivery info across an order's negotiations.
+ * Prefers confirmed > earliest dated > needs-clarification > unresolved.
+ */
+export function pickDeliveryForOrder(
+  negotiations: NegotiationRow[] | undefined,
+): OrderDelivery {
+  const list = (negotiations ?? []).slice();
+  if (list.length === 0) return EMPTY_DELIVERY;
+
+  // 1) Prefer a confirmed negotiation that also has a date.
+  const confirmedDated = list.find(
+    (n) => (n.status || "").toLowerCase() === "confirmed" && n.delivery_date_iso,
+  );
+  const pick =
+    confirmedDated ??
+    // 2) Otherwise the earliest ISO across all negotiations.
+    list
+      .filter((n) => !!n.delivery_date_iso)
+      .sort((a, b) => (a.delivery_date_iso! < b.delivery_date_iso! ? -1 : 1))[0] ??
+    // 3) Otherwise the first one that's awaiting clarification.
+    list.find((n) => n.delivery_date_needs_clarification) ??
+    list[0];
+
+  return toOrderDelivery(pick);
+}
+
+const EMPTY_DELIVERY: OrderDelivery = {
+  iso: null,
+  isoEnd: null,
+  confidence: "unresolved",
+  needsClarification: false,
+  raw: null,
+  supplier: null,
+  tone: "neutral",
+  label: "TBD",
+  longLabel: "Not provided yet",
+};
+
+function toOrderDelivery(n: NegotiationRow | undefined): OrderDelivery {
+  if (!n) return EMPTY_DELIVERY;
+  const confidence = (n.delivery_date_confidence ?? "unresolved") as OrderDelivery["confidence"];
+  const needsClarification = !!n.delivery_date_needs_clarification;
+  const iso = n.delivery_date_iso;
+  const isoEnd = n.delivery_date_iso_end ?? iso;
+
+  if (!iso) {
+    return {
+      iso: null,
+      isoEnd: null,
+      confidence,
+      needsClarification,
+      raw: n.delivery_date_raw,
+      supplier: n.supplier_name,
+      tone: needsClarification ? "amber" : "neutral",
+      label: needsClarification ? "Asking supplier" : "TBD",
+      longLabel: needsClarification
+        ? "Asking supplier for an exact date"
+        : "Not provided yet",
+    };
+  }
+
+  const tone: StatusTone =
+    confidence === "high"
+      ? (n.status || "").toLowerCase() === "confirmed"
+        ? "green"
+        : "blue"
+      : confidence === "medium"
+        ? "teal"
+        : "amber";
+
+  return {
+    iso,
+    isoEnd,
+    confidence,
+    needsClarification,
+    raw: n.delivery_date_raw,
+    supplier: n.supplier_name,
+    tone,
+    label: formatDeliveryShort(iso, isoEnd ?? iso),
+    longLabel: formatDeliveryLong(iso, isoEnd ?? iso),
+  };
+}
+
+function parseIsoDate(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+}
+
+function shouldShowYear(d: Date): boolean {
+  const now = new Date();
+  const diff = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+  return diff > 180 || d.getUTCFullYear() !== now.getUTCFullYear();
+}
+
+export function formatDeliveryShort(iso: string, isoEnd: string): string {
+  const a = parseIsoDate(iso);
+  const b = parseIsoDate(isoEnd);
+  if (!a) return iso;
+  const fmt = (d: Date, withWeekday: boolean) =>
+    new Intl.DateTimeFormat(undefined, {
+      timeZone: "UTC",
+      weekday: withWeekday ? "short" : undefined,
+      day: "numeric",
+      month: "short",
+      year: shouldShowYear(d) ? "numeric" : undefined,
+    }).format(d);
+  if (!b || iso === isoEnd) return fmt(a, true);
+  // Range
+  return `${fmt(a, false)} – ${fmt(b, false)}`;
+}
+
+export function formatDeliveryLong(iso: string, isoEnd: string): string {
+  const a = parseIsoDate(iso);
+  const b = parseIsoDate(isoEnd);
+  if (!a) return iso;
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat(undefined, {
+      timeZone: "UTC",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  if (!b || iso === isoEnd) return fmt(a);
+  return `${fmt(a)} – ${fmt(b)}`;
+}
