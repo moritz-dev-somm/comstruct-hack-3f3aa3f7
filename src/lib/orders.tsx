@@ -220,7 +220,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(KEY, JSON.stringify(orders));
   }, [orders, hydrated]);
 
-  const createFromCart = useCallback<OrdersCtx["createFromCart"]>((items) => {
+  const createFromCart = useCallback<OrdersCtx["createFromCart"]>((items, snapshot) => {
     // Group items by supplier (case-insensitive, trimmed). Items without
     // a supplier land in a single "Unassigned" bucket so they still get
     // routed somewhere visible.
