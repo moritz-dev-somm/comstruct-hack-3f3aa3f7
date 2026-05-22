@@ -92,19 +92,52 @@ function OrderRow({
   rfq,
   open,
   onToggle,
+  onCancel,
 }: {
   order: Order;
   negotiations: NegotiationRow[] | undefined;
   rfq: RfqRow | null;
   open: boolean;
   onToggle: () => void;
+  onCancel: (reason: string) => void;
 }) {
+  const navigate = useNavigate();
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const derived = deriveOrderStatus(order, negotiations);
   const delivery = pickDeliveryForOrder(negotiations);
   const shipping = pickShippingForOrder(negotiations);
   const list = negotiations ?? [];
   const timeline = buildOrderTimeline(order, negotiations, rfq);
+
+  const hasDelivery = delivery.iso != null || delivery.needsClarification;
+  const hasShipping = shipping.amountEur != null;
+  const hasDeliveryGrid = hasDelivery || hasShipping;
+
+  // Attention: either the agent flagged a supplier as needs_user, OR the RFQ
+  // failed (no alternative offer found). Both block the order without input.
+  const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
+  const rfqFailed = order.status === "rfq_failed";
+  const attention: AttentionInfo | null = needsUserNeg
+    ? {
+        kind: "needs_user",
+        title: `${needsUserNeg.supplier_name} needs your input`,
+        reason:
+          needsUserNeg.needs_user_reason ||
+          needsUserNeg.classification?.summary_en ||
+          needsUserNeg.classification?.summary ||
+          "Supplier raised a point the agent can't resolve on its own.",
+      }
+    : rfqFailed
+      ? {
+          kind: "rfq_failed",
+          title: "No alternative supplier found",
+          reason:
+            rfq?.escalation_reason ||
+            order.rejectionReason ||
+            "The agent contacted other suppliers but none could offer the exact same products.",
+        }
+      : null;
+
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
@@ -115,8 +148,8 @@ function OrderRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-sm font-mono">{order.id}</span>
             <StatusPill status={derived} />
-            <DeliveryPill delivery={delivery} />
-            <ShippingPill shipping={shipping} />
+            {hasDelivery && <DeliveryPill delivery={delivery} />}
+            {hasShipping && <ShippingPill shipping={shipping} />}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
@@ -135,10 +168,29 @@ function OrderRow({
       </button>
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <DeliveryBlock delivery={delivery} />
-            <ShippingBlock shipping={shipping} />
-          </div>
+          {attention && (
+            <AttentionBlock
+              info={attention}
+              onFindAlternatives={() => {
+                const q = order.items.map((i) => i.name).join(", ");
+                navigate({ to: "/", search: { prefill: q } });
+              }}
+              onCancel={() =>
+                onCancel(
+                  attention.kind === "rfq_failed"
+                    ? "Cancelled by foreman — no alternative supplier"
+                    : "Cancelled by foreman",
+                )
+              }
+            />
+          )}
+          {hasDeliveryGrid && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {hasDelivery && <DeliveryBlock delivery={delivery} />}
+              {hasShipping && <ShippingBlock shipping={shipping} />}
+            </div>
+          )}
+
           {list.length > 0 && <SuppliersStatusBlock negotiations={list} />}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Items</h4>
