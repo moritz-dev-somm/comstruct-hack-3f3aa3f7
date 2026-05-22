@@ -360,9 +360,53 @@ function AgentPage() {
   }
 
   const threads = useMemo<Thread[]>(() => {
-    if (!inbox || messagesQ.data?.ok !== true) return [];
-    return buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address);
-  }, [messagesQ.data, inbox]);
+    if (!inbox) return [];
+    const fromMessages =
+      messagesQ.data?.ok === true
+        ? buildThreads(messagesQ.data.messages as InboxMessage[], inbox.address)
+        : [];
+
+    // Merge in negotiations that AgentMail's inbox listing hasn't returned
+    // yet (e.g. a PO sent seconds ago, or outbound mail the API hasn't
+    // surfaced). Without this, freshly placed orders don't appear in the
+    // Conversations list until the supplier replies.
+    const negs =
+      negotiationsQ.data?.ok === true
+        ? (negotiationsQ.data.negotiations as NegotiationFull[])
+        : [];
+    if (negs.length === 0) return fromMessages;
+
+    const haveKey = new Set(fromMessages.map((t) => t.key));
+    const synthetic: Thread[] = [];
+    for (const n of negs) {
+      const key = n.thread_id || (n.subject ? `subj:${normalizeSubject(n.subject)}` : null);
+      if (!key || haveKey.has(key)) continue;
+      const at = n.last_reply_at || n.sent_at;
+      const syntheticMsg: InboxMessage = {
+        id: n.message_id || `neg:${n.id}`,
+        threadId: n.thread_id,
+        subject: n.subject || `Order ${n.order_id}`,
+        from: inbox.address,
+        to: n.supplier_email ? [n.supplier_email] : [],
+        receivedAt: at,
+        preview: `Purchase order ${n.order_id} sent to ${n.supplier_name ?? "supplier"}.`,
+        labels: ["sent"],
+      };
+      synthetic.push({
+        key,
+        subject: syntheticMsg.subject,
+        messages: [syntheticMsg],
+        lastAt: at,
+        supplierName: n.supplier_name || n.supplier_email || "Unknown supplier",
+        hasInbound: false,
+        hasOutbound: true,
+      });
+      haveKey.add(key);
+    }
+    if (synthetic.length === 0) return fromMessages;
+    return [...fromMessages, ...synthetic].sort((a, b) => (a.lastAt > b.lastAt ? -1 : 1));
+  }, [messagesQ.data, negotiationsQ.data, inbox]);
+
 
   // Map negotiations by thread_id (and by reply_message_id for per-msg verdicts).
   const negByThread = useMemo(() => {
