@@ -359,12 +359,8 @@ async function expandQueryToKeywords(
   userMessage: string,
   apiKey: string,
 ): Promise<SearchIntent[]> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
+  const url = "https://api.openai.com/v1/chat/completions";
+  const model = "gpt-5.4-mini";
 
   const sys = `You expand a construction foreman's vague request into concrete C-material product keywords likely to exist in a supplier catalog.
 
