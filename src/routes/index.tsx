@@ -522,13 +522,6 @@ function Home() {
               <ClipboardList className="size-4" />
               Orders
             </Link>
-            <Link
-              to="/settings"
-              aria-label="Approval rules"
-              className="grid size-10 place-items-center rounded-full border hover:bg-accent"
-            >
-              <SlidersHorizontal className="size-4" />
-            </Link>
             <button
               onClick={() => {
                 logout();

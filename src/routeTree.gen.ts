@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProcurementRouteImport } from './routes/procurement'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
@@ -30,11 +29,6 @@ import { Route as OrdersOrderIdTrackRouteImport } from './routes/orders.$orderId
 import { Route as ApiPublicAgentTimeoutsRouteImport } from './routes/api/public/agent-timeouts'
 import { Route as ApiPublicAgentmailWebhookRouteImport } from './routes/api/public/agentmail/webhook'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProcurementRoute = ProcurementRouteImport.update({
   id: '/procurement',
   path: '/procurement',
@@ -139,7 +133,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
@@ -160,7 +153,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
@@ -183,7 +175,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
@@ -207,7 +198,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/procurement'
-    | '/settings'
     | '/admin/products'
     | '/api/chat'
     | '/api/hybrid-search'
@@ -228,7 +218,6 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/orders'
-    | '/settings'
     | '/admin/products'
     | '/api/chat'
     | '/api/hybrid-search'
@@ -250,7 +239,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/procurement'
-    | '/settings'
     | '/admin/products'
     | '/api/chat'
     | '/api/hybrid-search'
@@ -273,7 +261,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRouteWithChildren
   ProcurementRoute: typeof ProcurementRouteWithChildren
-  SettingsRoute: typeof SettingsRoute
   AdminProductsRoute: typeof AdminProductsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiHybridSearchRoute: typeof ApiHybridSearchRoute
@@ -284,13 +271,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/procurement': {
       id: '/procurement'
       path: '/procurement'
@@ -487,7 +467,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrdersRoute: OrdersRouteWithChildren,
   ProcurementRoute: ProcurementRouteWithChildren,
-  SettingsRoute: SettingsRoute,
   AdminProductsRoute: AdminProductsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiHybridSearchRoute: ApiHybridSearchRoute,
@@ -498,3 +477,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
