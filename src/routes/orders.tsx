@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -7,7 +7,11 @@ import {
   ArrowLeft,
   ShoppingCart,
   Truck,
+  ShieldAlert,
+  Search,
+  XCircle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
@@ -38,7 +42,7 @@ export const Route = createFileRoute("/orders")({
 });
 
 function OrdersPage() {
-  const { orders } = useOrders();
+  const { orders, reject } = useOrders();
   const [openId, setOpenId] = useState<string | null>(orders[0]?.id ?? null);
   const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
   const negotiationsByOrder = useNegotiationsByOrder(orderIds);
@@ -74,6 +78,7 @@ function OrdersPage() {
             rfq={rfqsByOrder[o.id]?.rfq ?? null}
             open={openId === o.id}
             onToggle={() => setOpenId(openId === o.id ? null : o.id)}
+            onCancel={(reason) => reject(o.id, "Marco Bianchi", reason)}
           />
         ))}
       </main>
@@ -87,19 +92,52 @@ function OrderRow({
   rfq,
   open,
   onToggle,
+  onCancel,
 }: {
   order: Order;
   negotiations: NegotiationRow[] | undefined;
   rfq: RfqRow | null;
   open: boolean;
   onToggle: () => void;
+  onCancel: (reason: string) => void;
 }) {
+  const navigate = useNavigate();
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const derived = deriveOrderStatus(order, negotiations);
   const delivery = pickDeliveryForOrder(negotiations);
   const shipping = pickShippingForOrder(negotiations);
   const list = negotiations ?? [];
   const timeline = buildOrderTimeline(order, negotiations, rfq);
+
+  const hasDelivery = delivery.iso != null || delivery.needsClarification;
+  const hasShipping = shipping.amountEur != null;
+  const hasDeliveryGrid = hasDelivery || hasShipping;
+
+  // Attention: either the agent flagged a supplier as needs_user, OR the RFQ
+  // failed (no alternative offer found). Both block the order without input.
+  const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
+  const rfqFailed = order.status === "rfq_failed";
+  const attention: AttentionInfo | null = needsUserNeg
+    ? {
+        kind: "needs_user",
+        title: `${needsUserNeg.supplier_name} needs your input`,
+        reason:
+          needsUserNeg.needs_user_reason ||
+          needsUserNeg.classification?.summary_en ||
+          needsUserNeg.classification?.summary ||
+          "Supplier raised a point the agent can't resolve on its own.",
+      }
+    : rfqFailed
+      ? {
+          kind: "rfq_failed",
+          title: "No alternative supplier found",
+          reason:
+            rfq?.escalation_reason ||
+            order.rejectionReason ||
+            "The agent contacted other suppliers but none could offer the exact same products.",
+        }
+      : null;
+
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
@@ -110,8 +148,8 @@ function OrderRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-sm font-mono">{order.id}</span>
             <StatusPill status={derived} />
-            <DeliveryPill delivery={delivery} />
-            <ShippingPill shipping={shipping} />
+            {hasDelivery && <DeliveryPill delivery={delivery} />}
+            {hasShipping && <ShippingPill shipping={shipping} />}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
@@ -130,10 +168,29 @@ function OrderRow({
       </button>
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <DeliveryBlock delivery={delivery} />
-            <ShippingBlock shipping={shipping} />
-          </div>
+          {attention && (
+            <AttentionBlock
+              info={attention}
+              onFindAlternatives={() => {
+                const q = order.items.map((i) => i.name).join(", ");
+                navigate({ to: "/", search: { prefill: q } });
+              }}
+              onCancel={() =>
+                onCancel(
+                  attention.kind === "rfq_failed"
+                    ? "Cancelled by foreman — no alternative supplier"
+                    : "Cancelled by foreman",
+                )
+              }
+            />
+          )}
+          {hasDeliveryGrid && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {hasDelivery && <DeliveryBlock delivery={delivery} />}
+              {hasShipping && <ShippingBlock shipping={shipping} />}
+            </div>
+          )}
+
           {list.length > 0 && <SuppliersStatusBlock negotiations={list} />}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Items</h4>
@@ -336,3 +393,78 @@ const TONE_DOT: Record<StatusTone, string> = {
 function dotForTone(tone: StatusTone): string {
   return TONE_DOT[tone] ?? TONE_DOT.neutral;
 }
+
+type AttentionInfo = {
+  kind: "needs_user" | "rfq_failed";
+  title: string;
+  reason: string;
+};
+
+function AttentionBlock({
+  info,
+  onFindAlternatives,
+  onCancel,
+}: {
+  info: AttentionInfo;
+  onFindAlternatives: () => void;
+  onCancel: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="rounded-lg border border-brand/40 bg-brand/5 p-3.5">
+      <div className="flex items-start gap-3">
+        <div className="grid place-items-center size-9 rounded-md bg-brand text-brand-foreground shrink-0">
+          <ShieldAlert className="size-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-brand">{info.title}</div>
+          <p className="mt-1 text-sm text-foreground/85">{info.reason}</p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {info.kind === "rfq_failed"
+              ? "Pick replacement items from the catalog, or cancel this order."
+              : "Decide how to proceed — find an alternative or cancel."}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={onFindAlternatives}
+          className="gap-1.5"
+        >
+          <Search className="size-3.5" />
+          Find alternatives
+        </Button>
+        {confirming ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Cancel order for good?</span>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                setConfirming(false);
+                onCancel();
+              }}
+            >
+              Yes, cancel
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+              Keep open
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setConfirming(true)}
+            className="gap-1.5"
+          >
+            <XCircle className="size-3.5" />
+            Cancel order
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
