@@ -44,6 +44,19 @@ function ProcurementLayout() {
 
   return (
     <div className="min-h-screen flex bg-muted/30 text-foreground">
+      {/* Mobile header — visible on small screens where the sidebar is hidden */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 border-b bg-background/95 backdrop-blur">
+        <div className="flex items-center gap-2 px-3 h-12">
+          <div className="size-7 rounded-md bg-brand text-brand-foreground grid place-items-center shrink-0">
+            <HardHat className="size-4" />
+          </div>
+          <span className="font-semibold text-sm">comstruct</span>
+          <span className="text-[11px] text-muted-foreground">· Procurement</span>
+          <div className="flex-1" />
+          <SwitchRoleButton compact />
+        </div>
+      </div>
+
       <aside className="w-60 shrink-0 border-r bg-card hidden md:flex flex-col">
         <div className="border-b px-3 py-3 space-y-2">
           <div className="flex items-center gap-2">
@@ -101,7 +114,7 @@ function ProcurementLayout() {
           <SwitchRoleButton />
         </div>
       </aside>
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 md:pt-0 pt-12">
         <Outlet />
       </main>
     </div>
