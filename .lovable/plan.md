@@ -1,118 +1,114 @@
+
 ## Goal
 
-When a foreman submits an order ≥ €200, the PM still approves first. Once approved, instead of sending the PO straight to the original supplier, the agent **fans out an RFQ ("please quote your best price + shipping") to the top 3 suppliers active in the cart's dominant category**, waits up to 24h (or closes early if all reply), then **automatically places the PO with the lowest total (price × qty + shipping)**.
+Make the supplier agent smarter and more autonomous: auto-reject bad quotes, auto-failover to the next-best supplier, auto-cancel when no candidates remain, and let the agent answer supplier questions independently using full user/order context. Surface anything ambiguous in the "needs attention" panel.
 
-## Behaviour matrix (locked from your answers)
+## 1. Rejection & confirmation rules (hardcoded thresholds)
 
-| Condition | Result |
-|---|---|
-| Subtotal < €200 | Unchanged (auto-approved → PO to original supplier) |
-| Subtotal ≥ €200 | Tier = `pm`. PM approves → status becomes `rfq_in_progress` instead of `ordered` |
-| Subtotal ≥ €2000 | Same as above but central tier first, then RFQ |
-| RFQ recipients | Up to 3 suppliers from `suppliers` table whose catalog covers the dominant cart category (excluding the original supplier-of-record; original is included as RFQ #1 so they get a chance to defend) |
-| <3 eligible | Send to whatever's available (min 1) |
-| Wait window | 24h hard deadline, but close early if all invited suppliers respond |
-| ≥1 response | Auto-pick lowest `lineTotal + shipping_cost_eur`; create real PO to winner; original supplier (if losing) gets nothing — they were just bidding |
-| 0 responses | Escalate to human (`needs_user`) with reason "No RFQ responses in 24h" |
-| Supplier "out of stock" | Treated as non-bid (excluded from winner selection) |
-| Supplier asks question / wants human | Excluded from auto-decision; if all 3 bow out → escalate |
+In `agent/conditions.ts` (or a new `agent/policy.ts`) introduce a single policy evaluator that classifies a supplier reply into:
 
-## New order statuses
+- `accept` — proceed to confirm
+- `needs_user` — surface in attention box (don't cancel)
+- `auto_reject` — send cancellation email + failover
+- `clarify` — agent answers supplier question itself (no user input)
 
-Extend `OrderStatus` with:
-- `rfq_in_progress` (amber) — RFQ emails sent, waiting for quotes
-- `rfq_failed` (red) — escalated, no usable quotes
+Thresholds (hardcoded, easy to tune):
 
-`approved` becomes a transient state for ≥€200 orders before flipping to `rfq_in_progress`.
+```text
+shipping_cost_eur:
+  auto_reject if  > 40 EUR  AND  > 50% of subtotal
+  (both must be true → auto reject; otherwise accept)
 
-## DB schema (`rfqs` + `rfq_quotes` tables)
+lead_time_days:
+  > 30 days        → auto_reject
+  > 14 days        → needs_user (confirm long lead time)
+  <= 14 days       → accept
 
-```sql
-create table public.rfqs (
-  id uuid primary key default gen_random_uuid(),
-  order_id text not null,
-  status text not null default 'open', -- open | decided | escalated
-  deadline_at timestamptz not null,
-  invited_suppliers text[] not null,
-  winner_supplier text,
-  winner_total_eur numeric,
-  decided_at timestamptz,
-  escalation_reason text,
-  created_at timestamptz default now()
-);
-
-create table public.rfq_quotes (
-  id uuid primary key default gen_random_uuid(),
-  rfq_id uuid not null references public.rfqs(id) on delete cascade,
-  negotiation_id uuid references public.negotiations(id),
-  supplier_name text not null,
-  unit_price_eur numeric,        -- supplier's quoted unit price (if changed)
-  line_total_eur numeric,        -- qty × quoted unit price
-  shipping_cost_eur numeric,
-  total_eur numeric,             -- line_total + shipping
-  lead_time_days int,
-  status text not null default 'pending', -- pending | quoted | declined | unanswered
-  raw_reply_excerpt text,
-  received_at timestamptz
-);
+supplier explicitly declines / out of stock / can't fulfil  → auto_reject
+supplier asks a relevant question                            → clarify (agent answers) OR needs_user (if agent can't answer confidently)
 ```
 
-Both with permissive RLS (matches existing tables).
+## 2. Auto-failover to next supplier
 
-## Files added / changed
+When a quote is `auto_reject`:
 
-**New**
-- `agent/rfq.server.ts` — `startRfqForOrder(order)`: pick top-3 suppliers by category, create `rfqs` row, send 3 RFQ emails (one negotiation each, flagged with `rfq_id` in `order_snapshot`), set 24h deadline.
-- `agent/rfq.server.ts` — `recordRfqQuote(negotiationId, classification)`: insert/update `rfq_quotes` row from classifier output.
-- `agent/rfq.server.ts` — `maybeDecideRfq(rfqId)`: if all invited responded OR past deadline → pick winner (lowest `total_eur`), mark RFQ `decided`, create new `negotiations` row to send the actual PO to winner, flip order to `ordered`. If 0 quotable → escalate, set order `rfq_failed`.
-- `src/lib/rfq.functions.ts` — read-side server fn `getRfqForOrder(orderId)` for UI.
+1. Send polite cancellation/decline email to that supplier (templated, in supplier language).
+2. Mark the negotiation as `rejected` with reason.
+3. Pick the next supplier:
+   - **Hybrid lookup**: first find suppliers carrying the same product (SKU/name match in `products`), excluding already-tried ones.
+   - If none, fall back to top-3 by dominant category via existing `pickRfqSuppliers`.
+4. Open a new negotiation with that supplier using the same order snapshot.
+5. Record the chain on the order (`failover_history: [{ supplier, reason, at }, ...]`) so the UI can show "Tried Supplier A → rejected (shipping too high) → now contacting Supplier B".
+6. If no candidates remain: cancel the order, send cancellation email to active supplier(s), set order status `cancelled_no_supplier`.
 
-**Changed**
-- `agent/templates.ts` — add `composeRfqEmail(...)` (multilingual EN/DE/FR/IT) explicitly asking for "best unit price + shipping cost + lead time for the attached list, valid 24h".
-- `agent/conditions.ts` — when `cls.verdict === 'confirmed_with_issue'` or `'fully_confirmed'` and the negotiation belongs to an RFQ, **skip the existing auto-approve logic** and route to `record_rfq_quote` instead.
-- `agent/agent.server.ts` — add `AgentAction` kind `record_rfq_quote`; classifier prompt extended to always extract `unit_price_eur` (currently only does `shipping_cost_eur` + `lead_time_days`).
-- `src/routes/api/public/agentmail/webhook.ts` — after classifying a reply, if the negotiation is tagged `rfq`, call `recordRfqQuote` then `maybeDecideRfq` instead of sending confirmation/clarification.
-- `src/routes/api/public/agent-timeouts.ts` — extend the cron sweep to also call `maybeDecideRfq` for any open RFQ past its deadline.
-- `src/lib/orders.tsx` — add `rfq_in_progress` + `rfq_failed` to `OrderStatus` + `STATUS_META`; in `approve()`, if `tier !== 'auto'` AND subtotal ≥ €200, set status to `rfq_in_progress` instead of `ordered` and invoke `startRfqForOrder` via a new server fn; expose `placeWinningPo(orderId, supplier, total)` for the RFQ resolver to call back.
-- `src/routes/procurement.orders.$orderId.tsx` — new "RFQ quotes" panel: list of invited suppliers, their quoted unit price / shipping / lead time / total, winner highlighted, deadline countdown.
-- `src/routes/procurement.orders.tsx` — status badge for `rfq_in_progress` shows "X/Y quotes in" tooltip.
+## 3. Cancelled-order UI
 
-## Supplier discovery
+In `src/routes/procurement.orders.$orderId.tsx` and `src/lib/orders.tsx`:
 
-`pickRfqSuppliers(order)`:
-1. Compute dominant category = most common `category` across cart items (by line value).
-2. Query `select distinct supplier from products where category = $1 and supplier is not null limit 10`.
-3. Look those up in `suppliers` table to get email + language (skip ones with no contact).
-4. Always include the order's original supplier first (so it can defend the bid).
-5. Take top 3 by total catalog size in that category.
-6. Edge: 0 eligible → escalate immediately (`rfq_failed`, "No alternative suppliers in catalog").
+- When order status is `cancelled*`, replace the "Approve & confirm" CTA with:
+  - **"Return to search"** (primary) — restores the original cart + filters + chat context and routes the user back to the procurement search page pre-populated.
+  - **"Discard"** (secondary, ghost) — archives the order.
+- Add a visible failover trail in the order timeline (supplier chips with reject reason + cancellation email link).
+- Persist the original search state (`cart_snapshot`, `search_query`, `filters`) on the order at creation time so "Return to search" works deterministically.
 
-## Winner selection
+## 4. Smart agent replies (max context)
 
-For each `rfq_quotes` row with `status='quoted'` and `total_eur` finite:
-- Skip if classifier marked item unavailable.
-- Total = (quoted_unit_price ?? original_unit_price) × qty + (shipping_cost_eur ?? 0).
-- If no quoted price but supplier confirmed → fall back to original unit price for that supplier.
-- Lowest wins. Tie-break by lead time, then alphabetical.
+When the agent drafts any reply to a supplier (clarify, confirm, cancel), pass the LLM:
 
-## Edge cases handled
+- Company profile (name, address, VAT, payment terms, primary contact, language)
+- Project (name, site address, delivery window, foreman name & phone)
+- Full order snapshot (items, quantities, totals)
+- Full thread transcript so far
+- Supplier profile (name, language, prior orders if any)
+- The current policy decision + reason (so the email tone matches: decline vs. clarify vs. confirm)
 
-- Supplier replies twice → quote updated in-place by `negotiation_id`.
-- Supplier declines / out of stock → marked `declined`, excluded from winner pool.
-- All 3 decline → `rfq_failed`, human escalation.
-- Deadline passes with partial responses → decide with what we have (rule: ≥1 quoted wins, else escalate).
-- Order is cancelled mid-RFQ → cron skips RFQs whose order is in `rejected`.
-- Webhook fires after RFQ already decided → no-op (idempotent on `rfq.status='decided'`).
-- Original supplier wins → still issue a fresh PO (don't reuse the RFQ thread).
+The LLM is instructed to:
 
-## Testing
+- Answer supplier questions **only if** the answer is unambiguously derivable from the above context.
+- Otherwise return `needs_user: true` with a short question for the foreman, which the webhook surfaces into the attention box.
+- Always reply in the supplier's language.
 
-- Unit-ish: a script under `/tmp` that seeds an order ≥ €200, simulates 3 webhook payloads (one cheap, one expensive, one decline), and asserts the order ends `ordered` with the winning supplier.
-- Manual: `stack_modern--invoke-server-function` to hit the timeout sweep after seeding a stale RFQ; assert auto-escalation.
-- Build check + runtime check via preview after each major step.
+## 5. Attention box upgrades
 
-## Out of scope (call out so you can decide)
+In the order detail UI, the "Needs attention" panel becomes structured:
 
-- Sending the foreman a notification when a winner is picked (the order already updates in their `/orders` view).
-- Multi-category orders splitting into multiple RFQs — current plan picks one dominant category. If you want per-category RFQs, say so and I'll add it.
-- Letting the PM see/override the RFQ winner before the PO goes out (currently fully auto once PM approves).
+- **Question from supplier** — shows the supplier's question + agent's suggested answer, with "Send" / "Edit" / "Ignore".
+- **Long lead time** — "Supplier X quotes 21 days. Confirm or cancel?" with one-click Confirm / Cancel & failover.
+- **Ambiguous quote** — missing price / shipping → ask supplier for clarification (auto-drafted).
+
+## 6. Files to touch
+
+```text
+agent/
+  policy.ts                    (new — threshold evaluator, returns Decision)
+  agent.server.ts              (wire policy into reply handler, add failover)
+  rfq.server.ts                (failover candidate lookup)
+templates/
+  cancellation.ts              (new — multilang decline email)
+src/lib/
+  orders.tsx                   (failover_history, search_snapshot fields)
+  order-status.ts              (add cancelled_no_supplier, failover_in_progress)
+  negotiations.ts              (rejected status, reason)
+src/routes/
+  procurement.orders.$orderId.tsx  (cancelled CTAs, failover trail, attention panel)
+  procurement.index.tsx        (accept ?restore=<orderId> to rehydrate search)
+supabase migration:
+  orders: add failover_history jsonb, search_snapshot jsonb, cancellation_reason text
+  negotiations: add reject_reason text
+```
+
+## 7. Edge cases handled
+
+- Supplier replies after we already failed over → auto-decline politely, do not reopen.
+- Failover candidate is the same supplier (different email) → skip.
+- All candidates exhausted mid-RFQ → cancel order, notify all open negotiations.
+- Supplier asks an irrelevant question (e.g. "what's the weather") → ignore, do not surface.
+- LLM hallucination guard: if drafted answer references info not in context, fall back to `needs_user`.
+- "Return to search" when products no longer exist → restore what's available, flag missing items.
+
+## 8. Verification
+
+- Seed a test order > €200 → RFQ → simulate 3 replies (good / high-shipping / decline) → assert winner = good, failover trail logged, emails sent.
+- Simulate all-reject → assert order cancelled, "Return to search" restores cart.
+- Simulate supplier question "what's the delivery address?" → assert agent auto-answers from project context, no user prompt.
+- Simulate "can you pay in 60 days?" when payment terms = 30 → assert escalates to user.
