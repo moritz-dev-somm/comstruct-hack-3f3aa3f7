@@ -13,6 +13,7 @@ import type { ChecklistField, ReplyClassification } from "./agent.server";
  */
 
 export const REPLY_CAP = 12;
+export const REPLY_LIMIT_REACHED_PREFIX = "Reply limit reached";
 export const AUTO_LEAD_TIME_DAYS_MAX = 14;
 export const AUTO_SHIPPING_EUR_FLOOR = 20;
 export const AUTO_SHIPPING_PERCENT_MAX = 0.05;
