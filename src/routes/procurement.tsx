@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Inbox, ListChecks, BarChart3, Package, HardHat, LogOut, Bot } from "lucide-react";
+import { Inbox, ListChecks, BarChart3, Package, HardHat, LogOut, Bot, Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrders } from "@/lib/orders";
@@ -38,6 +38,7 @@ function ProcurementLayout() {
     { to: "/procurement/agent", label: "Supplier agent", icon: Bot },
     { to: "/procurement/analytics", label: "Analytics", icon: BarChart3 },
     { to: "/procurement/catalog", label: "Catalog", icon: Package },
+    { to: "/procurement/catalog/manage", label: "Manage database", icon: Database, indent: true },
   ] as const;
 
   return (
@@ -70,14 +71,17 @@ function ProcurementLayout() {
           {nav.map((n) => {
             const active = n.to === "/procurement"
               ? pathname === "/procurement" || pathname === "/procurement/"
-              : pathname.startsWith(n.to);
+              : n.to === "/procurement/catalog"
+                ? pathname === "/procurement/catalog" || pathname === "/procurement/catalog/"
+                : pathname.startsWith(n.to);
+            const indent = "indent" in n && n.indent;
             return (
               <Link
                 key={n.to}
                 to={n.to}
                 className={`flex items-center gap-2.5 px-3 h-9 rounded-md text-sm font-medium transition-colors ${
-                  active ? "bg-brand text-brand-foreground" : "hover:bg-accent"
-                }`}
+                  indent ? "ml-4" : ""
+                } ${active ? "bg-brand text-brand-foreground" : "hover:bg-accent"}`}
               >
                 <n.icon className="size-4" />
                 <span className="flex-1">{n.label}</span>
