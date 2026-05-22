@@ -1843,7 +1843,24 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
 
   async function submit() {
     if (cart.items.length === 0) return;
-    const createdOrders = orders.createFromCart(cart.items);
+    // Snapshot the current chat thread so /orders → "Find alternatives"
+    // can restore the exact context that produced this order.
+    let snapshot: import("@/lib/orders").ChatSnapshot | undefined;
+    try {
+      const raw = localStorage.getItem("comstruct-chat");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const msgs = Array.isArray(parsed?.messages) ? parsed.messages : [];
+        const lastUser = [...msgs].reverse().find((m: { role: string }) => m?.role === "user");
+        snapshot = {
+          messages: msgs,
+          recommendedIds: Array.isArray(parsed?.recommendedIds) ? parsed.recommendedIds : [],
+          recommendedQty: typeof parsed?.recommendedQty === "object" && parsed.recommendedQty ? parsed.recommendedQty : {},
+          lastQuery: typeof lastUser?.content === "string" ? lastUser.content : undefined,
+        };
+      }
+    } catch {}
+    const createdOrders = orders.createFromCart(cart.items, snapshot);
     cart.clear();
     onClose();
     if (createdOrders.length === 0) return;
