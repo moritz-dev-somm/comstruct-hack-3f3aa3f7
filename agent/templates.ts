@@ -285,7 +285,8 @@ function renderOrderText(s: OrderStrings, order: Order, ctx: OrderEmailContext):
     ``,
     s.thanks,
     `${COMPANY.agentName}`,
-    `${COMPANY.contact} · ${COMPANY.phone}`,
+    `${resolveContact(ctx.agentEmail)} · ${COMPANY.phone}`,
+
   ].join("\n");
 }
 
