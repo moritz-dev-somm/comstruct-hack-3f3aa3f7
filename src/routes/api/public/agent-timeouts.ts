@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/public/agent-timeouts")({
 
         const { data: rows, error } = await sb
           .from("negotiations")
-          .select("id, status, sent_at, last_reply_at, supplier_name")
+          .select("id, status, sent_at, last_reply_at, last_progress_at, supplier_name")
           .in("status", WAITING);
         if (error) {
           console.error("agent-timeouts: query failed", error);
@@ -36,9 +36,15 @@ export const Route = createFileRoute("/api/public/agent-timeouts")({
         }
 
         const stale = (rows ?? []).filter((r) => {
-          const last = (r as { last_reply_at: string | null }).last_reply_at;
-          const sent = (r as { sent_at: string }).sent_at;
-          const ref = last || sent;
+          const row = r as {
+            last_progress_at: string | null;
+            last_reply_at: string | null;
+            sent_at: string;
+          };
+          // Reset the 24h clock only on replies that actually moved the
+          // negotiation forward. Falls back to last_reply_at (for rows
+          // written before last_progress_at existed) then sent_at.
+          const ref = row.last_progress_at || row.last_reply_at || row.sent_at;
           return ref && ref < cutoff;
         });
 
@@ -49,7 +55,7 @@ export const Route = createFileRoute("/api/public/agent-timeouts")({
             .from("negotiations")
             .update({
               status: "needs_user",
-              needs_user_reason: `No reply from ${r.supplier_name ?? "supplier"} for 24h.`,
+              needs_user_reason: `No progress from ${r.supplier_name ?? "supplier"} for 24h.`,
             })
             .eq("id", r.id);
           if (!upErr) flipped++;
