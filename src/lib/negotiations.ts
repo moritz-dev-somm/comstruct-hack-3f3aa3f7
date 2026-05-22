@@ -8,15 +8,33 @@ export type NegotiationStatus =
   | "needs_user"
   | "declined";
 
+export type NegotiationClassification = {
+  verdict?:
+    | "fully_confirmed"
+    | "confirmed_with_issue"
+    | "declined"
+    | "needs_clarification"
+    | "unclear";
+  summary_en?: string;
+  summary?: string;
+  last_action?: string;
+  last_action_reason?: string | null;
+  lead_time?: string | null;
+  shipping_cost_eur?: number | null;
+} | null;
+
 export type NegotiationRow = {
   id: string;
   order_id: string;
   supplier_name: string;
+  subject: string | null;
   status: NegotiationStatus | string;
   needs_user_reason: string | null;
   sent_at: string;
   last_reply_at: string | null;
   confirmed_at: string | null;
+  reply_excerpt: string | null;
+  classification: NegotiationClassification;
   delivery_date_iso: string | null;
   delivery_date_iso_end: string | null;
   delivery_date_confidence: "high" | "medium" | "low" | "unresolved" | null;
