@@ -421,6 +421,23 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
                 : action.pendingChecklist.map((f) => CHECKLIST_LABEL_EN[f]);
             break;
           }
+          case "auto_reject_failover": {
+            // Send a polite cancellation email to this supplier, mark the
+            // negotiation auto-rejected, and surface for failover.
+            // Failover wiring (next-supplier selection) is handled separately;
+            // here we make sure the rejection email + reject_reason persist.
+            const { composeDeclineAckEmail } = await import("../../../../../agent/templates");
+            const cancelEmail = composeDeclineAckEmail(order, lang);
+            await reply(cancelEmail);
+            outboundText = cancelEmail.text;
+            nextStatus = "auto_rejected";
+            needsUserReason = action.reason;
+            await sb
+              .from("negotiations")
+              .update({ reject_reason: action.reason })
+              .eq("id", neg.id);
+            break;
+          }
           case "escalate_silent": {
             nextStatus = "needs_user";
             needsUserReason = action.reason;
