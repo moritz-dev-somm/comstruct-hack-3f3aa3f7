@@ -376,7 +376,7 @@ Use the same language as the user.`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
