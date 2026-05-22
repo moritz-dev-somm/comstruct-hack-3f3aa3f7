@@ -204,7 +204,7 @@ function Home() {
     else if (role === "supervisor") navigate({ to: "/procurement" });
   }, [role, navigate]);
 
-  if (role !== "foreman") return null;
+  // Early return moved below all hooks to keep hook order stable (fixes React #310).
 
   const inConversation = messages.length > 0;
   const showCatalog = inConversation || selectedCategory !== null;
