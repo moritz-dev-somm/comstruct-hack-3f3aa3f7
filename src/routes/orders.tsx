@@ -52,6 +52,9 @@ function computeAttention(
   negotiations: NegotiationRow[] | undefined,
   rfq: RfqRow | null,
 ): AttentionInfo | null {
+  // Cancelled / rejected orders are no longer actionable.
+  if (order.status === "rejected" || order.status === "cancelled") return null;
+
   const list = negotiations ?? [];
   const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
   if (needsUserNeg) {
