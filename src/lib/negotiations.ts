@@ -62,7 +62,7 @@ export function useNegotiationsByOrder(orderIds: string[]): Record<string, Negot
       const { data, error } = await supabase
         .from("negotiations")
         .select(
-          "id, order_id, supplier_name, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification",
+          "id, order_id, supplier_name, subject, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, reply_excerpt, classification, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification",
         )
         .in("order_id", orderIds);
       if (cancelled || error || !data) return;
