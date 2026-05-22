@@ -40,27 +40,44 @@ export type DerivedStatus =
   | "confirmed"
   | "delivered";
 
-export type StatusTone = "neutral" | "amber" | "green" | "blue" | "teal" | "red";
+export type StatusTone =
+  | "neutral"
+  | "slate"
+  | "amber"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "emerald"
+  | "lime"
+  | "blue"
+  | "sky"
+  | "indigo"
+  | "cyan"
+  | "teal"
+  | "violet"
+  | "fuchsia"
+  | "rose"
+  | "red";
 
 export const DERIVED_STATUS_META: Record<
   DerivedStatus,
   { label: string; short: string; hint: string; tone: StatusTone; Icon: LucideIcon }
 > = {
-  draft:               { label: "Draft",                       short: "Draft",        hint: "Not submitted yet",                              tone: "neutral", Icon: FileEdit },
+  draft:               { label: "Draft",                       short: "Draft",        hint: "Not submitted yet",                              tone: "slate",   Icon: FileEdit },
   pending_pm:          { label: "Pending PM approval",         short: "PM review",    hint: "Waiting for project manager",                    tone: "amber",   Icon: Hourglass },
-  pending_central:     { label: "Pending central approval",    short: "Central",      hint: "Waiting for central procurement",                tone: "amber",   Icon: Hourglass },
-  rejected:            { label: "Rejected",                    short: "Rejected",     hint: "Order was rejected",                             tone: "red",     Icon: XCircle },
-  sending:             { label: "Sending to supplier",         short: "Sending",      hint: "Agent is dispatching the PO",                    tone: "blue",    Icon: Send },
-  awaiting_first_reply:{ label: "Waiting on supplier",         short: "Waiting",      hint: "Agent is awaiting first reply",                  tone: "blue",    Icon: Clock },
-  clarifying:          { label: "Clarifying with supplier",    short: "Clarifying",   hint: "Agent is resolving open points",                 tone: "amber",   Icon: MessageCircleQuestion },
-  following_up:        { label: "Following up",                short: "Following up", hint: "Agent sent a reminder to the supplier",          tone: "amber",   Icon: RefreshCcw },
-  answering_questions: { label: "Answering supplier questions",short: "Q&A",          hint: "Agent is answering supplier's questions",        tone: "blue",    Icon: HelpCircle },
+  pending_central:     { label: "Pending central approval",    short: "Central",      hint: "Waiting for central procurement",                tone: "orange",  Icon: Hourglass },
+  rejected:            { label: "Rejected",                    short: "Rejected",     hint: "Order was rejected",                             tone: "rose",    Icon: XCircle },
+  sending:             { label: "Sending to supplier",         short: "Sending",      hint: "Agent is dispatching the PO",                    tone: "indigo",  Icon: Send },
+  awaiting_first_reply:{ label: "Waiting on supplier",         short: "Waiting",      hint: "Agent is awaiting first reply",                  tone: "sky",     Icon: Clock },
+  clarifying:          { label: "Clarifying with supplier",    short: "Clarifying",   hint: "Agent is resolving open points",                 tone: "violet",  Icon: MessageCircleQuestion },
+  following_up:        { label: "Following up",                short: "Following up", hint: "Agent sent a reminder to the supplier",          tone: "yellow",  Icon: RefreshCcw },
+  answering_questions: { label: "Answering supplier questions",short: "Q&A",          hint: "Agent is answering supplier's questions",        tone: "cyan",    Icon: HelpCircle },
   issues_raised:       { label: "Issues raised",               short: "Issues",       hint: "Supplier flagged problems with the order",       tone: "red",     Icon: AlertTriangle },
-  declined:            { label: "Supplier declined",           short: "Declined",     hint: "Supplier cannot fulfil this order",              tone: "red",     Icon: XCircle },
-  action_required:     { label: "Needs your input",            short: "Needs you",    hint: "Agent can't proceed without you",                tone: "amber",   Icon: ShieldAlert },
-  partially_confirmed: { label: "Partially confirmed",         short: "Part. conf.",  hint: "Some suppliers confirmed, others pending",       tone: "teal",    Icon: CircleDashed },
-  confirmed:           { label: "Confirmed by supplier",       short: "Confirmed",    hint: "Supplier confirmed the full order",              tone: "green",   Icon: CheckCircle2 },
-  delivered:           { label: "Delivered",                   short: "Delivered",    hint: "Materials received on site",                     tone: "teal",    Icon: PackageCheck },
+  declined:            { label: "Supplier declined",           short: "Declined",     hint: "Supplier cannot fulfil this order",              tone: "rose",    Icon: XCircle },
+  action_required:     { label: "Needs your input",            short: "Needs you",    hint: "Agent can't proceed without you",                tone: "fuchsia", Icon: ShieldAlert },
+  partially_confirmed: { label: "Partially confirmed",         short: "Part. conf.",  hint: "Some suppliers confirmed, others pending",       tone: "lime",    Icon: CircleDashed },
+  confirmed:           { label: "Confirmed by supplier",       short: "Confirmed",    hint: "Supplier confirmed the full order",              tone: "emerald", Icon: CheckCircle2 },
+  delivered:           { label: "Delivered",                   short: "Delivered",    hint: "Materials received on site",                     tone: "green",   Icon: PackageCheck },
 };
 
 /** Verdict the agent extracted from the most recent supplier reply. */
@@ -152,11 +169,22 @@ export function deriveOrderStatus(
 
 export const STATUS_TONE_CLASS: Record<StatusTone, string> = {
   neutral: "bg-muted text-muted-foreground border-border",
-  amber: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40",
-  green: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40",
-  blue: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/40",
-  teal: "bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/40",
-  red: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40",
+  slate:   "bg-slate-500/10 text-slate-700 border-slate-500/30",
+  amber:   "bg-amber-500/15 text-amber-800 border-amber-500/40",
+  orange:  "bg-orange-500/15 text-orange-800 border-orange-500/40",
+  yellow:  "bg-yellow-400/20 text-yellow-800 border-yellow-500/40",
+  green:   "bg-green-600/15 text-green-800 border-green-600/40",
+  emerald: "bg-emerald-500/15 text-emerald-800 border-emerald-500/40",
+  lime:    "bg-lime-400/20 text-lime-800 border-lime-500/40",
+  blue:    "bg-blue-500/15 text-blue-800 border-blue-500/40",
+  sky:     "bg-sky-500/15 text-sky-800 border-sky-500/40",
+  indigo:  "bg-indigo-500/15 text-indigo-800 border-indigo-500/40",
+  cyan:    "bg-cyan-500/15 text-cyan-800 border-cyan-500/40",
+  teal:    "bg-teal-500/15 text-teal-800 border-teal-500/40",
+  violet:  "bg-violet-500/15 text-violet-800 border-violet-500/40",
+  fuchsia: "bg-fuchsia-500/15 text-fuchsia-800 border-fuchsia-500/40",
+  rose:    "bg-rose-500/15 text-rose-800 border-rose-500/40",
+  red:     "bg-red-500/15 text-red-800 border-red-500/40",
 };
 
 /* ------------------------------------------------------------------ */
