@@ -55,7 +55,36 @@ function ProcurementLayout() {
           <div className="flex-1" />
           <SwitchRoleButton compact />
         </div>
+        <nav className="flex gap-1 px-2 pb-2 overflow-x-auto no-scrollbar">
+          {nav.map((n) => {
+            const active = n.to === "/procurement"
+              ? pathname === "/procurement" || pathname === "/procurement/"
+              : n.to === "/procurement/catalog"
+                ? pathname === "/procurement/catalog" || pathname === "/procurement/catalog/"
+                : pathname.startsWith(n.to);
+            return (
+              <Link
+                key={n.to}
+                to={n.to}
+                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                  active ? "bg-brand text-brand-foreground" : "bg-muted text-foreground hover:bg-accent"
+                }`}
+              >
+                <n.icon className="size-3.5" />
+                <span>{n.label}</span>
+                {"badge" in n && n.badge ? (
+                  <span className={`text-[10px] font-bold rounded-sm px-1 ${
+                    active ? "bg-brand-foreground text-brand" : "bg-background border border-border"
+                  }`}>
+                    {n.badge}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
+
 
       <aside className="w-60 shrink-0 border-r bg-card hidden md:flex flex-col sticky top-0 h-screen">
         <div className="border-b px-3 py-3 space-y-2">
