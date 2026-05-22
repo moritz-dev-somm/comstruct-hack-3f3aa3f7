@@ -253,8 +253,8 @@ const enrichTool = {
 };
 
 export async function enrichRow(row: ParsedRow): Promise<EnrichedRow> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing");
 
   const prompt = `You are a construction-materials expert. Enrich the following product so it can be added to a job-site catalog.
 
