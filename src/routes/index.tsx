@@ -833,14 +833,10 @@ function HeroView({
 
         {/* Primary action CTAs — voice (brand) + scan (grey), visually distinct */}
         <div className="mt-8 flex justify-center items-start gap-8">
-          <VoiceButton size="hero" onTranscript={(t) => send(t)} />
-          <VoiceModeButton
-            size="hero"
-            onUserTranscript={onVoiceUserTurn}
-            onAssistantTranscript={onVoiceAssistantTurn}
-          />
+          <VoiceButton size="hero" onTranscript={(t) => send(t, { speak: true })} />
           <ScanButton size="hero" onResult={(prompt) => send(prompt)} />
         </div>
+
 
         <div className="my-6 h-px bg-border" />
 
