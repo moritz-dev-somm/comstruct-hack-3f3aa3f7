@@ -247,6 +247,18 @@ function Home() {
     } catch {}
   }, []);
 
+  // Prefill the chat input when arriving from another tab (e.g. the orders
+  // page wants to find alternatives for items the agent couldn't source).
+  const { prefill } = Route.useSearch();
+  useEffect(() => {
+    if (!prefill) return;
+    setInput(`Find alternatives for: ${prefill}`);
+    setTimeout(() => inputRef.current?.focus(), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
+
+
+
   useEffect(() => {
     if (messages.length === 0) return;
     localStorage.setItem(
