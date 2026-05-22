@@ -329,6 +329,26 @@ function AgentPage() {
     staleTime: 0,
   });
 
+  const suppliersQ = useQuery({
+    queryKey: ["agent-suppliers-phone"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("email, phone, name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const phoneByEmail = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of suppliersQ.data ?? []) {
+      if (s.email && s.phone) m.set(s.email.toLowerCase(), s.phone);
+    }
+    return m;
+  }, [suppliersQ.data]);
+
   const messageMut = useMutation({
     mutationFn: (messageId: string) =>
       getFn({ data: { inboxId: inbox!.inboxId, messageId } }),
