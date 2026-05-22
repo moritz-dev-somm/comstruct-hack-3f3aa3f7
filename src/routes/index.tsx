@@ -801,6 +801,73 @@ function HeroView({
           </div>
         </div>
 
+        {/* Your saved templates — foreman-defined quick-buy bundles */}
+        {tplHydrated && templates.length > 0 && products.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-wide">
+              <div className="flex-1 h-px bg-border" />
+              your templates
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="mt-4 space-y-3">
+              {templates.map((tpl) => {
+                const resolved = tpl.items
+                  .map((it) => {
+                    const p = products.find((p) => p.sku === it.sku);
+                    return p ? { product: p, qty: it.qty } : null;
+                  })
+                  .filter((x): x is { product: Product; qty: number } => Boolean(x));
+                if (resolved.length === 0) return null;
+                const total = `€${resolved.reduce((s, r) => s + r.product.price * r.qty, 0).toFixed(2)}`;
+                const names = resolved.map((r) => `${r.qty}× ${r.product.name}`);
+                return (
+                  <div
+                    key={tpl.id}
+                    className="w-full rounded-xl border bg-card p-4 transition-colors hover:border-brand/40"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-sm font-semibold truncate">
+                          <Bookmark className="size-3.5 shrink-0 text-brand" />
+                          {tpl.name}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {resolved.length} item{resolved.length === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <span className="text-sm font-semibold shrink-0">{total}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                      {names.slice(0, 3).join(" · ")}
+                      {names.length > 3 && ` · +${names.length - 3} more`}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          onAddTemplate(resolved.map((r) => ({ sku: r.product.sku, qty: r.qty })))
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        <ShoppingCart className="size-3.5" />
+                        Add all to cart
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete template "${tpl.name}"?`)) removeTemplate(tpl.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-label="Delete template"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Quick Reorder — demo orders wired to real catalog SKUs */}
         {products.length > 0 && (
           <div className="mt-10">
