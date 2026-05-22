@@ -17,13 +17,55 @@ export const AUTO_LEAD_TIME_DAYS_MAX = 14;
 export const AUTO_SHIPPING_EUR_FLOOR = 20;
 export const AUTO_SHIPPING_PERCENT_MAX = 0.05;
 
+// Hardcoded reject/needs-user thresholds (user-tuned).
+// Shipping auto-rejects (→ failover) only when BOTH conditions hit.
+export const SHIPPING_HARDCAP_EUR = 40;
+export const SHIPPING_HARDCAP_PCT_OF_SUBTOTAL = 0.5;
+// Lead time
+export const LEAD_TIME_NEEDS_USER_DAYS = 14;
+export const LEAD_TIME_AUTO_REJECT_DAYS = 30;
+
 export type AgentAction =
   | { kind: "send_confirmation"; reason?: string }
   | { kind: "send_checklist_followup"; fields: ChecklistField[] }
   | { kind: "send_answer_questions"; questions: string[] }
   | { kind: "send_clarification_request"; pendingChecklist: ChecklistField[] }
+  | { kind: "auto_reject_failover"; reason: string }
   | { kind: "escalate_silent"; reason: string }
   | { kind: "no_op"; reason: string };
+
+/**
+ * Classify a quote/reply against the hardcoded thresholds.
+ * Used by the policy to decide whether to auto-reject (→ failover),
+ * defer to the user, or proceed normally.
+ */
+export function evaluateThresholds(
+  cls: ReplyClassification,
+  subtotalEur: number,
+): { verdict: "ok" | "needs_user" | "auto_reject"; reason: string } {
+  const ship = cls.shipping_cost_eur;
+  const days = cls.lead_time_days;
+
+  if (typeof days === "number" && Number.isFinite(days) && days > LEAD_TIME_AUTO_REJECT_DAYS) {
+    return { verdict: "auto_reject", reason: `Lead time ${days} days exceeds ${LEAD_TIME_AUTO_REJECT_DAYS}-day hard cap.` };
+  }
+  if (
+    typeof ship === "number" &&
+    Number.isFinite(ship) &&
+    ship > SHIPPING_HARDCAP_EUR &&
+    subtotalEur > 0 &&
+    ship > SHIPPING_HARDCAP_PCT_OF_SUBTOTAL * subtotalEur
+  ) {
+    return {
+      verdict: "auto_reject",
+      reason: `Shipping €${ship.toFixed(2)} exceeds both €${SHIPPING_HARDCAP_EUR} and ${Math.round(SHIPPING_HARDCAP_PCT_OF_SUBTOTAL * 100)}% of subtotal (€${subtotalEur.toFixed(2)}).`,
+    };
+  }
+  if (typeof days === "number" && Number.isFinite(days) && days > LEAD_TIME_NEEDS_USER_DAYS) {
+    return { verdict: "needs_user", reason: `Supplier quotes ${days}-day lead time — please confirm or cancel.` };
+  }
+  return { verdict: "ok", reason: "" };
+}
 
 export type CounterState = {
   followup_count: number;
@@ -89,6 +131,15 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
 
   switch (cls.verdict) {
     case "fully_confirmed": {
+      // Even fully-confirmed replies are auto-rejected if shipping or lead
+      // time blew past the hard caps.
+      const t = evaluateThresholds(cls, state.order_subtotal_eur);
+      if (t.verdict === "auto_reject") {
+        return { kind: "auto_reject_failover", reason: t.reason };
+      }
+      if (t.verdict === "needs_user") {
+        return { kind: "escalate_silent", reason: t.reason };
+      }
       if (pending.length === 0 && issues.length === 0) {
         return { kind: "send_confirmation" };
       }
@@ -104,22 +155,29 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
     }
 
     case "confirmed_with_issue": {
-      // Item unavailability → straight to human, no email.
+      // Item unavailability → auto-reject + failover (was: silent escalate).
       const unavailable = issues.some((i) => UNAVAILABLE_RE.test(i)) ||
         UNAVAILABLE_RE.test(cls.summary || "") ||
         UNAVAILABLE_RE.test(cls.summary_en || "");
       if (unavailable) {
         return {
-          kind: "escalate_silent",
-          reason: `Supplier flagged item unavailable: ${cls.summary_en || cls.summary}`,
+          kind: "auto_reject_failover",
+          reason: `Item unavailable: ${cls.summary_en || cls.summary}`,
         };
+      }
+
+      // Hard threshold check (shipping / lead time).
+      const t = evaluateThresholds(cls, state.order_subtotal_eur);
+      if (t.verdict === "auto_reject") {
+        return { kind: "auto_reject_failover", reason: t.reason };
+      }
+      if (t.verdict === "needs_user") {
+        return { kind: "escalate_silent", reason: t.reason };
       }
 
       const leadOk = isAcceptableLeadTime(cls);
       const shipOk = isAcceptableShipping(cls, state.order_subtotal_eur);
 
-      // Issues we tolerate automatically: only lead-time / shipping deviations,
-      // and only when both are within thresholds.
       const benignIssues = issues.every((i) =>
         /(lead time|delivery|liefer|consegna|livraison|shipping|versand|expédition|spedizione|frais|surcharge)/i.test(i),
       );
@@ -141,9 +199,11 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
     }
 
     case "declined": {
-      // No automatic email. Wait for human to authorise replacement purchase,
-      // which will trigger the decline-ack email separately.
-      return { kind: "escalate_silent", reason: `Supplier declined: ${cls.summary_en || cls.summary}` };
+      // Supplier explicitly declined → auto-failover to next supplier.
+      return {
+        kind: "auto_reject_failover",
+        reason: `Supplier declined: ${cls.summary_en || cls.summary}`,
+      };
     }
 
     case "needs_clarification": {

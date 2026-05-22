@@ -53,6 +53,8 @@ export type Database = {
           classification: Json | null
           confirmed_at: string | null
           created_at: string
+          failover_attempt: number
+          failover_of: string | null
           followup_count: number
           id: string
           inbox_id: string
@@ -64,6 +66,7 @@ export type Database = {
           order_id: string
           order_snapshot: Json
           project: string | null
+          reject_reason: string | null
           reply_excerpt: string | null
           reply_message_id: string | null
           security_reject_reason: string | null
@@ -82,6 +85,8 @@ export type Database = {
           classification?: Json | null
           confirmed_at?: string | null
           created_at?: string
+          failover_attempt?: number
+          failover_of?: string | null
           followup_count?: number
           id?: string
           inbox_id: string
@@ -93,6 +98,7 @@ export type Database = {
           order_id: string
           order_snapshot: Json
           project?: string | null
+          reject_reason?: string | null
           reply_excerpt?: string | null
           reply_message_id?: string | null
           security_reject_reason?: string | null
@@ -111,6 +117,8 @@ export type Database = {
           classification?: Json | null
           confirmed_at?: string | null
           created_at?: string
+          failover_attempt?: number
+          failover_of?: string | null
           followup_count?: number
           id?: string
           inbox_id?: string
@@ -122,6 +130,7 @@ export type Database = {
           order_id?: string
           order_snapshot?: Json
           project?: string | null
+          reject_reason?: string | null
           reply_excerpt?: string | null
           reply_message_id?: string | null
           security_reject_reason?: string | null
@@ -275,6 +284,7 @@ export type Database = {
           negotiation_id: string | null
           raw_reply_excerpt: string | null
           received_at: string | null
+          reject_reason: string | null
           rfq_id: string
           shipping_cost_eur: number | null
           status: string
@@ -292,6 +302,7 @@ export type Database = {
           negotiation_id?: string | null
           raw_reply_excerpt?: string | null
           received_at?: string | null
+          reject_reason?: string | null
           rfq_id: string
           shipping_cost_eur?: number | null
           status?: string
@@ -309,6 +320,7 @@ export type Database = {
           negotiation_id?: string | null
           raw_reply_excerpt?: string | null
           received_at?: string | null
+          reject_reason?: string | null
           rfq_id?: string
           shipping_cost_eur?: number | null
           status?: string
@@ -330,11 +342,13 @@ export type Database = {
       }
       rfqs: {
         Row: {
+          cancellation_reason: string | null
           created_at: string
           deadline_at: string
           decided_at: string | null
           dominant_category: string | null
           escalation_reason: string | null
+          failover_history: Json
           id: string
           invited_suppliers: string[]
           order_id: string
@@ -345,11 +359,13 @@ export type Database = {
           winner_total_eur: number | null
         }
         Insert: {
+          cancellation_reason?: string | null
           created_at?: string
           deadline_at: string
           decided_at?: string | null
           dominant_category?: string | null
           escalation_reason?: string | null
+          failover_history?: Json
           id?: string
           invited_suppliers?: string[]
           order_id: string
@@ -360,11 +376,13 @@ export type Database = {
           winner_total_eur?: number | null
         }
         Update: {
+          cancellation_reason?: string | null
           created_at?: string
           deadline_at?: string
           decided_at?: string | null
           dominant_category?: string | null
           escalation_reason?: string | null
+          failover_history?: Json
           id?: string
           invited_suppliers?: string[]
           order_id?: string
