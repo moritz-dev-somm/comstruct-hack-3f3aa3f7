@@ -436,7 +436,41 @@ function Home() {
     }
   }
 
-  // voice handled by <VoiceButton />; transcript is sent immediately
+  // --- Voice mode (Vapi) transcript bridge ---------------------------------
+  // Mirror live voice turns into the same `messages` state the typed flow
+  // uses, so the on-screen transcript stays in sync with what was said.
+  function appendVoiceUserTurn(text: string) {
+    const t = text.trim();
+    if (!t) return;
+    setMessages((prev) => [...prev, { role: "user", content: t }]);
+  }
+  function appendVoiceAssistantTurn(text: string) {
+    const t = text.trim();
+    if (!t) return;
+    // Re-use the product-token detection so any [[product:SKU:QTY]] markers
+    // the voice agent emits still surface as recommended pills.
+    const re = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
+    const found: { sku: string; qty: number }[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(t)) !== null) {
+      found.push({ sku: m[1], qty: m[2] ? parseInt(m[2], 10) : 1 });
+    }
+    if (found.length) {
+      setRecommendedIds((prev) => {
+        const set = new Set(prev);
+        const add = found.map((f) => f.sku).filter((s) => !set.has(s));
+        return add.length ? [...prev, ...add] : prev;
+      });
+      setRecommendedQty((prev) => {
+        const next = { ...prev };
+        for (const f of found) next[f.sku] = f.qty;
+        return next;
+      });
+    }
+    setMessages((prev) => [...prev, { role: "assistant", content: t }]);
+  }
+
+  // voice handled by <VoiceButton /> and <VoiceModeButton />.
 
   function reset() {
     setMessages([]);
