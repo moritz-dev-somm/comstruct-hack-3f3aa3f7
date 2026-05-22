@@ -91,7 +91,6 @@ async function parsePdf(file: File): Promise<PdfParse> {
   // "undefined is not a function" once pdf.js tries to talk to the worker).
   const [pdfjs, workerMod] = await Promise.all([
     import("pdfjs-dist"),
-    // @ts-expect-error - Vite-only `?url` suffix has no TS declaration
     import("pdfjs-dist/build/pdf.worker.min.mjs?url") as Promise<{ default: string }>,
   ]);
   pdfjs.GlobalWorkerOptions.workerSrc = workerMod.default;
