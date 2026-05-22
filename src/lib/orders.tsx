@@ -271,6 +271,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
           status,
           approver: tierApprover(tier),
           history,
+          searchSnapshot: snapshot,
         };
         running = [order, ...running];
         newOnes.push(order);
