@@ -258,15 +258,24 @@ function Home() {
   // The /orders "Find alternatives" handler also rewrites `comstruct-chat`
   // beforehand so the prior search context is already loaded by the effect
   // above — here we only seed a clear follow-up turn for the foreman.
-  const { prefill } = Route.useSearch();
+  const { prefill, autoSend } = Route.useSearch();
+  const prefillSentRef = useRef(false);
   useEffect(() => {
     if (!prefill) return;
+    if (autoSend) {
+      if (prefillSentRef.current) return;
+      prefillSentRef.current = true;
+      // Fire-and-forget; send() is safe to call without awaiting.
+      setTimeout(() => { void send(prefill); }, 0);
+      return;
+    }
     setInput(prefill);
     const isTouch = typeof window !== "undefined"
       && window.matchMedia("(hover: none), (pointer: coarse)").matches;
     if (!isTouch) setTimeout(() => inputRef.current?.focus(), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefill]);
+  }, [prefill, autoSend]);
+
 
 
 
