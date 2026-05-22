@@ -269,6 +269,18 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       prev.map((o) => {
         if (o.id !== id) return o;
         const now = new Date().toISOString();
+        // ≥ €200 → enter RFQ flow instead of immediate PO.
+        if (o.subtotal >= RFQ_THRESHOLD_EUR) {
+          return {
+            ...o,
+            status: "rfq_in_progress",
+            history: [
+              ...o.history,
+              { at: now, label: "Approved", actor },
+              { at: now, label: "Discount RFQ sent to top suppliers" },
+            ],
+          };
+        }
         return {
           ...o,
           status: "ordered",
@@ -311,9 +323,45 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  /**
+   * Called by the UI when the RFQ resolver decides on a winner. Flips the
+   * order to `ordered`, records the winning supplier + total in the history,
+   * and (if applicable) escalates to `rfq_failed` when no quote was usable.
+   */
+  const applyRfqResult = useCallback<OrdersCtx["applyRfqResult"]>((id, result) => {
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.id !== id) return o;
+        if (o.status !== "rfq_in_progress") return o; // idempotent
+        const now = new Date().toISOString();
+        if (result.kind === "decided") {
+          return {
+            ...o,
+            status: "ordered",
+            history: [
+              ...o.history,
+              {
+                at: now,
+                label: `Winner: ${result.winner} (€${result.total.toFixed(2)} total) — PO sent`,
+              },
+            ],
+          };
+        }
+        return {
+          ...o,
+          status: "rfq_failed",
+          history: [
+            ...o.history,
+            { at: now, label: `RFQ failed: ${result.reason}` },
+          ],
+        };
+      }),
+    );
+  }, []);
+
   const value = useMemo<OrdersCtx>(
-    () => ({ orders, createFromCart, approve, reject, advanceToDelivered }),
-    [orders, createFromCart, approve, reject, advanceToDelivered],
+    () => ({ orders, createFromCart, approve, reject, advanceToDelivered, applyRfqResult }),
+    [orders, createFromCart, approve, reject, advanceToDelivered, applyRfqResult],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
