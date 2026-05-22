@@ -507,7 +507,64 @@ function Home() {
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-3xl px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild>
+                <button
+                  aria-label="Open menu"
+                  className="inline-flex items-center justify-center size-10 rounded-full border hover:bg-accent"
+                >
+                  <Menu className="size-4" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 flex flex-col gap-6">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-medium text-muted-foreground">Current site</label>
+                    <Select
+                      value={project}
+                      onValueChange={(v) => {
+                        setProject(v);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <SelectTrigger className="h-10 w-full text-sm border-border">
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ramistrasse-101">Rämistrasse 101</SelectItem>
+                        <SelectItem value="bahnhofstrasse-42">Bahnhofstrasse 42</SelectItem>
+                        <SelectItem value="langstrasse-77">Langstrasse 77</SelectItem>
+                        <SelectItem value="sechselautenplatz-1">Sechseläutenplatz 1</SelectItem>
+                        <SelectItem value="limmatquai-150">Limmatquai 150</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Link
+                    to="/orders"
+                    onClick={() => setMenuOpen(false)}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 h-11 text-sm font-medium hover:bg-accent"
+                  >
+                    <ClipboardList className="size-4" />
+                    My orders
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      logout();
+                      navigate({ to: "/login" });
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 h-11 text-sm font-medium hover:bg-accent"
+                  >
+                    <LogOut className="size-4" />
+                    Switch user
+                  </button>
+                </div>
+              </SheetContent>
+            </Sheet>
             <button
               onClick={reset}
               aria-label="comstruct home"
@@ -519,40 +576,9 @@ function Home() {
                 className="h-8 w-auto"
               />
             </button>
-            <Select value={project} onValueChange={setProject}>
-              <SelectTrigger className="h-9 w-[180px] text-xs border-border">
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ramistrasse-101">Rämistrasse 101</SelectItem>
-                <SelectItem value="bahnhofstrasse-42">Bahnhofstrasse 42</SelectItem>
-                <SelectItem value="langstrasse-77">Langstrasse 77</SelectItem>
-                <SelectItem value="sechselautenplatz-1">Sechseläutenplatz 1</SelectItem>
-                <SelectItem value="limmatquai-150">Limmatquai 150</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div className="flex items-center gap-1.5">
             <LanguageSelector />
-            <Link
-              to="/orders"
-              aria-label="My orders"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border px-3 h-10 text-xs font-medium hover:bg-accent"
-            >
-              <ClipboardList className="size-4" />
-              Orders
-            </Link>
-            <button
-              onClick={() => {
-                logout();
-                navigate({ to: "/login" });
-              }}
-              aria-label="Switch user"
-              className="inline-flex items-center gap-1.5 rounded-full border px-3 h-10 text-xs font-medium hover:bg-accent"
-            >
-              <LogOut className="size-4" />
-              <span className="hidden sm:inline">Switch user</span>
-            </button>
             <button
               onClick={() => setCartOpen(true)}
               className="relative inline-flex items-center gap-2 rounded-full border px-3 h-10 text-sm font-medium hover:bg-accent"
@@ -568,6 +594,7 @@ function Home() {
           </div>
         </div>
       </header>
+
 
       <main className="flex-1 flex flex-col">
         {!showCatalog ? (
