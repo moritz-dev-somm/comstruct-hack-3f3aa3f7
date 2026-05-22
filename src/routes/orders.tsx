@@ -11,10 +11,12 @@ import {
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
+import { useRfqsByOrder, type RfqRow } from "@/lib/rfqs";
 import {
   DERIVED_STATUS_META,
   STATUS_TONE_CLASS,
   VERDICT_META,
+  buildOrderTimeline,
   deriveOrderStatus,
   negotiationToDerived,
   pickDeliveryForOrder,
@@ -22,6 +24,7 @@ import {
   type DerivedStatus,
   type OrderDelivery,
   type OrderShipping,
+  type StatusTone,
   type Verdict,
 } from "@/lib/order-status";
 import { SwitchUserButton } from "@/components/SwitchUserButton";
@@ -39,6 +42,7 @@ function OrdersPage() {
   const [openId, setOpenId] = useState<string | null>(orders[0]?.id ?? null);
   const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
   const negotiationsByOrder = useNegotiationsByOrder(orderIds);
+  const rfqsByOrder = useRfqsByOrder(orderIds);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -67,6 +71,7 @@ function OrdersPage() {
             key={o.id}
             order={o}
             negotiations={negotiationsByOrder[o.id]}
+            rfq={rfqsByOrder[o.id]?.rfq ?? null}
             open={openId === o.id}
             onToggle={() => setOpenId(openId === o.id ? null : o.id)}
           />
@@ -79,11 +84,13 @@ function OrdersPage() {
 function OrderRow({
   order,
   negotiations,
+  rfq,
   open,
   onToggle,
 }: {
   order: Order;
   negotiations: NegotiationRow[] | undefined;
+  rfq: RfqRow | null;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -92,6 +99,7 @@ function OrderRow({
   const delivery = pickDeliveryForOrder(negotiations);
   const shipping = pickShippingForOrder(negotiations);
   const list = negotiations ?? [];
+  const timeline = buildOrderTimeline(order, negotiations, rfq);
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
@@ -141,12 +149,18 @@ function OrderRow({
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Timeline</h4>
             <ol className="text-sm space-y-1.5">
-              {order.history.map((ev, idx) => (
+              {timeline.map((ev, idx) => (
                 <li key={idx} className="flex gap-3">
                   <span className="text-xs text-muted-foreground tabular-nums shrink-0 w-24">
                     {new Date(ev.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  <span>
+                  <span className="flex-1">
+                    {ev.tone && (
+                      <span
+                        className={`inline-block size-2 rounded-full mr-2 align-middle ${dotForTone(ev.tone)}`}
+                        aria-hidden
+                      />
+                    )}
                     {ev.label}
                     {ev.actor && <span className="text-muted-foreground"> · {ev.actor}</span>}
                   </span>
@@ -297,4 +311,28 @@ function VerdictPill({ verdict }: { verdict: Verdict }) {
       {m.label}
     </span>
   );
+}
+
+const TONE_DOT: Record<StatusTone, string> = {
+  neutral: "bg-muted-foreground/40",
+  slate: "bg-slate-500",
+  amber: "bg-amber-500",
+  orange: "bg-orange-500",
+  yellow: "bg-yellow-500",
+  green: "bg-green-600",
+  emerald: "bg-emerald-500",
+  lime: "bg-lime-500",
+  blue: "bg-blue-500",
+  sky: "bg-sky-500",
+  indigo: "bg-indigo-500",
+  cyan: "bg-cyan-500",
+  teal: "bg-teal-500",
+  violet: "bg-violet-500",
+  fuchsia: "bg-fuchsia-500",
+  rose: "bg-rose-500",
+  red: "bg-red-500",
+};
+
+function dotForTone(tone: StatusTone): string {
+  return TONE_DOT[tone] ?? TONE_DOT.neutral;
 }

@@ -40,6 +40,9 @@ export type NegotiationRow = {
   delivery_date_confidence: "high" | "medium" | "low" | "unresolved" | null;
   delivery_date_raw: string | null;
   delivery_date_needs_clarification: boolean | null;
+  reject_reason: string | null;
+  failover_of: string | null;
+  failover_attempt: number | null;
 };
 
 /**
@@ -62,7 +65,7 @@ export function useNegotiationsByOrder(orderIds: string[]): Record<string, Negot
       const { data, error } = await supabase
         .from("negotiations")
         .select(
-          "id, order_id, supplier_name, subject, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, reply_excerpt, classification, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification",
+          "id, order_id, supplier_name, subject, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, reply_excerpt, classification, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification, reject_reason, failover_of, failover_attempt",
         )
         .in("order_id", orderIds);
       if (cancelled || error || !data) return;
