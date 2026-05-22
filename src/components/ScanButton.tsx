@@ -49,7 +49,7 @@ export function ScanButton({
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Scan a product or barcode"
-            className="group relative grid h-24 w-24 place-items-center rounded-full bg-secondary text-secondary-foreground border border-border shadow-lg transition-transform active:scale-95 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/10 select-none touch-none"
+            className="group relative grid h-24 w-24 place-items-center rounded-full bg-background text-brand border-[3px] border-brand transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 select-none touch-none"
           >
             <ScanLine className="relative size-10" strokeWidth={2.5} />
           </button>
@@ -61,7 +61,7 @@ export function ScanButton({
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Scan a product or barcode"
-          className="relative grid size-14 shrink-0 place-items-center rounded-full bg-secondary text-secondary-foreground border border-border active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/10"
+          className="relative grid size-14 shrink-0 place-items-center rounded-full bg-background text-brand border-[3px] border-brand active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20"
         >
           <ScanLine className="size-6" strokeWidth={2.5} />
         </button>

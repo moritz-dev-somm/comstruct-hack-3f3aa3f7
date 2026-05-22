@@ -781,7 +781,7 @@ function HeroView({
             <button
               key={chip}
               onClick={() => send(chip)}
-              className="rounded-full border border-primary text-brand hover:bg-primary/10 px-3 h-8 text-xs font-medium"
+              className="rounded-full border border-brand text-brand hover:bg-brand/10 px-3 h-8 text-xs font-medium"
             >
               {chip}
             </button>
@@ -1122,7 +1122,7 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5 max-w-[80%] text-[15px]">
+        <div className="bg-brand text-brand-foreground rounded-2xl rounded-br-md px-4 py-2.5 max-w-[80%] text-[15px]">
           {msg.content}
         </div>
       </div>
@@ -1169,7 +1169,7 @@ function MessageBubble({ msg, products }: { msg: ChatMessage; products: Product[
           <button
             type="button"
             onClick={addAll}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 hover:bg-brand/10 text-brand px-3 py-1.5 text-sm font-medium transition-colors"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 text-sm font-semibold transition-colors"
           >
             <Plus className="size-4" /> Add all {bundle.length} to cart
           </button>
@@ -1343,7 +1343,7 @@ function InlineProductBubble({
           <HoldButton
             onTick={addBatch}
             stopPropagation
-            className="ml-1 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand text-brand-foreground px-2.5 h-7 text-xs font-bold"
+            className="ml-1 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 px-2.5 h-7 text-xs font-bold"
             aria-label={`Add ${addQty} ${product.name} to cart`}
           >
             <Plus className="size-3.5" />
