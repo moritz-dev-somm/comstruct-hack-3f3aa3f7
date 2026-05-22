@@ -751,9 +751,26 @@ function Home() {
             searching={searching}
             searchResults={searchResults}
             searchExtracted={searchExtracted}
+            followupBar={
+              <div className="flex items-end gap-2">
+                <div className="flex-1 min-w-0">
+                  <ChatInput
+                    value={input}
+                    onChange={setInput}
+                    onSend={() => send(input)}
+                    disabled={streaming}
+                    inputRef={inputRef}
+                    placeholder="Ask a follow-up…"
+                  />
+                </div>
+                <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
+                <VoiceButton size="compact" onTranscript={(t) => send(t, { speak: true })} />
+              </div>
+            }
           />
 
         )}
+
       </main>
 
       {/* Fixed close-chat button — always visible at top-left while in a conversation */}
