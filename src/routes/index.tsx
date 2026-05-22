@@ -41,6 +41,8 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
+import comstructLogo from "@/assets/comstruct-logo.png";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   IconTile,
   CompassIcon,
