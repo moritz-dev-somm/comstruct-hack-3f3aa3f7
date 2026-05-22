@@ -149,12 +149,18 @@ function OrderRow({
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Timeline</h4>
             <ol className="text-sm space-y-1.5">
-              {order.history.map((ev, idx) => (
+              {timeline.map((ev, idx) => (
                 <li key={idx} className="flex gap-3">
                   <span className="text-xs text-muted-foreground tabular-nums shrink-0 w-24">
                     {new Date(ev.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  <span>
+                  <span className="flex-1">
+                    {ev.tone && (
+                      <span
+                        className={`inline-block size-2 rounded-full mr-2 align-middle ${dotForTone(ev.tone)}`}
+                        aria-hidden
+                      />
+                    )}
                     {ev.label}
                     {ev.actor && <span className="text-muted-foreground"> · {ev.actor}</span>}
                   </span>
