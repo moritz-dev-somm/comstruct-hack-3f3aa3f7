@@ -155,15 +155,23 @@ function OrdersPage() {
     navigate({ to: "/", search: { prefill: prompt } });
   }
 
-  function handleCancel(order: Order, info: AttentionInfo) {
-    reject(
-      order.id,
-      "Marco Bianchi",
-      info.kind === "rfq_failed"
-        ? "Cancelled by foreman — no alternative supplier"
-        : "Cancelled by foreman",
-    );
+  function handleCancel(order: Order, _info: AttentionInfo) {
+    reject(order.id, "Marco Bianchi", "Cancelled by foreman");
   }
+
+  async function handleConfirmSupplier(order: Order, info: AttentionInfo) {
+    if (!info.negotiationId) return;
+    const { error } = await supabase
+      .from("negotiations")
+      .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+      .eq("id", info.negotiationId);
+    if (error) {
+      toast.error("Could not confirm supplier reply");
+      return;
+    }
+    toast.success("Supplier confirmed");
+  }
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
