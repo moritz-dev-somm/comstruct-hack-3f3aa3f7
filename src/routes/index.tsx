@@ -1143,10 +1143,18 @@ function ConversationView({
                 {f}
               </SuggestionButton>
             ))}
-          </div>
-        )}
-
       </div>
+
+      {/* Follow-up input — inline between conversation and catalog results */}
+      {followupBar && (
+        <div className="border-t bg-background">
+          <div className="mx-auto max-w-3xl px-4 py-3">
+            {followupBar}
+          </div>
+        </div>
+      )}
+
+
 
       {/* Hybrid catalog search results — refreshed after every assistant turn */}
       {(searching || (searchResults && searchResults.length > 0)) && (
