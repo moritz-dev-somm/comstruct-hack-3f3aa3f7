@@ -40,27 +40,44 @@ export type DerivedStatus =
   | "confirmed"
   | "delivered";
 
-export type StatusTone = "neutral" | "amber" | "green" | "blue" | "teal" | "red";
+export type StatusTone =
+  | "neutral"
+  | "slate"
+  | "amber"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "emerald"
+  | "lime"
+  | "blue"
+  | "sky"
+  | "indigo"
+  | "cyan"
+  | "teal"
+  | "violet"
+  | "fuchsia"
+  | "rose"
+  | "red";
 
 export const DERIVED_STATUS_META: Record<
   DerivedStatus,
   { label: string; short: string; hint: string; tone: StatusTone; Icon: LucideIcon }
 > = {
-  draft:               { label: "Draft",                       short: "Draft",        hint: "Not submitted yet",                              tone: "neutral", Icon: FileEdit },
+  draft:               { label: "Draft",                       short: "Draft",        hint: "Not submitted yet",                              tone: "slate",   Icon: FileEdit },
   pending_pm:          { label: "Pending PM approval",         short: "PM review",    hint: "Waiting for project manager",                    tone: "amber",   Icon: Hourglass },
-  pending_central:     { label: "Pending central approval",    short: "Central",      hint: "Waiting for central procurement",                tone: "amber",   Icon: Hourglass },
-  rejected:            { label: "Rejected",                    short: "Rejected",     hint: "Order was rejected",                             tone: "red",     Icon: XCircle },
-  sending:             { label: "Sending to supplier",         short: "Sending",      hint: "Agent is dispatching the PO",                    tone: "blue",    Icon: Send },
-  awaiting_first_reply:{ label: "Waiting on supplier",         short: "Waiting",      hint: "Agent is awaiting first reply",                  tone: "blue",    Icon: Clock },
-  clarifying:          { label: "Clarifying with supplier",    short: "Clarifying",   hint: "Agent is resolving open points",                 tone: "amber",   Icon: MessageCircleQuestion },
-  following_up:        { label: "Following up",                short: "Following up", hint: "Agent sent a reminder to the supplier",          tone: "amber",   Icon: RefreshCcw },
-  answering_questions: { label: "Answering supplier questions",short: "Q&A",          hint: "Agent is answering supplier's questions",        tone: "blue",    Icon: HelpCircle },
+  pending_central:     { label: "Pending central approval",    short: "Central",      hint: "Waiting for central procurement",                tone: "orange",  Icon: Hourglass },
+  rejected:            { label: "Rejected",                    short: "Rejected",     hint: "Order was rejected",                             tone: "rose",    Icon: XCircle },
+  sending:             { label: "Sending to supplier",         short: "Sending",      hint: "Agent is dispatching the PO",                    tone: "indigo",  Icon: Send },
+  awaiting_first_reply:{ label: "Waiting on supplier",         short: "Waiting",      hint: "Agent is awaiting first reply",                  tone: "sky",     Icon: Clock },
+  clarifying:          { label: "Clarifying with supplier",    short: "Clarifying",   hint: "Agent is resolving open points",                 tone: "violet",  Icon: MessageCircleQuestion },
+  following_up:        { label: "Following up",                short: "Following up", hint: "Agent sent a reminder to the supplier",          tone: "yellow",  Icon: RefreshCcw },
+  answering_questions: { label: "Answering supplier questions",short: "Q&A",          hint: "Agent is answering supplier's questions",        tone: "cyan",    Icon: HelpCircle },
   issues_raised:       { label: "Issues raised",               short: "Issues",       hint: "Supplier flagged problems with the order",       tone: "red",     Icon: AlertTriangle },
-  declined:            { label: "Supplier declined",           short: "Declined",     hint: "Supplier cannot fulfil this order",              tone: "red",     Icon: XCircle },
-  action_required:     { label: "Needs your input",            short: "Needs you",    hint: "Agent can't proceed without you",                tone: "amber",   Icon: ShieldAlert },
-  partially_confirmed: { label: "Partially confirmed",         short: "Part. conf.",  hint: "Some suppliers confirmed, others pending",       tone: "teal",    Icon: CircleDashed },
-  confirmed:           { label: "Confirmed by supplier",       short: "Confirmed",    hint: "Supplier confirmed the full order",              tone: "green",   Icon: CheckCircle2 },
-  delivered:           { label: "Delivered",                   short: "Delivered",    hint: "Materials received on site",                     tone: "teal",    Icon: PackageCheck },
+  declined:            { label: "Supplier declined",           short: "Declined",     hint: "Supplier cannot fulfil this order",              tone: "rose",    Icon: XCircle },
+  action_required:     { label: "Needs your input",            short: "Needs you",    hint: "Agent can't proceed without you",                tone: "fuchsia", Icon: ShieldAlert },
+  partially_confirmed: { label: "Partially confirmed",         short: "Part. conf.",  hint: "Some suppliers confirmed, others pending",       tone: "lime",    Icon: CircleDashed },
+  confirmed:           { label: "Confirmed by supplier",       short: "Confirmed",    hint: "Supplier confirmed the full order",              tone: "emerald", Icon: CheckCircle2 },
+  delivered:           { label: "Delivered",                   short: "Delivered",    hint: "Materials received on site",                     tone: "green",   Icon: PackageCheck },
 };
 
 /** Verdict the agent extracted from the most recent supplier reply. */
