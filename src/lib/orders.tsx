@@ -124,7 +124,7 @@ type OrdersCtx = {
    * gets its own ID, subtotal, tier and status — this mirrors procurement
    * reality (one PO per supplier).
    */
-  createFromCart: (items: CartItem[]) => Order[];
+  createFromCart: (items: CartItem[], snapshot?: ChatSnapshot) => Order[];
   approve: (id: string, actor: string) => void;
   reject: (id: string, actor: string, reason: string) => void;
   advanceToDelivered: (id: string) => void;
