@@ -57,7 +57,7 @@ function ProcurementLayout() {
         </div>
       </div>
 
-      <aside className="w-60 shrink-0 border-r bg-card hidden md:flex flex-col">
+      <aside className="w-60 shrink-0 border-r bg-card hidden md:flex flex-col sticky top-0 h-screen">
         <div className="border-b px-3 py-3 space-y-2">
           <div className="flex items-center gap-2">
             <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
@@ -81,7 +81,7 @@ function ProcurementLayout() {
             </SelectContent>
           </Select>
         </div>
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {nav.map((n) => {
             const active = n.to === "/procurement"
               ? pathname === "/procurement" || pathname === "/procurement/"
