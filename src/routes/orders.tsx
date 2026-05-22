@@ -78,6 +78,7 @@ function OrdersPage() {
             rfq={rfqsByOrder[o.id]?.rfq ?? null}
             open={openId === o.id}
             onToggle={() => setOpenId(openId === o.id ? null : o.id)}
+            onCancel={(reason) => reject(o.id, "Marco Bianchi", reason)}
           />
         ))}
       </main>
