@@ -10,9 +10,13 @@ import {
   ShieldAlert,
   Search,
   XCircle,
+  CheckCircle2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatEUR } from "@/lib/catalog";
+import { supabase } from "@/integrations/supabase/client";
+
 import { useOrders, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
 import { useRfqsByOrder, type RfqRow } from "@/lib/rfqs";
