@@ -784,26 +784,6 @@ function Home() {
         </button>
       )}
 
-      {/* Fixed bottom bar in conversation mode: chat input + separate, distinct voice button */}
-      {inConversation && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto max-w-3xl px-4 py-3 flex items-end gap-3">
-            <div className="flex-1">
-              <ChatInput
-                value={input}
-                onChange={setInput}
-                onSend={() => send(input)}
-                disabled={streaming}
-                inputRef={inputRef}
-                placeholder="Ask a follow-up…"
-              />
-            </div>
-            <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
-            <VoiceButton size="compact" onTranscript={(t) => send(t, { speak: true })} />
-
-          </div>
-        </div>
-      )}
 
       {/* Approval banner — driven by budget/rules decision */}
       <ApprovalBanner />
