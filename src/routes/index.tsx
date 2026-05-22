@@ -1256,7 +1256,11 @@ function InlineProductBubble({
             >
               −
             </HoldButton>
-            <span className="px-1.5 text-xs font-bold tabular-nums">{inCart.qty}</span>
+            <QtyInput
+              value={inCart.qty}
+              onChange={(n) => cart.setQty(product.sku, n)}
+              className="w-7 px-1 text-xs"
+            />
             <HoldButton
               onTick={() => cart.adjust(product.sku, +addQty)}
               stopPropagation
