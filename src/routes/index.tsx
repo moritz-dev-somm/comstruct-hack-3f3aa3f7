@@ -60,6 +60,9 @@ const REDBULL_THRESHOLD = 500;
 
 export const Route = createFileRoute("/")({
   component: Home,
+  validateSearch: (search: Record<string, unknown>) => ({
+    prefill: typeof search.prefill === "string" ? search.prefill : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "comstruct — order C-materials in plain language" },
