@@ -96,7 +96,7 @@ function LoginPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col md:grid md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
       {/* ─── Brand panel ─────────────────────────────────────────── */}
       <aside
-        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-5 md:p-12 lg:p-16 md:min-h-screen"
+        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-5 pb-4 md:p-12 lg:p-16 md:min-h-screen"
         style={{
           backgroundImage:
             "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px)",
