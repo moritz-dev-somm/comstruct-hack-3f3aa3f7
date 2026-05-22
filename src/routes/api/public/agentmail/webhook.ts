@@ -553,6 +553,7 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             reply_message_id: replyMessageId,
             needs_user_reason: needsUserReason,
             last_reply_at: new Date().toISOString(),
+            ...(madeProgress ? { last_progress_at: new Date().toISOString() } : {}),
             confirmed_at: nextStatus === "confirmed" ? new Date().toISOString() : null,
             followup_count: nextFollowup,
             clarification_count: nextClarification,
