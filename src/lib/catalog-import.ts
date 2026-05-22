@@ -89,14 +89,16 @@ async function parsePdf(file: File): Promise<PdfParse> {
   // Use the bundled worker via CDN fallback (worker URL must be set in browsers)
   // We use the workerless legacy build by setting workerSrc to a data URL is fragile;
   // pdfjs-dist v5 supports running without a worker via `disableWorker`.
-  // @ts-expect-error – GlobalWorkerOptions exists at runtime
-  if (pdfjs.GlobalWorkerOptions) {
-    // @ts-expect-error – assigning a string is supported at runtime
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  // pdfjs-dist v5 supports a worker URL via GlobalWorkerOptions
+  const opts = (pdfjs as unknown as { GlobalWorkerOptions?: { workerSrc: string } })
+    .GlobalWorkerOptions;
+  if (opts) {
+    opts.workerSrc = new URL(
       "pdfjs-dist/build/pdf.worker.min.mjs",
       import.meta.url,
     ).toString();
   }
+
 
   const data = new Uint8Array(await file.arrayBuffer());
   const loadingTask = pdfjs.getDocument({ data });
