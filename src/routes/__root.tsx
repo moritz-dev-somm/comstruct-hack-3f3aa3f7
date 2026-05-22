@@ -12,6 +12,7 @@ import { CartProvider } from "@/lib/cart";
 import { BudgetProvider } from "@/lib/budget";
 import { OrdersProvider } from "@/lib/orders";
 import { RoleProvider } from "@/lib/role";
+import { TemplatesProvider } from "@/lib/templates";
 import { InteractiveDotField } from "@/components/InteractiveDotField";
 
 
@@ -127,11 +128,13 @@ function RootComponent() {
       <RoleProvider>
         <BudgetProvider>
           <CartProvider>
-            <OrdersProvider>
-              <InteractiveDotField />
-              <Outlet />
-              <Toaster position="top-center" richColors />
-            </OrdersProvider>
+            <TemplatesProvider>
+              <OrdersProvider>
+                <InteractiveDotField />
+                <Outlet />
+                <Toaster position="top-center" richColors />
+              </OrdersProvider>
+            </TemplatesProvider>
           </CartProvider>
         </BudgetProvider>
       </RoleProvider>
