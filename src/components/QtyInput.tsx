@@ -14,7 +14,7 @@ type Props = {
  * that can be focused/clicked to type a new quantity. Enter or blur commits;
  * Escape reverts. Empty or 0 calls onChange(0) (caller decides to remove).
  */
-export function QtyInput({ value, onChange, className, max = 999, ariaLabel = "Quantity" }: Props) {
+export function QtyInput({ value, onChange, className, max = 9999, ariaLabel = "Quantity" }: Props) {
   const [draft, setDraft] = useState(String(value));
   const ref = useRef<HTMLInputElement>(null);
 
