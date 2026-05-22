@@ -35,6 +35,7 @@ import { VoiceButton } from "@/components/VoiceButton";
 import { ScanButton } from "@/components/ScanButton";
 import { ProductImage } from "@/components/ProductImage";
 import { HoldButton } from "@/components/HoldButton";
+import { QtyInput } from "@/components/QtyInput";
 
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
