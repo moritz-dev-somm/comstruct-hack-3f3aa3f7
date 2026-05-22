@@ -133,7 +133,7 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
     },
   };
 
-  const res = await fetch(LOVABLE_AI_URL, {
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
