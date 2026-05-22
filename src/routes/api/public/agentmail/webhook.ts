@@ -388,6 +388,16 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
         };
         const action = decideAction(effectiveCls, state);
 
+        // Progress = reply actually moved the negotiation forward.
+        // Resets the 24h supplier-silence timer; a junk reply ("hi") does not.
+        const newChecklistAnswered = answeredChecklist.length > prevAnswered.length;
+        const terminalVerdict =
+          effectiveCls.verdict === "fully_confirmed" ||
+          effectiveCls.verdict === "confirmed_with_issue" ||
+          effectiveCls.verdict === "declined";
+        const madeProgress =
+          verifiedAnsweredOpen.length > 0 || newChecklistAnswered || terminalVerdict;
+
         let nextStatus: string = neg.status ?? "awaiting_reply";
         let needsUserReason: string | null = null;
         let replyMessageId: string | null = null;
