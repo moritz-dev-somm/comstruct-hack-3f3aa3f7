@@ -19,7 +19,7 @@ import {
   Plus,
   Ruler,
   Search,
-  SlidersHorizontal,
+  
   ShoppingCart,
   X,
   Zap,
