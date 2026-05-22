@@ -386,29 +386,6 @@ function OrderRow({
   );
 }
 
-function DeliveryPill({ delivery }: { delivery: OrderDelivery }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[delivery.tone]}`}
-      title={delivery.raw ? `Supplier said: "${delivery.raw}"` : undefined}
-    >
-      <CalendarDays className="size-3" />
-      {delivery.label}
-    </span>
-  );
-}
-
-function ShippingPill({ shipping }: { shipping: OrderShipping }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[shipping.tone]}`}
-      title={shipping.supplier ? `From ${shipping.supplier}` : undefined}
-    >
-      <Truck className="size-3" />
-      {shipping.label}
-    </span>
-  );
-}
 
 function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
   return (
