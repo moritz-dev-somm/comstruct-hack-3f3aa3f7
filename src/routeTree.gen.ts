@@ -15,6 +15,7 @@ import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProcurementIndexRouteImport } from './routes/procurement.index'
+import { Route as ProcurementSettingsRouteImport } from './routes/procurement.settings'
 import { Route as ProcurementOrdersRouteImport } from './routes/procurement.orders'
 import { Route as ProcurementCatalogRouteImport } from './routes/procurement.catalog'
 import { Route as ProcurementAnalyticsRouteImport } from './routes/procurement.analytics'
@@ -57,6 +58,11 @@ const IndexRoute = IndexRouteImport.update({
 const ProcurementIndexRoute = ProcurementIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => ProcurementRoute,
+} as any)
+const ProcurementSettingsRoute = ProcurementSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => ProcurementRoute,
 } as any)
 const ProcurementOrdersRoute = ProcurementOrdersRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
+  '/procurement/settings': typeof ProcurementSettingsRoute
   '/procurement/': typeof ProcurementIndexRoute
   '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
+  '/procurement/settings': typeof ProcurementSettingsRoute
   '/procurement': typeof ProcurementIndexRoute
   '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
+  '/procurement/settings': typeof ProcurementSettingsRoute
   '/procurement/': typeof ProcurementIndexRoute
   '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
+    | '/procurement/settings'
     | '/procurement/'
     | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
+    | '/procurement/settings'
     | '/procurement'
     | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
+    | '/procurement/settings'
     | '/procurement/'
     | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
@@ -312,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/procurement/'
       preLoaderRoute: typeof ProcurementIndexRouteImport
+      parentRoute: typeof ProcurementRoute
+    }
+    '/procurement/settings': {
+      id: '/procurement/settings'
+      path: '/settings'
+      fullPath: '/procurement/settings'
+      preLoaderRoute: typeof ProcurementSettingsRouteImport
       parentRoute: typeof ProcurementRoute
     }
     '/procurement/orders': {
@@ -446,6 +465,7 @@ interface ProcurementRouteChildren {
   ProcurementAnalyticsRoute: typeof ProcurementAnalyticsRoute
   ProcurementCatalogRoute: typeof ProcurementCatalogRouteWithChildren
   ProcurementOrdersRoute: typeof ProcurementOrdersRouteWithChildren
+  ProcurementSettingsRoute: typeof ProcurementSettingsRoute
   ProcurementIndexRoute: typeof ProcurementIndexRoute
 }
 
@@ -454,6 +474,7 @@ const ProcurementRouteChildren: ProcurementRouteChildren = {
   ProcurementAnalyticsRoute: ProcurementAnalyticsRoute,
   ProcurementCatalogRoute: ProcurementCatalogRouteWithChildren,
   ProcurementOrdersRoute: ProcurementOrdersRouteWithChildren,
+  ProcurementSettingsRoute: ProcurementSettingsRoute,
   ProcurementIndexRoute: ProcurementIndexRoute,
 }
 
