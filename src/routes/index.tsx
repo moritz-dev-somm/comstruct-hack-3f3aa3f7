@@ -498,6 +498,8 @@ function Home() {
     }
   }
 
+  if (role !== "foreman") return null;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top bar */}
