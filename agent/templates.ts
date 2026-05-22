@@ -356,63 +356,71 @@ export function composeOrderEmail(order: Order, ctx: OrderEmailContext): Compose
    2. Confirmation (short)
    ============================================================ */
 
-const CONFIRM: Record<
-  SupplierLanguage,
-  { subject: string; body: (id: string, eta: string) => string }
-> = {
-  en: {
-    subject: "Order confirmed — thank you",
-    body: (id, eta) =>
-      `Thank you for confirming order ${id}. We are treating it as firmly placed.${eta ? ` ${eta}` : ""} Please send the dispatch note and invoice to ${COMPANY.contact}.`,
-  },
-  de: {
-    subject: "Bestellung bestätigt — vielen Dank",
-    body: (id, eta) =>
-      `Vielen Dank für die Bestätigung der Bestellung ${id}. Wir betrachten sie als fest erteilt.${eta ? ` ${eta}` : ""} Bitte senden Sie Lieferschein und Rechnung an ${COMPANY.contact}.`,
-  },
-  fr: {
-    subject: "Commande confirmée — merci",
-    body: (id, eta) =>
-      `Merci pour la confirmation de la commande ${id}. Elle est considérée comme fermement passée.${eta ? ` ${eta}` : ""} Merci d'envoyer le bordereau et la facture à ${COMPANY.contact}.`,
-  },
-  it: {
-    subject: "Ordine confermato — grazie",
-    body: (id, eta) =>
-      `Grazie per aver confermato l'ordine ${id}. Lo consideriamo fermamente piazzato.${eta ? ` ${eta}` : ""} Inviate bolla e fattura a ${COMPANY.contact}.`,
-  },
+/**
+ * Build the trailing "invoice" line for the confirmation email.
+ * - If we already received the invoice → cheerful acknowledgement, no ask.
+ * - Otherwise → soft ask ("if possible, reply with the invoice attached").
+ * The hard "Please send the invoice to <address>" wording is gone.
+ */
+function invoiceLine(
+  lang: SupplierLanguage,
+  invoiceReceived: boolean,
+  contact: string,
+): string {
+  if (invoiceReceived) {
+    switch (lang) {
+      case "de": return "Die Rechnung haben wir bereits erhalten — vielen Dank.";
+      case "fr": return "Nous avons bien reçu la facture — merci.";
+      case "it": return "Abbiamo già ricevuto la fattura — grazie.";
+      default:   return "We have already received the invoice — thank you.";
+    }
+  }
+  switch (lang) {
+    case "de":
+      return `Falls möglich, antworten Sie uns bitte mit angehängter Rechnung (oder senden Sie sie an ${contact}).`;
+    case "fr":
+      return `Si possible, merci de répondre avec la facture en pièce jointe (ou de l'envoyer à ${contact}).`;
+    case "it":
+      return `Se possibile, vi preghiamo di rispondere allegando la fattura (oppure inviarla a ${contact}).`;
+    default:
+      return `If possible, please reply with the invoice attached (or send it to ${contact}).`;
+  }
+}
+
+const CONFIRM_SUBJECT: Record<SupplierLanguage, string> = {
+  en: "Order confirmed — thank you",
+  de: "Bestellung bestätigt — vielen Dank",
+  fr: "Commande confirmée — merci",
+  it: "Ordine confermato — grazie",
 };
+
+function confirmBody(
+  lang: SupplierLanguage,
+  id: string,
+  eta: string,
+  invoice: string,
+): string {
+  const tail = `${eta ? ` ${eta}` : ""} ${invoice}`.trim();
+  switch (lang) {
+    case "de":
+      return `Vielen Dank für die Bestätigung der Bestellung ${id}. Wir betrachten sie als fest erteilt.${tail ? " " + tail : ""}`;
+    case "fr":
+      return `Merci pour la confirmation de la commande ${id}. Elle est considérée comme fermement passée.${tail ? " " + tail : ""}`;
+    case "it":
+      return `Grazie per aver confermato l'ordine ${id}. Lo consideriamo fermamente piazzato.${tail ? " " + tail : ""}`;
+    default:
+      return `Thank you for confirming order ${id}. We are treating it as firmly placed.${tail ? " " + tail : ""}`;
+  }
+}
 
 function etaLine(lang: SupplierLanguage, leadTime: string | null | undefined): string {
   if (!leadTime) return "";
   switch (lang) {
-    case "de":
-      return `Liefertermin notiert: ${leadTime}.`;
-    case "fr":
-      return `Livraison notée : ${leadTime}.`;
-    case "it":
-      return `Consegna annotata: ${leadTime}.`;
-    default:
-      return `Noted delivery: ${leadTime}.`;
+    case "de": return `Liefertermin notiert: ${leadTime}.`;
+    case "fr": return `Livraison notée : ${leadTime}.`;
+    case "it": return `Consegna annotata: ${leadTime}.`;
+    default:   return `Noted delivery: ${leadTime}.`;
   }
-}
-
-function renderConfirmText(
-  s: (typeof CONFIRM)["en"],
-  greeting: string,
-  sign: string,
-  orderId: string,
-  eta: string,
-): string {
-  return [greeting, ``, s.body(orderId, eta), ``, sign, COMPANY.agentName].join("\n");
-}
-function renderConfirmHtml(
-  s: (typeof CONFIRM)["en"],
-  greeting: string,
-  sign: string,
-  orderId: string,
-  eta: string,
-): string {
-  return `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.body(orderId, eta))}</p><p>${escapeHtml(sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
 }
 
 const GREETING: Record<SupplierLanguage, string> = {
@@ -430,19 +438,30 @@ const SIGN: Record<SupplierLanguage, string> = {
 
 export function composeConfirmationEmail(
   order: Order,
-  details: { leadTime?: string | null },
+  details: { leadTime?: string | null; invoiceReceived?: boolean; agentEmail?: string },
   language: SupplierLanguage = "en",
 ): ComposedEmail {
-  const en = CONFIRM.en;
-  const native = CONFIRM[language];
+  const contact = resolveContact(details.agentEmail);
+  const invoiceReceived = Boolean(details.invoiceReceived);
   const etaEn = etaLine("en", details.leadTime);
   const etaNative = etaLine(language, details.leadTime);
+  const invEn = invoiceLine("en", invoiceReceived, contact);
+  const invNative = invoiceLine(language, invoiceReceived, contact);
+  const textEn = [GREETING.en, ``, confirmBody("en", order.id, etaEn, invEn), ``, SIGN.en, COMPANY.agentName].join("\n");
+  const textNative = [GREETING[language], ``, confirmBody(language, order.id, etaNative, invNative), ``, SIGN[language], COMPANY.agentName].join("\n");
+  const htmlEn = `<p>${escapeHtml(GREETING.en)}</p><p>${escapeHtml(confirmBody("en", order.id, etaEn, invEn))}</p><p>${escapeHtml(SIGN.en)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
+  const htmlNative = `<p>${escapeHtml(GREETING[language])}</p><p>${escapeHtml(confirmBody(language, order.id, etaNative, invNative))}</p><p>${escapeHtml(SIGN[language])}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
   return assembleBilingual({
     language,
-    subjectEn: `Re: [${order.id}] ${en.subject}`,
-    subjectNative: native.subject,
-    textEn: renderConfirmText(en, GREETING.en, SIGN.en, order.id, etaEn),
-    textNative: renderConfirmText(native, GREETING[language], SIGN[language], order.id, etaNative),
+    subjectEn: `Re: [${order.id}] ${CONFIRM_SUBJECT.en}`,
+    subjectNative: CONFIRM_SUBJECT[language],
+    textEn,
+    textNative,
+    htmlEn,
+    htmlNative,
+  });
+}
+
     htmlEn: renderConfirmHtml(en, GREETING.en, SIGN.en, order.id, etaEn),
     htmlNative: renderConfirmHtml(native, GREETING[language], SIGN[language], order.id, etaNative),
   });
