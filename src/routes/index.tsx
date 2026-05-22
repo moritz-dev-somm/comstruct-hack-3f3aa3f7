@@ -1980,37 +1980,37 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ChocolateIncentive({ subtotal }: { subtotal: number }) {
-  const remaining = Math.max(0, CHOCOLATE_THRESHOLD - subtotal);
+function RedbullIncentive({ subtotal }: { subtotal: number }) {
+  const remaining = Math.max(0, REDBULL_THRESHOLD - subtotal);
   const unlocked = remaining === 0;
-  const progress = Math.min(100, (subtotal / CHOCOLATE_THRESHOLD) * 100);
+  const progress = Math.min(100, (subtotal / REDBULL_THRESHOLD) * 100);
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="aspect-[16/10] bg-muted overflow-hidden">
+    <div className="rounded-lg border bg-card p-2 flex items-center gap-3">
+      <div className="h-14 w-14 shrink-0 rounded-md bg-muted overflow-hidden">
         <img
-          src={chocolatesImg}
-          alt="Complimentary box of Swiss artisan chocolates"
-          width={1024}
-          height={640}
+          src={redbullImg}
+          alt="Complimentary 6-pack of Red Bull"
+          width={112}
+          height={112}
           loading="lazy"
           className="w-full h-full object-cover"
         />
       </div>
-      <div className="p-3 space-y-2">
+      <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-baseline justify-between gap-2">
-          <div className="text-sm font-semibold leading-tight">
-            Free box of Swiss chocolates
+          <div className="text-xs font-semibold leading-tight truncate">
+            Free 6-pack of Red Bull
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+          <div className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
             Gift
           </div>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
           {unlocked
-            ? "Unlocked — we'll ship a box with your delivery."
-            : `Spend ${formatEUR(remaining)} more to unlock a complimentary box with your next delivery.`}
+            ? "Unlocked — ships with your delivery."
+            : `Spend ${formatEUR(remaining)} more to unlock.`}
         </p>
-        <div className="h-1.5 w-full rounded-sm bg-muted overflow-hidden">
+        <div className="h-1 w-full rounded-sm bg-muted overflow-hidden">
           <div
             className="h-full bg-primary transition-all"
             style={{ width: `${progress}%` }}
