@@ -251,17 +251,13 @@ async function fetchProductsBySkus(skus: string[]): Promise<ProductRow[]> {
 
 /** Embed a short query string using the same 1536-dim model as /api/hybrid-search. */
 async function embedQuery(text: string, apiKey: string): Promise<number[] | null> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/embeddings"
-    : "https://ai.gateway.lovable.dev/v1/embeddings";
-  const model = useOpenAI ? "text-embedding-3-small" : "openai/text-embedding-3-small";
+  const url = "https://api.openai.com/v1/embeddings";
+  const model = "text-embedding-3-small";
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ model, input: text, dimensions: 1536 }),
