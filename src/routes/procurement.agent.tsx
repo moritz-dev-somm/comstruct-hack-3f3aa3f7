@@ -649,9 +649,11 @@ function Legend() {
 
 function NeedsAttentionQueue({
   items,
+  phoneByEmail,
   onChanged,
 }: {
   items: NegotiationFull[];
+  phoneByEmail: Map<string, string>;
   onChanged: () => void;
 }) {
   if (items.length === 0) return null;
@@ -668,7 +670,12 @@ function NeedsAttentionQueue({
       </div>
       <ul className="divide-y divide-brand/20">
         {items.map((n) => (
-          <NeedsAttentionRow key={n.id} neg={n} onChanged={onChanged} />
+          <NeedsAttentionRow
+            key={n.id}
+            neg={n}
+            phone={n.supplier_email ? phoneByEmail.get(n.supplier_email.toLowerCase()) ?? null : null}
+            onChanged={onChanged}
+          />
         ))}
       </ul>
     </section>
