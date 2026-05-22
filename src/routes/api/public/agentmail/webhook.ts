@@ -539,6 +539,11 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             last_processed_message_id: messageId || null,
             last_inbound_from: fromEmail,
             security_reject_reason: null,
+            delivery_date_iso: delivery.iso,
+            delivery_date_iso_end: delivery.isoEnd,
+            delivery_date_confidence: delivery.confidence,
+            delivery_date_raw: deliveryRaw,
+            delivery_date_needs_clarification: delivery.needsClarification,
             ...(matchedByFallback && threadId ? { thread_id: threadId } : {}),
           })
           .eq("id", neg.id);
