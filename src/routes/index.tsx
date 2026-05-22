@@ -752,7 +752,7 @@ function HeroView({
             <button
               key={chip}
               onClick={() => send(chip)}
-              className="rounded-full border border-brand text-brand hover:bg-brand/10 px-3 h-8 text-xs font-medium"
+              className="rounded-full border border-primary text-brand hover:bg-primary/10 px-3 h-8 text-xs font-medium"
             >
               {chip}
             </button>
