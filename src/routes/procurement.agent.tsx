@@ -531,6 +531,12 @@ function AgentPage() {
           </ul>
         )}
       </section>
+        </TabsContent>
+
+        <TabsContent value="import">
+          <ImportDatabaseTab />
+        </TabsContent>
+      </Tabs>
 
       {openId && (
         <div
