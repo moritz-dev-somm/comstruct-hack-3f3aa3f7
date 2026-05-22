@@ -306,8 +306,8 @@ function composeRfqEmail(args: {
 /* ============================================================ */
 
 export type RfqStartResult =
-  | { ok: true; rfqId: string; invited: Array<{ name: string; email: string }>; dominantCategory: string | null }
-  | { ok: false; error: string };
+  | { ok: true; rfqId: string; invited: Array<{ name: string; email: string }>; items: Order["items"]; subtotal: number; dominantCategory: string | null }
+  | { ok: false; error: string; reason?: string };
 
 export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
   try {
@@ -315,31 +315,21 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
     const sb = adminClient();
     const am = agentMail();
 
-    const { suppliers, dominantCategory: cat } = await pickRfqSuppliers(order);
+    const pick = await pickRfqSuppliers(order);
 
-    if (suppliers.length === 0) {
-      // No supplier discoverable → record an escalated RFQ for visibility.
-      const { data: rfq } = await sb
-        .from("rfqs")
-        .insert({
-          order_id: order.id,
-          status: "escalated",
-          deadline_at: new Date(Date.now() + RFQ_DEADLINE_HOURS * 3600_000).toISOString(),
-          invited_suppliers: [],
-          dominant_category: cat,
-          escalation_reason: "No alternative suppliers found in catalog for this category.",
-          decided_at: new Date().toISOString(),
-          order_snapshot: order as unknown as Record<string, unknown>,
-        })
-        .select("id")
-        .single();
-      return {
-        ok: false,
-        error: "no_suppliers",
-        // @ts-expect-error informational
-        rfqId: rfq?.id,
-      };
+    if (!pick.qualifies) {
+      // Order doesn't meet the discount criteria (no ≥2 suppliers share the
+      // exact same products totalling ≥ €200). Do NOT fan out and do NOT
+      // create a bogus RFQ row — caller should fall back to a direct PO.
+      return { ok: false, error: "not_qualifying", reason: pick.reason };
     }
+
+    const { suppliers, items: rfqItems, subtotal: rfqSubtotal, dominantCategory: cat } = pick;
+
+    // Build a "trimmed" order containing only the comparable items so the
+    // RFQ email and downstream quote totals are scoped to what the suppliers
+    // can actually bid on.
+    const rfqOrder: Order = { ...order, items: rfqItems, subtotal: rfqSubtotal };
 
     const deadlineAt = new Date(Date.now() + RFQ_DEADLINE_HOURS * 3600_000).toISOString();
     const { data: rfqRow, error: rfqErr } = await sb
@@ -350,19 +340,19 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
         deadline_at: deadlineAt,
         invited_suppliers: suppliers.map((s) => s.name),
         dominant_category: cat,
-        order_snapshot: order as unknown as Record<string, unknown>,
+        order_snapshot: rfqOrder as unknown as Record<string, unknown>,
       })
       .select("id")
       .single();
     if (rfqErr || !rfqRow) throw rfqErr ?? new Error("failed to create rfq");
     const rfqId = rfqRow.id as string;
 
-    // Fan out to each supplier (independent — one failure doesn't block others).
+    // Fan out to each qualifying supplier (independent — one failure doesn't block others).
     for (const sup of suppliers) {
       try {
         const email = composeRfqEmail({
-          order,
-          items: order.items,
+          order: rfqOrder,
+          items: rfqItems,
           supplierName: sup.name,
           language: sup.language,
         });
@@ -389,7 +379,7 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
             subject: email.subject,
             status: "awaiting_reply",
             order_snapshot: {
-              ...order,
+              ...rfqOrder,
               supplier_language: sup.language,
               rfq_id: rfqId,
               rfq_role: "bidder",
@@ -397,6 +387,7 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
           })
           .select("id")
           .single();
+
 
         await sb.from("rfq_quotes").insert({
           rfq_id: rfqId,
