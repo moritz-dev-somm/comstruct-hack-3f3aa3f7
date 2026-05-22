@@ -33,10 +33,37 @@ export const startOrderRfq = createServerFn({ method: "POST" })
     return await startRfqForOrder(order);
   });
 
+type RfqDto = {
+  id: string;
+  order_id: string;
+  status: string;
+  deadline_at: string;
+  invited_suppliers: string[];
+  dominant_category: string | null;
+  winner_supplier: string | null;
+  winner_total_eur: number | null;
+  decided_at: string | null;
+  escalation_reason: string | null;
+  created_at: string;
+};
+type QuoteDto = {
+  id: string;
+  supplier_name: string;
+  supplier_email: string | null;
+  status: string;
+  unit_price_eur: number | null;
+  line_total_eur: number | null;
+  shipping_cost_eur: number | null;
+  total_eur: number | null;
+  lead_time_days: number | null;
+  raw_reply_excerpt: string | null;
+  received_at: string | null;
+};
+
 /** Read-side: full RFQ state (header + per-supplier quotes) for one order. */
 export const getRfqForOrder = createServerFn({ method: "POST" })
   .inputValidator(z.object({ orderId: z.string().min(1) }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ rfq: RfqDto | null; quotes: QuoteDto[] }> => {
     const sb = adminClient();
     const { data: rfq } = await sb
       .from("rfqs")
@@ -47,15 +74,15 @@ export const getRfqForOrder = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (!rfq) return { rfq: null, quotes: [] as Array<Record<string, unknown>> };
+    if (!rfq) return { rfq: null, quotes: [] };
 
     const { data: quotes } = await sb
       .from("rfq_quotes")
       .select(
         "id, supplier_name, supplier_email, status, unit_price_eur, line_total_eur, shipping_cost_eur, total_eur, lead_time_days, raw_reply_excerpt, received_at",
       )
-      .eq("rfq_id", rfq.id);
-    return { rfq, quotes: quotes ?? [] };
+      .eq("rfq_id", (rfq as RfqDto).id);
+    return { rfq: rfq as RfqDto, quotes: (quotes ?? []) as QuoteDto[] };
   });
 
 /** Force a decision attempt — used by webhook + tests. */
