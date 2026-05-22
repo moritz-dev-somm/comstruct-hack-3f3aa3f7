@@ -6,6 +6,7 @@ const BASE_ALPHA = 0.16;
 const PEAK_ALPHA = 0.45;
 const BASE_R = 0.9;
 const PEAK_R = 1.6;
+const FADE_SPEED = 0.12; // higher = snappier; lower = smoother fade
 
 export function InteractiveDotField() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,6 +29,11 @@ export function InteractiveDotField() {
     let height = 0;
     let dpr = 1;
 
+    // smoothed pointer state for fade transitions
+    let smoothX = -9999;
+    let smoothY = -9999;
+    let influence = 0;
+
     const resize = () => {
       dpr = window.devicePixelRatio || 1;
       width = window.innerWidth;
@@ -40,21 +46,25 @@ export function InteractiveDotField() {
       draw();
     };
 
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
       const r2 = RADIUS * RADIUS;
-      const px = pointer.active ? pointer.x : -9999;
-      const py = pointer.active ? pointer.y : -9999;
+      const px = pointer.active ? pointer.x : smoothX;
+      const py = pointer.active ? pointer.y : smoothY;
+      const currentInfluence = pointer.active ? 1 : influence;
+
       for (let y = GRID / 2; y < height; y += GRID) {
         for (let x = GRID / 2; x < width; x += GRID) {
           let f = 0;
-          if (pointer.active) {
+          if (currentInfluence > 0.001) {
             const dx = x - px;
             const dy = y - py;
             const d2 = dx * dx + dy * dy;
             if (d2 < r2) {
               const t = 1 - Math.sqrt(d2) / RADIUS;
-              f = t * t * (3 - 2 * t);
+              f = t * t * (3 - 2 * t) * currentInfluence;
             }
           }
           const alpha = BASE_ALPHA + (PEAK_ALPHA - BASE_ALPHA) * f;
@@ -70,7 +80,16 @@ export function InteractiveDotField() {
     let raf = 0;
     let dirty = false;
     const loop = () => {
-      if (dirty) {
+      if (pointer.active || influence > 0.001) {
+        if (!pointer.active) {
+          influence = lerp(influence, 0, FADE_SPEED);
+        }
+        if (pointer.active) {
+          smoothX = lerp(smoothX, pointer.x, FADE_SPEED);
+          smoothY = lerp(smoothY, pointer.y, FADE_SPEED);
+        }
+        draw();
+      } else if (dirty) {
         draw();
         dirty = false;
       }
@@ -91,7 +110,6 @@ export function InteractiveDotField() {
     };
 
     const isOverBackground = (x: number, y: number) => {
-      // Temporarily allow elementFromPoint to see through the canvas
       const prevPE = canvas.style.pointerEvents;
       canvas.style.pointerEvents = "none";
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
