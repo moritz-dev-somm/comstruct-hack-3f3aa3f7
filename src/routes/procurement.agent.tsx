@@ -384,26 +384,15 @@ function AgentPage() {
         </p>
       </header>
 
-      <Tabs defaultValue="inbox" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="inbox" className="gap-1.5">
-            <InboxIcon className="size-3.5" /> Inbox & negotiations
-          </TabsTrigger>
-          <TabsTrigger value="import" className="gap-1.5">
-            <Database className="size-3.5" /> Import database
-          </TabsTrigger>
-        </TabsList>
+      <NeedsAttentionQueue
+        items={needsAttention}
+        onChanged={() => {
+          negotiationsQ.refetch();
+          messagesQ.refetch();
+        }}
+      />
 
-        <TabsContent value="inbox" className="space-y-4">
-          <NeedsAttentionQueue
-            items={needsAttention}
-            onChanged={() => {
-              negotiationsQ.refetch();
-              messagesQ.refetch();
-            }}
-          />
-
-          <section className="rounded-xl border bg-card overflow-hidden">
+      <section className="rounded-xl border bg-card overflow-hidden">
         <div className="px-5 py-3 border-b flex items-center justify-between">
           <h2 className="font-semibold flex items-center gap-2">
             <Mail className="size-4" /> Conversations
@@ -531,12 +520,7 @@ function AgentPage() {
           </ul>
         )}
       </section>
-        </TabsContent>
 
-        <TabsContent value="import">
-          <ImportDatabaseTab />
-        </TabsContent>
-      </Tabs>
 
       {openId && (
         <div
