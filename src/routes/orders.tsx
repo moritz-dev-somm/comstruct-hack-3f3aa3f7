@@ -74,6 +74,7 @@ function OrderRow({
 }) {
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const derived = deriveOrderStatus(order, negotiations);
+  const delivery = pickDeliveryForOrder(negotiations);
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
@@ -81,9 +82,10 @@ function OrderRow({
         className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-accent/50"
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm font-mono">{order.id}</span>
             <StatusPill status={derived} />
+            <DeliveryPill delivery={delivery} />
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
@@ -96,6 +98,7 @@ function OrderRow({
       </button>
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
+          <DeliveryBlock delivery={delivery} />
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Items</h4>
             <ul className="text-sm space-y-1">
@@ -129,6 +132,51 @@ function OrderRow({
               {order.rejectionReason}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeliveryPill({ delivery }: { delivery: OrderDelivery }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[delivery.tone]}`}
+      title={delivery.raw ? `Supplier said: "${delivery.raw}"` : undefined}
+    >
+      <CalendarDays className="size-3" />
+      {delivery.label}
+    </span>
+  );
+}
+
+function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
+  const confidenceLabel: Record<OrderDelivery["confidence"], string> = {
+    high: "high confidence",
+    medium: "medium confidence",
+    low: "low confidence",
+    unresolved: "unknown",
+  };
+  return (
+    <div className="rounded-md border bg-background px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Delivery
+        </h4>
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {confidenceLabel[delivery.confidence]}
+        </span>
+      </div>
+      <div className="mt-1 text-sm font-semibold">{delivery.longLabel}</div>
+      {delivery.raw && (
+        <div className="mt-1 text-xs text-muted-foreground">
+          Supplier said: <span className="italic">"{delivery.raw}"</span>
+          {delivery.supplier ? <span> · {delivery.supplier}</span> : null}
+        </div>
+      )}
+      {delivery.needsClarification && (
+        <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+          Asked supplier to confirm an exact calendar date.
         </div>
       )}
     </div>
