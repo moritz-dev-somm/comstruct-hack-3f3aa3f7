@@ -135,7 +135,7 @@ export function deriveOrderStatus(
   const list = negotiations ?? [];
   if (list.length === 0) return "sending";
 
-  const derivedList = list.map(negToDerived);
+  const derivedList = list.map(negotiationToDerived);
   const confirmedCount = derivedList.filter((d) => d === "confirmed").length;
   if (confirmedCount > 0 && confirmedCount < derivedList.length) {
     // Mix of confirmed + still-open — surface the worst open one, but if
