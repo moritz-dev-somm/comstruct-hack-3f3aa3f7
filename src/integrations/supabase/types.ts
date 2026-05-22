@@ -266,6 +266,116 @@ export type Database = {
         }
         Relationships: []
       }
+      rfq_quotes: {
+        Row: {
+          created_at: string
+          id: string
+          lead_time_days: number | null
+          line_total_eur: number | null
+          negotiation_id: string | null
+          raw_reply_excerpt: string | null
+          received_at: string | null
+          rfq_id: string
+          shipping_cost_eur: number | null
+          status: string
+          supplier_email: string | null
+          supplier_name: string
+          total_eur: number | null
+          unit_price_eur: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_time_days?: number | null
+          line_total_eur?: number | null
+          negotiation_id?: string | null
+          raw_reply_excerpt?: string | null
+          received_at?: string | null
+          rfq_id: string
+          shipping_cost_eur?: number | null
+          status?: string
+          supplier_email?: string | null
+          supplier_name: string
+          total_eur?: number | null
+          unit_price_eur?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_time_days?: number | null
+          line_total_eur?: number | null
+          negotiation_id?: string | null
+          raw_reply_excerpt?: string | null
+          received_at?: string | null
+          rfq_id?: string
+          shipping_cost_eur?: number | null
+          status?: string
+          supplier_email?: string | null
+          supplier_name?: string
+          total_eur?: number | null
+          unit_price_eur?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_quotes_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfqs: {
+        Row: {
+          created_at: string
+          deadline_at: string
+          decided_at: string | null
+          dominant_category: string | null
+          escalation_reason: string | null
+          id: string
+          invited_suppliers: string[]
+          order_id: string
+          order_snapshot: Json
+          status: string
+          updated_at: string
+          winner_supplier: string | null
+          winner_total_eur: number | null
+        }
+        Insert: {
+          created_at?: string
+          deadline_at: string
+          decided_at?: string | null
+          dominant_category?: string | null
+          escalation_reason?: string | null
+          id?: string
+          invited_suppliers?: string[]
+          order_id: string
+          order_snapshot?: Json
+          status?: string
+          updated_at?: string
+          winner_supplier?: string | null
+          winner_total_eur?: number | null
+        }
+        Update: {
+          created_at?: string
+          deadline_at?: string
+          decided_at?: string | null
+          dominant_category?: string | null
+          escalation_reason?: string | null
+          id?: string
+          invited_suppliers?: string[]
+          order_id?: string
+          order_snapshot?: Json
+          status?: string
+          updated_at?: string
+          winner_supplier?: string | null
+          winner_total_eur?: number | null
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           created_at: string
