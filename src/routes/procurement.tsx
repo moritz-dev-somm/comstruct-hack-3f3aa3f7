@@ -62,17 +62,20 @@ function ProcurementLayout() {
               : n.to === "/procurement/catalog"
                 ? pathname === "/procurement/catalog" || pathname === "/procurement/catalog/"
                 : pathname.startsWith(n.to);
+            const hasBadge = "badge" in n && n.badge;
             return (
               <Link
                 key={n.to}
                 to={n.to}
-                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                aria-label={n.label}
+                title={n.label}
+                className={`flex items-center gap-1.5 px-2 h-8 rounded-md text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
                   active ? "bg-brand text-brand-foreground" : "bg-muted text-foreground hover:bg-accent"
                 }`}
               >
                 <n.icon className="size-3.5" />
-                <span>{n.label}</span>
-                {"badge" in n && n.badge ? (
+                {active && <span>{n.label}</span>}
+                {hasBadge ? (
                   <span className={`text-[10px] font-bold rounded-sm px-1 ${
                     active ? "bg-brand-foreground text-brand" : "bg-background border border-border"
                   }`}>
@@ -83,6 +86,7 @@ function ProcurementLayout() {
             );
           })}
         </nav>
+
       </div>
 
 
