@@ -33,7 +33,6 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Switching tabs swaps in that role's demo credentials.
   useEffect(() => {
     const u = DEMO_USERS[tab];
     setUsername(u.username);
@@ -47,7 +46,6 @@ function LoginPage() {
     setError(null);
     setSubmitting(true);
 
-    // Small artificial delay so it feels like a real sign-in.
     await new Promise((r) => setTimeout(r, 200));
 
     const result = signIn(username, password);
@@ -61,47 +59,47 @@ function LoginPage() {
     navigate({ to: dest });
   }
 
-  const tabMeta: Record<Tab, { title: string; subtitle: string; icon: React.ReactNode }> = {
+  const tabMeta: Record<Tab, { title: string; description: string; icon: React.ReactNode }> = {
     foreman: {
-      title: "Foreman sign in",
-      subtitle: "Order materials from the site in plain language.",
+      title: "Foreman",
+      description: "Order materials from the site",
       icon: <HardHat className="size-5" />,
     },
     supervisor: {
-      title: "Supervisor sign in",
-      subtitle: "Approvals, orders, analytics and catalog.",
+      title: "Supervisor",
+      description: "Approvals, orders and catalog",
       icon: <ClipboardList className="size-5" />,
     },
   };
-  const meta = tabMeta[tab];
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground flex flex-col">
-      <header className="px-6 h-14 flex items-center gap-2">
+    <div className="min-h-screen dot-bg text-foreground flex flex-col">
+      <header className="px-6 h-14 flex items-center gap-2.5 border-b bg-background/80 backdrop-blur">
         <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
           <HardHat className="size-5" />
         </div>
-        <span className="font-semibold text-sm">comstruct</span>
+        <span className="font-semibold text-sm tracking-tight">comstruct</span>
       </header>
 
       <main className="flex-1 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">Sign in to comstruct</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Choose your role and continue.
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Select your role to continue
             </p>
           </div>
 
-          <div className="rounded-xl border bg-card p-6">
-            {/* Role tabs */}
+          <div className="rounded-xl border bg-card p-1">
+            {/* Role selector */}
             <div
               role="tablist"
               aria-label="Role"
-              className="grid grid-cols-2 gap-1 p-1 rounded-md bg-muted"
+              className="grid grid-cols-2 gap-1"
             >
               {(["foreman", "supervisor"] as Tab[]).map((t) => {
                 const active = tab === t;
+                const meta = tabMeta[t];
                 return (
                   <button
                     key={t}
@@ -110,93 +108,98 @@ function LoginPage() {
                     type="button"
                     onClick={() => setTab(t)}
                     className={cn(
-                      "inline-flex items-center justify-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
+                      "flex flex-col items-center gap-2 rounded-lg px-4 py-4 text-sm font-medium transition-colors",
                       active
-                        ? "bg-card text-foreground border border-border"
-                        : "text-muted-foreground hover:text-foreground",
+                        ? "bg-brand text-brand-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
                     )}
                   >
-                    {t === "foreman" ? (
-                      <HardHat className="size-4" />
-                    ) : (
-                      <ClipboardList className="size-4" />
-                    )}
-                    <span className="capitalize">{t}</span>
+                    <div className={cn(
+                      "size-9 rounded-md grid place-items-center",
+                      active ? "bg-brand-foreground/15" : "bg-muted",
+                    )}>
+                      {meta.icon}
+                    </div>
+                    <div className="text-center">
+                      <div className="font-semibold">{meta.title}</div>
+                      <div className={cn(
+                        "text-[11px] leading-tight mt-0.5",
+                        active ? "text-brand-foreground/80" : "text-muted-foreground",
+                      )}>
+                        {meta.description}
+                      </div>
+                    </div>
                   </button>
                 );
               })}
             </div>
+          </div>
 
-            <div className="mt-5 flex items-center gap-3">
-              <div className="size-10 rounded-md bg-brand/10 text-brand grid place-items-center">
-                {meta.icon}
-              </div>
-              <div>
-                <div className="text-sm font-semibold">{meta.title}</div>
-                <div className="text-xs text-muted-foreground">{meta.subtitle}</div>
-              </div>
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+            <div className="space-y-1.5">
+              <Label htmlFor="username" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Username
+              </Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (error) setError(null);
+                }}
+                maxLength={100}
+                required
+                className="h-11"
+              />
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
-              <div className="space-y-1.5">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  maxLength={100}
-                  required
-                />
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError(null);
+                }}
+                maxLength={200}
+                required
+                className="h-11"
+              />
+            </div>
+
+            {error ? (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                {error}
               </div>
+            ) : null}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  maxLength={200}
-                  required
-                />
-              </div>
+            <Button type="submit" className="w-full h-11 text-sm font-semibold" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin mr-2" />
+                  Signing in…
+                </>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
 
-              {error ? (
-                <div
-                  role="alert"
-                  className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                >
-                  {error}
-                </div>
-              ) : null}
-
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Signing in…
-                  </>
-                ) : (
-                  "Sign in"
-                )}
-              </Button>
-            </form>
-
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Demo credentials are pre-filled — just press <span className="font-medium text-foreground">Sign in</span>.
-            </p>
-          </div>
+          <p className="mt-6 text-center text-[11px] text-muted-foreground">
+            comstruct — construction procurement, simplified.
+          </p>
         </div>
       </main>
     </div>
