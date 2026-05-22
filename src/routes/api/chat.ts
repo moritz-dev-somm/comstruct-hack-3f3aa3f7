@@ -499,21 +499,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "add_to_cart",
-      description: "Add a catalog item to the cart by its SKU (e.g. C001).",
-      parameters: {
-        type: "object",
-        properties: {
-          sku: { type: "string" },
-          quantity: { type: "number", description: "Whole units." },
-        },
-        required: ["sku", "quantity"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "flag_as_a_material",
       description: "Mark the request as out-of-scope (A-material, e.g. concrete, doors, windows) and offer to notify the PM.",
       parameters: {
