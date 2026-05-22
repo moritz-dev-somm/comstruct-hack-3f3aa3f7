@@ -292,15 +292,11 @@ function AttentionBanner({
         <div className="grid place-items-center size-8 rounded-md bg-brand text-brand-foreground shrink-0">
           <ShieldAlert className="size-4" />
         </div>
-        <div>
-          <div className="text-sm font-bold text-brand uppercase tracking-wide">
-            Action required — {items.length} order{items.length === 1 ? "" : "s"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            These orders are paused until you decide how to continue.
-          </div>
+        <div className="text-sm font-bold text-brand uppercase tracking-wide">
+          Action required — {items.length} order{items.length === 1 ? "" : "s"}
         </div>
       </div>
+
       <ul className="space-y-3">
         {items.map(({ order, info }) => (
           <AttentionItem
