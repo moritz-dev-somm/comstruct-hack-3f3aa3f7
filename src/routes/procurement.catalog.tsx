@@ -210,14 +210,60 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     const rows = stage.rows;
     setStage({ name: "importing", total: rows.length, done: 0 });
     try {
-      // Insert in batches of 100 so the request stays small
-      const CHUNK = 100;
+      // Enrich + insert in batches of 25 (matches server enrich cap)
+      const CHUNK = 25;
       let done = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
         const slice = rows.slice(i, i + CHUNK);
+
+        // Ask AI to fill DB fields not present in the source file
+        let enrichedBySku = new Map<string, any>();
+        try {
+          const res = await fetch("/api/catalog-import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "enrich",
+              rows: slice.map((r) => ({
+                sku: r.sku,
+                name: r.name,
+                category: r.category,
+                unit: r.unit,
+                supplier: r.supplier ?? null,
+                description: r.description ?? null,
+              })),
+            }),
+          });
+          if (res.ok) {
+            const { rows: enriched } = (await res.json()) as { rows: any[] };
+            enrichedBySku = new Map(enriched.map((e) => [String(e.sku), e]));
+          } else {
+            console.warn("Enrichment failed, inserting raw rows");
+          }
+        } catch (err) {
+          console.warn("Enrichment error:", err);
+        }
+
+        const merged = slice.map((r) => {
+          const e = enrichedBySku.get(r.sku);
+          if (!e) return r;
+          return {
+            ...r,
+            description: r.description ?? e.description ?? null,
+            name_en: e.name_en ?? null,
+            description_en: e.description_en ?? null,
+            unit_en: e.unit_en ?? null,
+            keywords: Array.isArray(e.keywords) ? e.keywords : [],
+            keywords_en: Array.isArray(e.keywords_en) ? e.keywords_en : [],
+            use_cases: Array.isArray(e.use_cases) ? e.use_cases : [],
+            use_cases_en: Array.isArray(e.use_cases_en) ? e.use_cases_en : [],
+            enriched_at: new Date().toISOString(),
+          };
+        });
+
         const { error } = await supabase
           .from("products")
-          .upsert(slice, { onConflict: "sku", ignoreDuplicates: false });
+          .upsert(merged, { onConflict: "sku", ignoreDuplicates: false });
         if (error) throw new Error(error.message);
         done += slice.length;
         setStage({ name: "importing", total: rows.length, done });

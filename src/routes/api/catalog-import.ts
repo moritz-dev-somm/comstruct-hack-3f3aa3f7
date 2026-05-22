@@ -1,16 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Catalog import helper.
+ * Catalog import helper — calls OpenAI directly (no Lovable AI Gateway).
  *
- * Two modes:
- *  - mode: "map"  → input { headers, sample } → output { mapping }
- *      Used for CSV/XLSX. Client parses rows, sends a few sample rows, server asks
- *      Gemini which column corresponds to sku / name / price / unit / category / supplier.
- *
- *  - mode: "pdf"  → input { text, fileName } → output { rows: ProductRow[] }
- *      Used for PDFs (text already extracted on the client via pdfjs-dist).
- *      Gemini reads the raw text and emits structured product rows directly.
+ * Modes:
+ *  - "map"     CSV/XLSX header → field mapping
+ *  - "pdf"     Extract structured rows from PDF text
+ *  - "enrich"  Fill DB fields not present in the source file (translations,
+ *              descriptions, keywords, use cases) for a batch of rows
  */
 
 type ColumnTarget =
@@ -35,13 +32,34 @@ type ExtractedRow = {
   description?: string;
 };
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
+type EnrichInput = {
+  sku: string;
+  name: string;
+  category: string;
+  unit: string;
+  supplier?: string | null;
+  description?: string | null;
+};
 
-async function callGateway(body: unknown) {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY missing");
-  const res = await fetch(GATEWAY, {
+type EnrichOutput = {
+  sku: string;
+  name_en: string;
+  description: string;
+  description_en: string;
+  unit_en: string;
+  keywords: string[];
+  keywords_en: string[];
+  use_cases: string[];
+  use_cases_en: string[];
+};
+
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const MODEL = "gpt-5.4-mini";
+
+async function callOpenAI(body: unknown) {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY missing");
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -51,15 +69,13 @@ async function callGateway(body: unknown) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(`AI gateway ${res.status}: ${txt.slice(0, 300)}`);
+    throw new Error(`OpenAI ${res.status}: ${txt.slice(0, 400)}`);
   }
   return res.json() as Promise<{
     choices: Array<{
       message: {
         content?: string | null;
-        tool_calls?: Array<{
-          function: { name: string; arguments: string };
-        }>;
+        tool_calls?: Array<{ function: { name: string; arguments: string } }>;
       };
     }>;
   }>;
@@ -78,19 +94,10 @@ async function aiMapColumns(headers: string[], sample: string[][]): Promise<Mapp
           mapping: {
             type: "object",
             description:
-              "Object where keys are the original headers and values are one of: sku, name, price_eur, unit, category, supplier, description, ignore.",
+              "Keys = original headers, values one of: sku, name, price_eur, unit, category, supplier, description, ignore.",
             additionalProperties: {
               type: "string",
-              enum: [
-                "sku",
-                "name",
-                "price_eur",
-                "unit",
-                "category",
-                "supplier",
-                "description",
-                "ignore",
-              ],
+              enum: ["sku", "name", "price_eur", "unit", "category", "supplier", "description", "ignore"],
             },
           },
         },
@@ -100,7 +107,7 @@ async function aiMapColumns(headers: string[], sample: string[][]): Promise<Mapp
     },
   };
 
-  const data = await callGateway({
+  const data = await callOpenAI({
     model: MODEL,
     messages: [
       {
@@ -139,10 +146,10 @@ async function aiExtractFromPdfText(text: string, fileName: string): Promise<Ext
             items: {
               type: "object",
               properties: {
-                sku: { type: "string", description: "Supplier SKU / article number" },
+                sku: { type: "string" },
                 name: { type: "string" },
-                price_eur: { type: "number", description: "Unit price in EUR (number only)" },
-                unit: { type: "string", description: "Unit of measure, e.g. Stk, m, kg, box" },
+                price_eur: { type: "number" },
+                unit: { type: "string" },
                 category: { type: "string" },
                 supplier: { type: "string" },
                 description: { type: "string" },
@@ -158,21 +165,17 @@ async function aiExtractFromPdfText(text: string, fileName: string): Promise<Ext
     },
   };
 
-  // Cap input to keep latency manageable
   const trimmed = text.slice(0, 60_000);
 
-  const data = await callGateway({
+  const data = await callOpenAI({
     model: MODEL,
     messages: [
       {
         role: "system",
         content:
-          "You extract structured product rows from supplier PDF catalogs. Output one row per distinct article. Skip headers/footers. Be precise with SKUs and prices. If price is per pack, still use the listed price. If a field is missing, omit the optional ones; required fields (sku, name, price_eur, unit, category) must be filled — infer a sensible category from context.",
+          "You extract structured product rows from supplier PDF catalogs. Output one row per distinct article. Skip headers/footers. Be precise with SKUs and prices. Required fields (sku, name, price_eur, unit, category) must always be filled — infer a sensible category from context.",
       },
-      {
-        role: "user",
-        content: `File: ${fileName}\n\nPDF text:\n${trimmed}`,
-      },
+      { role: "user", content: `File: ${fileName}\n\nPDF text:\n${trimmed}` },
     ],
     tools: [tool],
     tool_choice: { type: "function", function: { name: "extract_products" } },
@@ -184,6 +187,92 @@ async function aiExtractFromPdfText(text: string, fileName: string): Promise<Ext
   return parsed.rows ?? [];
 }
 
+async function aiEnrichRows(rows: EnrichInput[]): Promise<EnrichOutput[]> {
+  if (rows.length === 0) return [];
+  const tool = {
+    type: "function" as const,
+    function: {
+      name: "enrich_products",
+      description:
+        "For each input product, fill missing catalog fields: German + English translations, a short marketing description, unit translation, search keywords, and typical construction-site use cases.",
+      parameters: {
+        type: "object",
+        properties: {
+          rows: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                sku: { type: "string", description: "Echo the input SKU exactly" },
+                name_en: { type: "string", description: "English product name" },
+                description: { type: "string", description: "1-2 sentence German product description" },
+                description_en: { type: "string", description: "1-2 sentence English product description" },
+                unit_en: { type: "string", description: "Unit of measure in English (e.g. piece, m, kg, box)" },
+                keywords: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "5-10 German search keywords / synonyms a foreman might say",
+                },
+                keywords_en: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "5-10 English search keywords / synonyms",
+                },
+                use_cases: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "2-5 short German construction-site use-case phrases",
+                },
+                use_cases_en: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "2-5 short English construction-site use-case phrases",
+                },
+              },
+              required: [
+                "sku",
+                "name_en",
+                "description",
+                "description_en",
+                "unit_en",
+                "keywords",
+                "keywords_en",
+                "use_cases",
+                "use_cases_en",
+              ],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["rows"],
+        additionalProperties: false,
+      },
+    },
+  };
+
+  const data = await callOpenAI({
+    model: MODEL,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You enrich construction-supply catalog rows. Be concise, accurate, and use professional construction terminology. Always preserve the input SKU verbatim. Output one entry per input row, in the same order.",
+      },
+      {
+        role: "user",
+        content: `Enrich these ${rows.length} products. If the input description is present, refine it rather than discard it.\n\n${JSON.stringify(rows, null, 2)}`,
+      },
+    ],
+    tools: [tool],
+    tool_choice: { type: "function", function: { name: "enrich_products" } },
+  });
+
+  const call = data.choices?.[0]?.message?.tool_calls?.[0];
+  if (!call) throw new Error("AI returned no tool call for enrichment");
+  const parsed = JSON.parse(call.function.arguments) as { rows: EnrichOutput[] };
+  return parsed.rows ?? [];
+}
+
 export const Route = createFileRoute("/api/catalog-import")({
   server: {
     handlers: {
@@ -191,7 +280,8 @@ export const Route = createFileRoute("/api/catalog-import")({
         try {
           const body = (await request.json()) as
             | { mode: "map"; headers: string[]; sample: string[][] }
-            | { mode: "pdf"; text: string; fileName: string };
+            | { mode: "pdf"; text: string; fileName: string }
+            | { mode: "enrich"; rows: EnrichInput[] };
 
           if (body.mode === "map") {
             if (!Array.isArray(body.headers) || body.headers.length === 0) {
@@ -204,15 +294,23 @@ export const Route = createFileRoute("/api/catalog-import")({
           if (body.mode === "pdf") {
             if (!body.text || body.text.trim().length < 20) {
               return Response.json(
-                {
-                  error:
-                    "PDF appears to be empty or scanned — no extractable text. Try Excel/CSV instead.",
-                },
+                { error: "PDF appears to be empty or scanned — no extractable text. Try Excel/CSV instead." },
                 { status: 422 },
               );
             }
             const rows = await aiExtractFromPdfText(body.text, body.fileName ?? "catalog.pdf");
             return Response.json({ rows });
+          }
+
+          if (body.mode === "enrich") {
+            if (!Array.isArray(body.rows) || body.rows.length === 0) {
+              return Response.json({ rows: [] });
+            }
+            if (body.rows.length > 25) {
+              return Response.json({ error: "Send at most 25 rows per enrich call" }, { status: 400 });
+            }
+            const enriched = await aiEnrichRows(body.rows);
+            return Response.json({ rows: enriched });
           }
 
           return Response.json({ error: "unknown mode" }, { status: 400 });
