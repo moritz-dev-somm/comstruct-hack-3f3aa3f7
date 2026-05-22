@@ -271,7 +271,7 @@ Map the category to ONE of: ${SITE_CATEGORIES.join(", ")}. Generate German + Eng
 
 Reply ONLY via the save_product_info tool call.`;
 
-  const res = await fetch(LOVABLE_AI_URL, {
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
