@@ -364,7 +364,7 @@ export function VoiceButton({
         onPointerCancel={() => { if (pressStartRef.current) handlePressEnd(); }}
         onContextMenu={(e) => e.preventDefault()}
         aria-label="Tap to speak, or hold and release to send"
-        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground shadow-md shadow-brand/20 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 select-none touch-none"
+        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/20 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 select-none touch-none"
       >
         <Mic className="size-6" strokeWidth={2.5} />
       </button>
