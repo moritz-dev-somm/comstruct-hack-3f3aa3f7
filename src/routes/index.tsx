@@ -1833,12 +1833,6 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           >
             {ctaLabel}
           </button>
-          <Link
-            to="/settings"
-            className="block text-center text-xs text-muted-foreground hover:text-foreground"
-          >
-            Adjust budget &amp; rules
-          </Link>
         </div>
       </div>
     </div>
