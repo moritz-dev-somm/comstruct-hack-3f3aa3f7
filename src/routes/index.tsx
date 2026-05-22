@@ -260,9 +260,12 @@ function Home() {
   useEffect(() => {
     if (!prefill) return;
     setInput(prefill);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    const isTouch = typeof window !== "undefined"
+      && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    if (!isTouch) setTimeout(() => inputRef.current?.focus(), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
+
 
 
 
@@ -274,10 +277,18 @@ function Home() {
     );
   }, [messages, recommendedIds, recommendedQty]);
 
-  // focus input on load and after stream ends
+  // Re-focus the input after a stream ends, but only on devices with a
+  // physical pointer (desktop). On touch devices auto-focusing would pop
+  // the on-screen keyboard up unexpectedly — keyboard should only appear
+  // when the user taps the field.
   useEffect(() => {
-    if (!streaming) inputRef.current?.focus();
+    if (streaming) return;
+    if (typeof window === "undefined") return;
+    const isTouch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    if (isTouch) return;
+    inputRef.current?.focus();
   }, [streaming, inConversation]);
+
 
   // auto scroll
   useEffect(() => {
