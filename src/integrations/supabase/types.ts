@@ -53,6 +53,11 @@ export type Database = {
           classification: Json | null
           confirmed_at: string | null
           created_at: string
+          delivery_date_confidence: string | null
+          delivery_date_iso: string | null
+          delivery_date_iso_end: string | null
+          delivery_date_needs_clarification: boolean
+          delivery_date_raw: string | null
           failover_attempt: number
           failover_of: string | null
           followup_count: number
@@ -85,6 +90,11 @@ export type Database = {
           classification?: Json | null
           confirmed_at?: string | null
           created_at?: string
+          delivery_date_confidence?: string | null
+          delivery_date_iso?: string | null
+          delivery_date_iso_end?: string | null
+          delivery_date_needs_clarification?: boolean
+          delivery_date_raw?: string | null
           failover_attempt?: number
           failover_of?: string | null
           followup_count?: number
@@ -117,6 +127,11 @@ export type Database = {
           classification?: Json | null
           confirmed_at?: string | null
           created_at?: string
+          delivery_date_confidence?: string | null
+          delivery_date_iso?: string | null
+          delivery_date_iso_end?: string | null
+          delivery_date_needs_clarification?: boolean
+          delivery_date_raw?: string | null
           failover_attempt?: number
           failover_of?: string | null
           followup_count?: number

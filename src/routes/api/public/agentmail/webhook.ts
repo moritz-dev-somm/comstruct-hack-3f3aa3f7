@@ -26,6 +26,7 @@ import {
   type CounterState,
 } from "../../../../../agent/conditions";
 import type { ChecklistField } from "../../../../../agent/agent.server";
+import { resolveDeliveryDate } from "../../../../../agent/delivery-date";
 import {
   extractOrderIdFromSubject,
   parseEmailAddress,
@@ -305,9 +306,49 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
           (neg.order_snapshot as { supplier_language?: string })?.supplier_language,
         );
 
+        // Resolve the supplier's free-form delivery wording to a concrete
+        // calendar date (e.g. "by next Tuesday" → 2026-06-02), anchored on
+        // the reply timestamp. If the wording is too vague we append a
+        // clarification ask so the next outbound email requests a hard date.
+        const replyReceivedAt = new Date();
+        const deliveryRaw =
+          cls.checklist?.delivery_date ?? cls.lead_time ?? null;
+        const delivery = resolveDeliveryDate(deliveryRaw, replyReceivedAt);
+        const DELIVERY_CLARIFY_EN =
+          "Could you confirm the exact calendar delivery date (DD.MM.YYYY)?";
+        const DELIVERY_CLARIFY_NATIVE: Record<SupplierLanguage, string> = {
+          en: "Could you confirm the exact calendar delivery date (DD.MM.YYYY)?",
+          de: "Können Sie uns das exakte Lieferdatum (TT.MM.JJJJ) bestätigen?",
+          fr: "Pouvez-vous confirmer la date exacte de livraison (JJ/MM/AAAA) ?",
+          it: "Potete confermare la data esatta di consegna (GG/MM/AAAA)?",
+        };
+        const alreadyAsked = (prevOpenQuestions ?? []).some((q) =>
+          /exact|calendar|kalender|date\s+exacte|data\s+esatta/i.test(q),
+        );
+        const clsUnclearEn = Array.isArray(cls.unclear_points_en)
+          ? [...cls.unclear_points_en]
+          : [];
+        const clsUnclearNative = Array.isArray(cls.unclear_points)
+          ? [...cls.unclear_points]
+          : [];
+        if (delivery.needsClarification && !alreadyAsked) {
+          clsUnclearEn.push(DELIVERY_CLARIFY_EN);
+          clsUnclearNative.push(
+            DELIVERY_CLARIFY_NATIVE[
+              (pickLang(
+                cls.reply_language,
+                (neg.order_snapshot as { supplier_language?: string })
+                  ?.supplier_language,
+              ) as SupplierLanguage) ?? "en"
+            ],
+          );
+        }
+
         // Build effective classification used by the policy decision.
         const effectiveCls: ReplyClassification = {
           ...cls,
+          unclear_points: clsUnclearNative,
+          unclear_points_en: clsUnclearEn,
           answered_open_questions: verifiedAnsweredOpen,
           still_open_questions: verifiedStillOpen,
           // If the only reason we were "unclear" was unanswered open questions
@@ -318,10 +359,11 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             (cls.still_open_questions?.length ?? 0) > 0 &&
             verifiedStillOpen.length === 0 &&
             (cls.missing_checklist?.length ?? 0) === 0 &&
-            (cls.unclear_points?.length ?? 0) === 0
+            clsUnclearNative.length === 0
               ? "fully_confirmed"
               : cls.verdict,
         };
+
 
         // Accumulate concise "facts already given" — include verifier evidence.
         const newAnswers: string[] = [];
@@ -497,6 +539,11 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
             last_processed_message_id: messageId || null,
             last_inbound_from: fromEmail,
             security_reject_reason: null,
+            delivery_date_iso: delivery.iso,
+            delivery_date_iso_end: delivery.isoEnd,
+            delivery_date_confidence: delivery.confidence,
+            delivery_date_raw: deliveryRaw,
+            delivery_date_needs_clarification: delivery.needsClarification,
             ...(matchedByFallback && threadId ? { thread_id: threadId } : {}),
           })
           .eq("id", neg.id);
