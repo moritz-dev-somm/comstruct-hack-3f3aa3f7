@@ -38,6 +38,14 @@ export type OrderEvent = {
   actor?: string;
 };
 
+export type ChatSnapshot = {
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  recommendedIds: string[];
+  recommendedQty: Record<string, number>;
+  /** Last user-typed query at the time the order was placed. */
+  lastQuery?: string;
+};
+
 export type Order = {
   id: string; // ORD-####
   createdAt: string;
@@ -50,6 +58,9 @@ export type Order = {
   approver?: string;
   rejectionReason?: string;
   history: OrderEvent[];
+  /** Chat thread + recommendations that produced this order. Used by
+   * "Find alternatives" to restore the original search context. */
+  searchSnapshot?: ChatSnapshot;
 };
 
 export const FOREMAN = {
