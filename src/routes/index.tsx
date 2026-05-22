@@ -201,15 +201,18 @@ function Home() {
   const [project, setProject] = useState("ramistrasse-101");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { role, logout } = useRole();
+  const { role, hydrated, logout } = useRole();
   const navigate = useNavigate();
 
   // Root is the login page — if no role is set, send the user there.
   // If a supervisor lands here, route them to their workspace.
+  // Wait until localStorage has hydrated so a refresh doesn't flash to /login.
   useEffect(() => {
+    if (!hydrated) return;
     if (role === null) navigate({ to: "/login" });
     else if (role === "supervisor") navigate({ to: "/procurement" });
-  }, [role, navigate]);
+  }, [role, hydrated, navigate]);
+
 
   // Early return moved below all hooks to keep hook order stable (fixes React #310).
 
