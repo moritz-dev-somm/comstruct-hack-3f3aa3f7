@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Inbox, ListChecks, BarChart3, Package, HardHat, LogOut, Bot, Database } from "lucide-react";
+import { Inbox, ListChecks, BarChart3, Package, HardHat, LogOut, Bot, Database, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrders } from "@/lib/orders";
@@ -39,6 +39,7 @@ function ProcurementLayout() {
     { to: "/procurement/analytics", label: "Analytics", icon: BarChart3 },
     { to: "/procurement/catalog", label: "Catalog", icon: Package },
     { to: "/procurement/catalog/manage", label: "Manage database", icon: Database, indent: true },
+    { to: "/procurement/settings", label: "Approval rules", icon: SlidersHorizontal },
   ] as const;
 
   return (
