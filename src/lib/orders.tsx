@@ -26,6 +26,8 @@ export type OrderStatus =
   | "pending_pm"
   | "pending_central"
   | "approved"
+  | "rfq_in_progress"
+  | "rfq_failed"
   | "ordered"
   | "delivered"
   | "rejected";
@@ -89,10 +91,19 @@ export const STATUS_META: Record<
   pending_pm: { label: "Pending PM", tone: "amber" },
   pending_central: { label: "Pending Central", tone: "amber" },
   approved: { label: "Approved", tone: "green" },
+  rfq_in_progress: { label: "Collecting quotes", tone: "amber" },
+  rfq_failed: { label: "Quote round failed", tone: "red" },
   ordered: { label: "Ordered", tone: "blue" },
   delivered: { label: "Delivered", tone: "teal" },
   rejected: { label: "Rejected", tone: "red" },
 };
+
+/**
+ * Orders at or above this subtotal trigger a multi-supplier discount RFQ
+ * after PM/Central approval instead of an immediate PO. Kept in sync with
+ * `RFQ_THRESHOLD_EUR` in `agent/rfq.server.ts`.
+ */
+export const RFQ_THRESHOLD_EUR = 200;
 
 type OrdersCtx = {
   orders: Order[];
