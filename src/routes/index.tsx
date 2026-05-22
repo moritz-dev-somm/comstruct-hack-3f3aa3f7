@@ -188,6 +188,7 @@ function Home() {
   const { data: products = [] } = useProducts();
   const [aMaterialFlag, setAMaterialFlag] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<HybridSearchResult[] | null>(null);
   const [searchExtracted, setSearchExtracted] = useState<HybridExtracted | null>(null);
