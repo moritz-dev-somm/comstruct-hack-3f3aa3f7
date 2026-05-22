@@ -701,6 +701,8 @@ function Home() {
               }
             }}
             products={products}
+            onVoiceUserTurn={appendVoiceUserTurn}
+            onVoiceAssistantTurn={appendVoiceAssistantTurn}
           />
         ) : (
           <ConversationView
@@ -813,6 +815,8 @@ function HeroView({
   onAddTemplate,
   categoryTiles,
   products,
+  onVoiceUserTurn,
+  onVoiceAssistantTurn,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -823,6 +827,8 @@ function HeroView({
   onAddTemplate: (items: TemplateItem[]) => void;
   categoryTiles: CategoryTileData[];
   products: Product[];
+  onVoiceUserTurn: (text: string) => void;
+  onVoiceAssistantTurn: (text: string) => void;
 }) {
   const { templates, hydrated: tplHydrated, remove: removeTemplate } = useTemplates();
   return (
@@ -844,8 +850,8 @@ function HeroView({
           <VoiceButton size="hero" onTranscript={(t) => send(t)} />
           <VoiceModeButton
             size="hero"
-            onUserTranscript={appendVoiceUserTurn}
-            onAssistantTranscript={appendVoiceAssistantTurn}
+            onUserTranscript={onVoiceUserTurn}
+            onAssistantTranscript={onVoiceAssistantTurn}
           />
           <ScanButton size="hero" onResult={(prompt) => send(prompt)} />
         </div>
