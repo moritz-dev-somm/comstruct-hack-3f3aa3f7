@@ -692,9 +692,8 @@ function Home() {
               }
             }}
             products={products}
-            onVoiceUserTurn={appendVoiceUserTurn}
-            onVoiceAssistantTurn={appendVoiceAssistantTurn}
           />
+
         ) : (
           <ConversationView
             messages={messages}
