@@ -19,6 +19,7 @@ import { Route as ProcurementOrdersRouteImport } from './routes/procurement.orde
 import { Route as ProcurementCatalogRouteImport } from './routes/procurement.catalog'
 import { Route as ProcurementAnalyticsRouteImport } from './routes/procurement.analytics'
 import { Route as ProcurementAgentRouteImport } from './routes/procurement.agent'
+import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiScanRouteImport } from './routes/api/scan'
 import { Route as ApiHybridSearchRouteImport } from './routes/api/hybrid-search'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -79,6 +80,11 @@ const ProcurementAgentRoute = ProcurementAgentRouteImport.update({
   id: '/agent',
   path: '/agent',
   getParentRoute: () => ProcurementRoute,
+} as any)
+const ApiTtsRoute = ApiTtsRouteImport.update({
+  id: '/api/tts',
+  path: '/api/tts',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiScanRoute = ApiScanRouteImport.update({
   id: '/api/scan',
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
   '/api/scan': typeof ApiScanRoute
+  '/api/tts': typeof ApiTtsRoute
   '/procurement/agent': typeof ProcurementAgentRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
   '/api/scan': typeof ApiScanRoute
+  '/api/tts': typeof ApiTtsRoute
   '/procurement/agent': typeof ProcurementAgentRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
   '/api/scan': typeof ApiScanRoute
+  '/api/tts': typeof ApiTtsRoute
   '/procurement/agent': typeof ProcurementAgentRoute
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/hybrid-search'
     | '/api/scan'
+    | '/api/tts'
     | '/procurement/agent'
     | '/procurement/analytics'
     | '/procurement/catalog'
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/hybrid-search'
     | '/api/scan'
+    | '/api/tts'
     | '/procurement/agent'
     | '/procurement/analytics'
     | '/procurement/catalog'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/hybrid-search'
     | '/api/scan'
+    | '/api/tts'
     | '/procurement/agent'
     | '/procurement/analytics'
     | '/procurement/catalog'
@@ -278,6 +290,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiHybridSearchRoute: typeof ApiHybridSearchRoute
   ApiScanRoute: typeof ApiScanRoute
+  ApiTtsRoute: typeof ApiTtsRoute
   ApiPublicAgentTimeoutsRoute: typeof ApiPublicAgentTimeoutsRoute
   ApiPublicAgentmailWebhookRoute: typeof ApiPublicAgentmailWebhookRoute
 }
@@ -353,6 +366,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/procurement/agent'
       preLoaderRoute: typeof ProcurementAgentRouteImport
       parentRoute: typeof ProcurementRoute
+    }
+    '/api/tts': {
+      id: '/api/tts'
+      path: '/api/tts'
+      fullPath: '/api/tts'
+      preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/scan': {
       id: '/api/scan'
@@ -492,6 +512,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiHybridSearchRoute: ApiHybridSearchRoute,
   ApiScanRoute: ApiScanRoute,
+  ApiTtsRoute: ApiTtsRoute,
   ApiPublicAgentTimeoutsRoute: ApiPublicAgentTimeoutsRoute,
   ApiPublicAgentmailWebhookRoute: ApiPublicAgentmailWebhookRoute,
 }
