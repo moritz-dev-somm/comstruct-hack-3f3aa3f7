@@ -1,10 +1,10 @@
-// Enrich products with descriptions, attributes, and use cases via Lovable AI.
+// Enrich products with descriptions, attributes, and use cases via OpenAI.
 import { createClient } from "@supabase/supabase-js";
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "gpt-5.4-mini";
 const CONCURRENCY = 6;
 
 const tool = {
