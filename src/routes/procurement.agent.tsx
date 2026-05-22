@@ -5,8 +5,10 @@ import { useMemo, useState } from "react";
 import {
   Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send,
   Inbox as InboxIcon, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Circle,
-  Clock, UserRound, ShieldAlert,
+  Clock, UserRound, ShieldAlert, Database,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ImportDatabaseTab } from "@/components/ImportDatabaseTab";
 import {
   listInboxMessages,
   getInboxMessage,
