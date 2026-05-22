@@ -5,7 +5,7 @@ import type { ChecklistField, ReplyClassification } from "./agent.server";
  * accumulated state, decide which outbound action the agent should take.
  *
  * Safety rules:
- *  - Hard cap of 5 supplier replies per negotiation → human review.
+ *  - Hard cap of 12 supplier replies per negotiation → handover email + human review.
  *  - Never auto-confirm with unmet checklist or unresolved issues.
  *  - Declines, item-unavailable, supplier-asks-for-human, or any
  *    question we cannot auto-answer → human review (no automatic email).
