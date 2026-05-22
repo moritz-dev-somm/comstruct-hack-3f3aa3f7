@@ -752,7 +752,7 @@ function HeroView({
             <button
               key={chip}
               onClick={() => send(chip)}
-              className="rounded-full border border-brand text-brand hover:bg-brand/10 px-3 h-8 text-xs font-medium"
+              className="rounded-full border border-primary text-brand hover:bg-primary/10 px-3 h-8 text-xs font-medium"
             >
               {chip}
             </button>
@@ -811,7 +811,7 @@ function HeroView({
                     </div>
                     <button
                       onClick={() => onAddQuickOrder(resolved.map((p) => p.sku))}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       <ShoppingCart className="size-3.5" />
                       Add all to cart
@@ -1805,7 +1805,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           <button
             disabled={cart.items.length === 0}
             onClick={submit}
-            className="w-full h-12 rounded-lg bg-brand text-brand-foreground font-semibold disabled:opacity-40"
+            className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold disabled:opacity-40"
           >
             {ctaLabel}
           </button>
