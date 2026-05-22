@@ -365,7 +365,16 @@ function Home() {
       console.error(e);
     } finally {
       setStreaming(false);
+      if (speakNextReplyRef.current) {
+        speakNextReplyRef.current = false;
+        setMessages((prev) => {
+          const last = [...prev].reverse().find((m) => m.role === "assistant");
+          if (last?.content) speakAssistantText(last.content);
+          return prev;
+        });
+      }
     }
+
   }
 
   function handleEvent(evt: { type: string; [k: string]: unknown }) {
