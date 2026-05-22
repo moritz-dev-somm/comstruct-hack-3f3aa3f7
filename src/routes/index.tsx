@@ -314,7 +314,7 @@ function Home() {
     return [...rec, ...rest];
   }, [recommendedIds, products, selectedCategory]);
 
-  async function send(text: string) {
+  async function send(text: string, opts?: { speak?: boolean }) {
     if (!text.trim() || streaming) return;
     const userMsg: ChatMessage = { role: "user", content: text };
     const newHistory = [...messages, userMsg];
