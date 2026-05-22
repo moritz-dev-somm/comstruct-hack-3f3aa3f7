@@ -1,11 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { HardHat, ClipboardList, Loader2 } from "lucide-react";
+import { HardHat, ClipboardList, Loader2, ArrowRight } from "lucide-react";
 import { useRole, DEMO_USERS } from "@/lib/role";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import comstructLogo from "@/assets/comstruct-logo.png";
+import {
+  IconTile,
+  BlueprintIcon,
+  GearIcon,
+  CompassIcon,
+} from "@/components/construction-icons";
 
 type Tab = "foreman" | "supervisor";
 
@@ -38,7 +45,6 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // If `?as=` changes (e.g. user clicks Switch user again), follow it.
   useEffect(() => {
     if (as && as !== tab) setTab(as);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,82 +79,133 @@ function LoginPage() {
   const tabMeta: Record<Tab, { title: string; description: string; icon: React.ReactNode }> = {
     foreman: {
       title: "Foreman",
-      description: "Order materials from the site",
-      icon: <HardHat className="size-5" />,
+      description: "Order materials from the site in plain language.",
+      icon: <HardHat className="size-4" />,
     },
     supervisor: {
       title: "Supervisor",
-      description: "Approvals, orders and catalog",
-      icon: <ClipboardList className="size-5" />,
+      description: "Review approvals, orders and the catalog.",
+      icon: <ClipboardList className="size-4" />,
     },
   };
 
-  return (
-    <div className="min-h-screen dot-bg text-foreground flex flex-col">
-      <header className="px-6 h-14 flex items-center gap-2.5 border-b bg-background/80 backdrop-blur">
-        <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
-          <HardHat className="size-5" />
-        </div>
-        <span className="font-semibold text-sm tracking-tight">comstruct</span>
-      </header>
+  const demo = DEMO_USERS[tab];
 
-      <main className="flex-1 flex items-center justify-center px-4 py-10">
+  return (
+    <div className="min-h-screen bg-background text-foreground grid md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
+      {/* ─── Brand panel ─────────────────────────────────────────── */}
+      <aside
+        className="relative bg-brand text-brand-foreground overflow-hidden flex flex-col p-8 md:p-12 lg:p-16 min-h-[260px] md:min-h-screen"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      >
+        {/* Soft top-right halo */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-40 -right-40 size-[480px] rounded-full opacity-30"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgba(255,255,255,0.18), transparent 70%)",
+          }}
+        />
+
+        <div className="relative flex items-center gap-3">
+          <img
+            src={comstructLogo}
+            alt="comstruct"
+            className="h-9 w-auto brightness-0 invert"
+          />
+        </div>
+
+        <div className="relative mt-auto pt-12 md:pt-0">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-brand-foreground/70">
+            Construction procurement
+          </p>
+          <h1 className="mt-4 text-3xl md:text-4xl lg:text-5xl font-semibold leading-[1.05] tracking-tight max-w-[18ch]">
+            Order C-materials in plain language.
+          </h1>
+          <p className="mt-4 text-sm md:text-base text-brand-foreground/75 max-w-[36ch]">
+            One assistant for the whole site — from the first voice note to the
+            delivery slip.
+          </p>
+
+          <ul className="mt-10 hidden md:flex flex-col gap-5 max-w-md">
+            <FeatureRow
+              icon={BlueprintIcon}
+              title="Voice, scan, type"
+              sub="Capture what the crew needs without slowing down."
+            />
+            <FeatureRow
+              icon={GearIcon}
+              title="AI supplier agent"
+              sub="Negotiates, follows up and confirms delivery dates for you."
+            />
+            <FeatureRow
+              icon={CompassIcon}
+              title="Live order tracking"
+              sub="From request to site — one timeline, no spreadsheets."
+            />
+          </ul>
+        </div>
+
+        <div className="relative mt-10 hidden md:flex items-center justify-between text-[11px] uppercase tracking-[0.22em] text-brand-foreground/60">
+          <span>est. 2026 · Zürich</span>
+          <span>v1.0</span>
+        </div>
+      </aside>
+
+      {/* ─── Auth panel ─────────────────────────────────────────── */}
+      <main className="dot-bg flex items-center justify-center px-5 py-10 md:py-12">
         <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+          <div className="mb-8">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+              Welcome back
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Sign in</h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Select your role to continue
+              {tabMeta[tab].description}
             </p>
           </div>
 
-          <div className="rounded-xl border bg-card p-1">
-            {/* Role selector */}
-            <div
-              role="tablist"
-              aria-label="Role"
-              className="grid grid-cols-2 gap-1"
-            >
-              {(["foreman", "supervisor"] as Tab[]).map((t) => {
-                const active = tab === t;
-                const meta = tabMeta[t];
-                return (
-                  <button
-                    key={t}
-                    role="tab"
-                    aria-selected={active}
-                    type="button"
-                    onClick={() => setTab(t)}
-                    className={cn(
-                      "flex flex-col items-center gap-2 rounded-lg px-4 py-4 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-brand text-brand-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                    )}
-                  >
-                    <div className={cn(
-                      "size-9 rounded-md grid place-items-center",
-                      active ? "bg-brand-foreground/15" : "bg-muted",
-                    )}>
-                      {meta.icon}
-                    </div>
-                    <div className="text-center">
-                      <div className="font-semibold">{meta.title}</div>
-                      <div className={cn(
-                        "text-[11px] leading-tight mt-0.5",
-                        active ? "text-brand-foreground/80" : "text-muted-foreground",
-                      )}>
-                        {meta.description}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+          {/* Segmented role control */}
+          <div
+            role="tablist"
+            aria-label="Role"
+            className="relative grid grid-cols-2 rounded-full border bg-muted/50 p-1 mb-6"
+          >
+            {(["foreman", "supervisor"] as Tab[]).map((t) => {
+              const active = tab === t;
+              const meta = tabMeta[t];
+              return (
+                <button
+                  key={t}
+                  role="tab"
+                  aria-selected={active}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={cn(
+                    "relative z-10 inline-flex items-center justify-center gap-2 h-9 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors",
+                    active
+                      ? "bg-brand text-brand-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {meta.icon}
+                  {meta.title}
+                </button>
+              );
+            })}
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="username" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Label
+                htmlFor="username"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+              >
                 Username
               </Label>
               <Input
@@ -163,12 +220,15 @@ function LoginPage() {
                 }}
                 maxLength={100}
                 required
-                className="h-11"
+                className="h-11 bg-background"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Label
+                htmlFor="password"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+              >
                 Password
               </Label>
               <Input
@@ -183,7 +243,7 @@ function LoginPage() {
                 }}
                 maxLength={200}
                 required
-                className="h-11"
+                className="h-11 bg-background"
               />
             </div>
 
@@ -196,23 +256,67 @@ function LoginPage() {
               </div>
             ) : null}
 
-            <Button type="submit" className="w-full h-11 text-sm font-semibold" disabled={submitting}>
+            <Button
+              type="submit"
+              className="group w-full h-11 text-sm font-semibold"
+              disabled={submitting}
+            >
               {submitting ? (
                 <>
                   <Loader2 className="size-4 animate-spin mr-2" />
                   Signing in…
                 </>
               ) : (
-                "Sign in"
+                <>
+                  Sign in
+                  <ArrowRight className="size-4 ml-2 transition-transform group-hover:translate-x-0.5" />
+                </>
               )}
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-[11px] text-muted-foreground">
+          <div className="mt-6 flex items-center justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-[11px] text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-brand" />
+              Demo creds prefilled —
+              <span className="font-mono text-foreground/80">
+                {demo.username} / {demo.password}
+              </span>
+            </div>
+          </div>
+
+          <p className="mt-8 text-center text-[11px] text-muted-foreground">
             comstruct — construction procurement, simplified.
           </p>
         </div>
       </main>
     </div>
+  );
+}
+
+function FeatureRow({
+  icon: Icon,
+  title,
+  sub,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <li className="flex items-start gap-4">
+      <IconTile
+        icon={Icon as never}
+        tone="light"
+        size="sm"
+        className="border-brand-foreground/15"
+      />
+      <div className="pt-1">
+        <div className="text-sm font-semibold">{title}</div>
+        <div className="text-xs text-brand-foreground/70 mt-0.5 max-w-[36ch]">
+          {sub}
+        </div>
+      </div>
+    </li>
   );
 }
