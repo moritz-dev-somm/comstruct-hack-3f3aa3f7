@@ -746,12 +746,8 @@ function Home() {
               />
             </div>
             <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
-            <VoiceButton size="compact" onTranscript={(t) => send(t)} />
-            <VoiceModeButton
-              size="compact"
-              onUserTranscript={appendVoiceUserTurn}
-              onAssistantTranscript={appendVoiceAssistantTurn}
-            />
+            <VoiceButton size="compact" onTranscript={(t) => send(t, { speak: true })} />
+
           </div>
         </div>
       )}
