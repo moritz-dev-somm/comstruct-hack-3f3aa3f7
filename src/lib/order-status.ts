@@ -441,17 +441,28 @@ export function buildOrderTimeline(
   const events: TimelineEvent[] = (order.history ?? []).map((e) => ({ ...e }));
   const list = (negotiations ?? []).slice().sort((a, b) => a.sent_at.localeCompare(b.sent_at));
 
+  // Suppliers already mentioned by an existing "PO sent to X" history entry —
+  // skip the synthesised PO event for them to avoid duplicates.
+  const poSentSuppliers = new Set<string>();
+  for (const e of events) {
+    const m = /^po sent to (.+?)(?:\s+—.*)?$/i.exec(e.label.trim());
+    if (m) poSentSuppliers.add(m[1].trim().toLowerCase());
+  }
+
   for (const n of list) {
     const attempt = n.failover_attempt ?? 0;
-    // Outgoing PO/email to this supplier.
-    events.push({
-      at: n.sent_at,
-      label:
-        attempt > 0
-          ? `Failover #${attempt}: PO sent to ${n.supplier_name}`
-          : `PO sent to ${n.supplier_name}`,
-      tone: attempt > 0 ? "amber" : "indigo",
-    });
+    const supplierKey = (n.supplier_name || "").trim().toLowerCase();
+    if (attempt > 0 || !poSentSuppliers.has(supplierKey)) {
+      events.push({
+        at: n.sent_at,
+        label:
+          attempt > 0
+            ? `Failover #${attempt}: PO sent to ${n.supplier_name}`
+            : `PO sent to ${n.supplier_name}`,
+        tone: attempt > 0 ? "amber" : "indigo",
+      });
+      poSentSuppliers.add(supplierKey);
+    }
 
     if (!n.last_reply_at) continue;
     const verdict = (n.classification?.verdict || "").toLowerCase();
@@ -481,12 +492,38 @@ export function buildOrderTimeline(
         label: `${n.supplier_name} confirmed with issues${reason}`,
         tone: "amber",
       });
-    } else if (verdict === "needs_clarification" || s === "clarifying" || s === "answering_questions") {
+    } else if (
+      verdict === "needs_clarification" ||
+      s === "clarifying" ||
+      s === "answering_questions"
+    ) {
+      // Two events: the supplier's reply, then the agent's clarification ask.
       events.push({
         at: n.last_reply_at,
-        label: `${n.supplier_name} asked a clarification${reason}`,
-        tone: "violet",
+        label: reasonRaw
+          ? `${n.supplier_name} replied: ${reasonRaw}`
+          : `${n.supplier_name} replied`,
+        tone: "blue",
       });
+      if ((n.clarification_count ?? 0) > 0 || s === "clarifying") {
+        const followupAt = new Date(
+          new Date(n.last_reply_at).getTime() + 60_000,
+        ).toISOString();
+        events.push({
+          at: followupAt,
+          label: `Agent asked ${n.supplier_name} for clarification`,
+          tone: "violet",
+        });
+      } else if (s === "answering_questions") {
+        const followupAt = new Date(
+          new Date(n.last_reply_at).getTime() + 60_000,
+        ).toISOString();
+        events.push({
+          at: followupAt,
+          label: `Agent answered ${n.supplier_name}'s questions`,
+          tone: "cyan",
+        });
+      }
     } else if (s === "needs_user") {
       events.push({
         at: n.last_reply_at,
@@ -519,11 +556,12 @@ export function buildOrderTimeline(
     }
   }
 
-  // De-duplicate exact label+timestamp pairs (e.g. local history already had
-  // a "PO sent" entry from auto-approval), then sort chronologically.
+  // De-duplicate by normalized label (ignoring timestamp) so we never show
+  // the same line twice — e.g. "PO sent to Uvex" from both local history
+  // and the synthesised negotiation event.
   const seen = new Set<string>();
   const deduped = events.filter((e) => {
-    const k = `${e.at}::${e.label.toLowerCase()}`;
+    const k = e.label.trim().toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
