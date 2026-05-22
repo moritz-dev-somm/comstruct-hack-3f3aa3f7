@@ -1553,7 +1553,11 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
                     className="w-12 h-full grid place-items-center hover:bg-accent text-2xl font-semibold"
                     aria-label="Decrease"
                   >−</HoldButton>
-                  <span className="px-4 text-lg font-bold tabular-nums">{inCart.qty}</span>
+                  <QtyInput
+                    value={inCart.qty}
+                    onChange={(n) => cart.setQty(product.sku, n)}
+                    className="w-14 px-3 text-lg"
+                  />
                   <HoldButton
                     onTick={() => cart.adjust(product.sku, +1)}
                     className="w-12 h-full grid place-items-center hover:bg-accent text-2xl font-semibold"
