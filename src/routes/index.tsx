@@ -1119,7 +1119,7 @@ function ConversationView({
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl px-4 py-6 space-y-4 pb-32">
+      <div className="mx-auto max-w-3xl px-4 py-6 space-y-4 pb-6">
         {messages.map((m, i) => (
           <MessageBubble key={i} msg={m} products={allProducts} />
         ))}
