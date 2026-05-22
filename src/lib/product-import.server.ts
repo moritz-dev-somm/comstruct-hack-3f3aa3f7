@@ -1,11 +1,11 @@
 // Server-only helpers for the product database import feature.
-// Parses Excel/CSV/PDF files into product rows and enriches them via Lovable AI.
+// Parses Excel/CSV/PDF files into product rows and enriches them via OpenAI.
 
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const ENRICH_MODEL = "google/gemini-2.5-flash";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const ENRICH_MODEL = "gpt-5.4-mini";
 
 export type ParsedRow = {
   name: string;
