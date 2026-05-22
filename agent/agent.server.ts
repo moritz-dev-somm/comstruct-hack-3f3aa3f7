@@ -280,7 +280,7 @@ Also:
 - shipping_cost_eur: numeric EUR (0 = included). Null if never mentioned.
 - wants_human: true ONLY if supplier explicitly asks to talk to a person.
 
-unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
+unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". NEVER ask for information that was ALREADY GIVEN to the supplier in the ORIGINAL PURCHASE ORDER (delivery address, project name, VAT ID, payment terms, line items, prices, contact details) — that data is on our side, not theirs. If the latest reply is too short or generic to extract anything (e.g. "hi", "ok", "thanks", "noted"), return [] and we will re-ask the ORIGINAL checklist questions verbatim. Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
 unclear_points_en: the SAME list as unclear_points, but in ENGLISH. Same order, same length. Used for cross-turn matching. [] when unclear_points is [].
 
 Finally pick suggested_outbound (policy may override):
