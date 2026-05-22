@@ -75,7 +75,7 @@ export const Route = createFileRoute("/api/scan")({
             });
           }
 
-          const apiKey = process.env.LOVABLE_API_KEY;
+          const apiKey = process.env.OPENAI_API_KEY;
           if (!apiKey) {
             return new Response(JSON.stringify({ error: "AI not configured" }), {
               status: 500,
@@ -83,14 +83,14 @@ export const Route = createFileRoute("/api/scan")({
             });
           }
 
-          const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const resp = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${apiKey}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "openai/gpt-5.4-mini",
+              model: "gpt-5.4-mini",
               messages: [
                 { role: "system", content: SYSTEM },
                 {
