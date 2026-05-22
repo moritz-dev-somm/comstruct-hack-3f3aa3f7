@@ -22,6 +22,7 @@ import { Route as ProcurementAgentRouteImport } from './routes/procurement.agent
 import { Route as ApiScanRouteImport } from './routes/api/scan'
 import { Route as ApiHybridSearchRouteImport } from './routes/api/hybrid-search'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiCatalogImportRouteImport } from './routes/api/catalog-import'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as ProcurementOrdersOrderIdRouteImport } from './routes/procurement.orders.$orderId'
 import { Route as ProcurementCatalogManageRouteImport } from './routes/procurement.catalog.manage'
@@ -94,6 +95,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCatalogImportRoute = ApiCatalogImportRouteImport.update({
+  id: '/api/catalog-import',
+  path: '/api/catalog-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({
   id: '/admin/products',
   path: '/admin/products',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
   '/admin/products': typeof AdminProductsRoute
+  '/api/catalog-import': typeof ApiCatalogImportRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
   '/api/scan': typeof ApiScanRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
   '/admin/products': typeof AdminProductsRoute
+  '/api/catalog-import': typeof ApiCatalogImportRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
   '/api/scan': typeof ApiScanRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
   '/admin/products': typeof AdminProductsRoute
+  '/api/catalog-import': typeof ApiCatalogImportRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
   '/api/scan': typeof ApiScanRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/procurement'
     | '/admin/products'
+    | '/api/catalog-import'
     | '/api/chat'
     | '/api/hybrid-search'
     | '/api/scan'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/admin/products'
+    | '/api/catalog-import'
     | '/api/chat'
     | '/api/hybrid-search'
     | '/api/scan'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/procurement'
     | '/admin/products'
+    | '/api/catalog-import'
     | '/api/chat'
     | '/api/hybrid-search'
     | '/api/scan'
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRouteWithChildren
   ProcurementRoute: typeof ProcurementRouteWithChildren
   AdminProductsRoute: typeof AdminProductsRoute
+  ApiCatalogImportRoute: typeof ApiCatalogImportRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiHybridSearchRoute: typeof ApiHybridSearchRoute
   ApiScanRoute: typeof ApiScanRoute
@@ -360,6 +373,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/catalog-import': {
+      id: '/api/catalog-import'
+      path: '/api/catalog-import'
+      fullPath: '/api/catalog-import'
+      preLoaderRoute: typeof ApiCatalogImportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/products': {
@@ -468,6 +488,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRouteWithChildren,
   ProcurementRoute: ProcurementRouteWithChildren,
   AdminProductsRoute: AdminProductsRoute,
+  ApiCatalogImportRoute: ApiCatalogImportRoute,
   ApiChatRoute: ApiChatRoute,
   ApiHybridSearchRoute: ApiHybridSearchRoute,
   ApiScanRoute: ApiScanRoute,
@@ -477,3 +498,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
