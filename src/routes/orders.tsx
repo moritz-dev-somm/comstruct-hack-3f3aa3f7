@@ -224,11 +224,13 @@ function AttentionBanner({
   items,
   onFindAlternatives,
   onCancel,
+  onConfirmSupplier,
   onOpen,
 }: {
   items: Array<{ order: Order; info: AttentionInfo }>;
   onFindAlternatives: (order: Order) => void;
   onCancel: (order: Order, info: AttentionInfo) => void;
+  onConfirmSupplier: (order: Order, info: AttentionInfo) => void;
   onOpen: (id: string) => void;
 }) {
   return (
@@ -251,48 +253,101 @@ function AttentionBanner({
       </div>
       <ul className="space-y-3">
         {items.map(({ order, info }) => (
-          <li
+          <AttentionItem
             key={order.id}
-            className="rounded-lg border border-brand/30 bg-background p-3 space-y-2"
-          >
-            <button
-              type="button"
-              onClick={() => onOpen(order.id)}
-              className="block w-full text-left"
-            >
-              <div className="text-xs font-mono text-muted-foreground">{order.id}</div>
-              <div className="text-sm font-semibold text-brand">{info.title}</div>
-              <p className="text-sm text-foreground/85 mt-0.5">{info.problem}</p>
-            </button>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() => onFindAlternatives(order)}
-                className="gap-1.5"
-              >
-                <Search className="size-3.5" />
-                Find alternatives
-              </Button>
-              <CancelButton onConfirm={() => onCancel(order, info)} />
-            </div>
-          </li>
+            order={order}
+            info={info}
+            onOpen={onOpen}
+            onFindAlternatives={onFindAlternatives}
+            onCancel={onCancel}
+            onConfirmSupplier={onConfirmSupplier}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-function CancelButton({ onConfirm }: { onConfirm: () => void }) {
+function AttentionItem({
+  order,
+  info,
+  onOpen,
+  onFindAlternatives,
+  onCancel,
+  onConfirmSupplier,
+}: {
+  order: Order;
+  info: AttentionInfo;
+  onOpen: (id: string) => void;
+  onFindAlternatives: (order: Order) => void;
+  onCancel: (order: Order, info: AttentionInfo) => void;
+  onConfirmSupplier: (order: Order, info: AttentionInfo) => void;
+}) {
+  // Local override so a foreman who clicks "Decline" on a `decide` item
+  // moves straight into the cancel / find-alternatives stage without
+  // waiting for a server round-trip.
+  const [declined, setDeclined] = useState(false);
+  const effectiveStage: AttentionStage =
+    info.stage === "decide" && declined ? "rejected" : info.stage;
+
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={onConfirm}
-      className="gap-1.5"
-    >
-      <XCircle className="size-3.5" />
-      Cancel order
-    </Button>
+    <li className="rounded-lg border border-brand/30 bg-background p-3 space-y-2">
+      <button
+        type="button"
+        onClick={() => onOpen(order.id)}
+        className="block w-full text-left"
+      >
+        <div className="text-xs font-mono text-muted-foreground">{order.id}</div>
+        <div className="text-sm font-semibold text-brand">{info.title}</div>
+        <p className="text-sm text-foreground/85 mt-0.5">{info.problem}</p>
+      </button>
+      <div className="flex flex-wrap gap-2">
+        {effectiveStage === "decide" ? (
+          <>
+            <Button
+              size="sm"
+              onClick={() => onConfirmSupplier(order, info)}
+              className="gap-1.5"
+            >
+              <CheckCircle2 className="size-3.5" />
+              Confirm
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDeclined(true)}
+              className="gap-1.5"
+            >
+              <XCircle className="size-3.5" />
+              Decline
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              onClick={() => onFindAlternatives(order)}
+              className="gap-1.5"
+            >
+              <Search className="size-3.5" />
+              Find alternatives
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onCancel(order, info)}
+              className="gap-1.5"
+            >
+              <XCircle className="size-3.5" />
+              Cancel order
+            </Button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
   );
 }
 
