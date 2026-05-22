@@ -131,6 +131,15 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
 
   switch (cls.verdict) {
     case "fully_confirmed": {
+      // Even fully-confirmed replies are auto-rejected if shipping or lead
+      // time blew past the hard caps.
+      const t = evaluateThresholds(cls, state.order_subtotal_eur);
+      if (t.verdict === "auto_reject") {
+        return { kind: "auto_reject_failover", reason: t.reason };
+      }
+      if (t.verdict === "needs_user") {
+        return { kind: "escalate_silent", reason: t.reason };
+      }
       if (pending.length === 0 && issues.length === 0) {
         return { kind: "send_confirmation" };
       }
@@ -146,22 +155,29 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
     }
 
     case "confirmed_with_issue": {
-      // Item unavailability → straight to human, no email.
+      // Item unavailability → auto-reject + failover (was: silent escalate).
       const unavailable = issues.some((i) => UNAVAILABLE_RE.test(i)) ||
         UNAVAILABLE_RE.test(cls.summary || "") ||
         UNAVAILABLE_RE.test(cls.summary_en || "");
       if (unavailable) {
         return {
-          kind: "escalate_silent",
-          reason: `Supplier flagged item unavailable: ${cls.summary_en || cls.summary}`,
+          kind: "auto_reject_failover",
+          reason: `Item unavailable: ${cls.summary_en || cls.summary}`,
         };
+      }
+
+      // Hard threshold check (shipping / lead time).
+      const t = evaluateThresholds(cls, state.order_subtotal_eur);
+      if (t.verdict === "auto_reject") {
+        return { kind: "auto_reject_failover", reason: t.reason };
+      }
+      if (t.verdict === "needs_user") {
+        return { kind: "escalate_silent", reason: t.reason };
       }
 
       const leadOk = isAcceptableLeadTime(cls);
       const shipOk = isAcceptableShipping(cls, state.order_subtotal_eur);
 
-      // Issues we tolerate automatically: only lead-time / shipping deviations,
-      // and only when both are within thresholds.
       const benignIssues = issues.every((i) =>
         /(lead time|delivery|liefer|consegna|livraison|shipping|versand|expédition|spedizione|frais|surcharge)/i.test(i),
       );
@@ -183,9 +199,11 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
     }
 
     case "declined": {
-      // No automatic email. Wait for human to authorise replacement purchase,
-      // which will trigger the decline-ack email separately.
-      return { kind: "escalate_silent", reason: `Supplier declined: ${cls.summary_en || cls.summary}` };
+      // Supplier explicitly declined → auto-failover to next supplier.
+      return {
+        kind: "auto_reject_failover",
+        reason: `Supplier declined: ${cls.summary_en || cls.summary}`,
+      };
     }
 
     case "needs_clarification": {
