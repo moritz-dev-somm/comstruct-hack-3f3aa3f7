@@ -81,7 +81,7 @@ function ProcurementLayout() {
             </SelectContent>
           </Select>
         </div>
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {nav.map((n) => {
             const active = n.to === "/procurement"
               ? pathname === "/procurement" || pathname === "/procurement/"
