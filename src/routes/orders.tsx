@@ -194,9 +194,11 @@ function OrdersPage() {
             items={attentions}
             onFindAlternatives={handleFindAlternatives}
             onCancel={handleCancel}
+            onConfirmSupplier={handleConfirmSupplier}
             onOpen={(id) => setOpenId(id)}
           />
         )}
+
         {orders.length === 0 && (
           <div className="text-center py-20 text-sm text-muted-foreground">
             <ShoppingCart className="size-8 mx-auto mb-3 opacity-40" />
