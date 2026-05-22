@@ -83,6 +83,35 @@ function pickLang(
   return "en";
 }
 
+const LANG_LOCALE: Record<SupplierLanguage, string> = {
+  en: "en-GB",
+  de: "de-DE",
+  fr: "fr-FR",
+  it: "it-IT",
+};
+function formatDeliveryForLang(
+  iso: string | null,
+  isoEnd: string | null,
+  lang: SupplierLanguage,
+): string | null {
+  if (!iso) return null;
+  const parse = (s: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+  };
+  const a = parse(iso);
+  if (!a) return null;
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat(LANG_LOCALE[lang], {
+      timeZone: "UTC",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  const b = isoEnd && isoEnd !== iso ? parse(isoEnd) : null;
+  return b ? `${fmt(a)} – ${fmt(b)}` : fmt(a);
+}
 export const Route = createFileRoute("/api/public/agentmail/webhook")({
   server: {
     handlers: {
