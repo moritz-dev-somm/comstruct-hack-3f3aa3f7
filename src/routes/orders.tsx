@@ -176,9 +176,8 @@ function OrdersPage() {
   }, [orders, negotiationsByOrder, rfqsByOrder]);
 
   function handleFindAlternatives(order: Order) {
-    // Restore the chat context that produced this order, then send the user
-    // to the home chat with a focused follow-up prompt. We also cancel the
-    // original order so the attention alert clears automatically.
+    // Restore the chat context that produced this order so the assistant has
+    // the full conversation when crafting alternatives.
     if (order.searchSnapshot) {
       try {
         localStorage.setItem(
@@ -192,13 +191,19 @@ function OrdersPage() {
       } catch {}
     }
     reject(order.id, "Marco Bianchi", "Replaced — searching for alternatives");
+
     const blockedItems = order.items.map((i) => i.name).join(", ");
     const original = order.searchSnapshot?.lastQuery;
-    const prompt = original
-      ? `Original request: "${original}". These products didn't work: ${blockedItems}. Suggest alternatives that fit the same job.`
-      : `Suggest alternatives to: ${blockedItems}.`;
-    navigate({ to: "/", search: { prefill: prompt } });
+    // Natural, foreman-style prompt that's also auto-sent on arrival.
+    const lead = original
+      ? `I originally asked for ${original}, and you suggested ${blockedItems}.`
+      : `I tried to order ${blockedItems}.`;
+    const prompt =
+      `${lead} The supplier can't fulfil it. Can you try to find the exact same product from a different supplier — even if the price is a bit higher? If nothing matches, suggest the closest alternative that does the same job.`;
+
+    navigate({ to: "/", search: { prefill: prompt, autoSend: true } });
   }
+
 
   function handleCancel(order: Order, _info: AttentionInfo) {
     reject(order.id, "Marco Bianchi", "Cancelled by foreman");
