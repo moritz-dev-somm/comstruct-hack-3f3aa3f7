@@ -12,7 +12,7 @@ import type { ChecklistField, ReplyClassification } from "./agent.server";
  *  - Auto-approve only if lead time is reasonable AND shipping cost is low.
  */
 
-export const REPLY_CAP = 5;
+export const REPLY_CAP = 12;
 export const AUTO_LEAD_TIME_DAYS_MAX = 14;
 export const AUTO_SHIPPING_EUR_FLOOR = 20;
 export const AUTO_SHIPPING_PERCENT_MAX = 0.05;
