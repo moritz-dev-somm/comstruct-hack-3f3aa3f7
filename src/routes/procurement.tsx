@@ -121,7 +121,7 @@ function ProcurementLayout() {
   );
 }
 
-function SwitchRoleButton() {
+function SwitchRoleButton({ compact = false }: { compact?: boolean } = {}) {
   const { logout } = useRole();
   const navigate = useNavigate();
   return (
@@ -130,7 +130,9 @@ function SwitchRoleButton() {
         logout();
         navigate({ to: "/login" });
       }}
-      className="w-full flex items-center gap-2 px-3 h-9 rounded-md text-xs text-muted-foreground hover:bg-accent"
+      className={`flex items-center gap-2 px-3 rounded-md text-xs text-muted-foreground hover:bg-accent transition-colors ${
+        compact ? "h-9 border" : "h-9 w-full"
+      }`}
     >
       <LogOut className="size-4" /> Switch user
     </button>
