@@ -121,7 +121,7 @@ Set category_filter ONLY when the user explicitly names a category or the item i
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
