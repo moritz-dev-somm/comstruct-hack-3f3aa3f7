@@ -84,21 +84,16 @@ async function parseXlsx(file: File): Promise<TabularParse> {
 }
 
 async function parsePdf(file: File): Promise<PdfParse> {
-  // Dynamic import keeps the heavy worker bundle out of initial load
-  const pdfjs = await import("pdfjs-dist");
-  // Use the bundled worker via CDN fallback (worker URL must be set in browsers)
-  // We use the workerless legacy build by setting workerSrc to a data URL is fragile;
-  // pdfjs-dist v5 supports running without a worker via `disableWorker`.
-  // pdfjs-dist v5 supports a worker URL via GlobalWorkerOptions
-  const opts = (pdfjs as unknown as { GlobalWorkerOptions?: { workerSrc: string } })
-    .GlobalWorkerOptions;
-  if (opts) {
-    opts.workerSrc = new URL(
-      "pdfjs-dist/build/pdf.worker.min.mjs",
-      import.meta.url,
-    ).toString();
-  }
-
+  // Dynamic import keeps the heavy worker bundle out of initial load.
+  // Use Vite's `?url` import for the worker so it resolves in dev AND prod
+  // bundles (a bare specifier passed to `new URL(..., import.meta.url)`
+  // produces a broken path after minification, which surfaces as
+  // "undefined is not a function" once pdf.js tries to talk to the worker).
+  const [pdfjs, workerMod] = await Promise.all([
+    import("pdfjs-dist"),
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url") as Promise<{ default: string }>,
+  ]);
+  pdfjs.GlobalWorkerOptions.workerSrc = workerMod.default;
 
   const data = new Uint8Array(await file.arrayBuffer());
   const loadingTask = pdfjs.getDocument({ data });
