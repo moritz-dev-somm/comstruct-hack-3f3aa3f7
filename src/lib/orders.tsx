@@ -179,12 +179,18 @@ function nextOrderId(orders: Order[]): string {
 }
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<Order[]>(() => load());
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    setOrders(load());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     localStorage.setItem(KEY, JSON.stringify(orders));
-  }, [orders]);
+  }, [orders, hydrated]);
 
   const createFromCart = useCallback<OrdersCtx["createFromCart"]>((items) => {
     // Group items by supplier (case-insensitive, trimmed). Items without
