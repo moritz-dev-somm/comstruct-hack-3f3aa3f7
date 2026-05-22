@@ -408,3 +408,127 @@ export function pickShippingForOrder(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/*  Merged order timeline                                             */
+/* ------------------------------------------------------------------ */
+
+export type TimelineEvent = {
+  at: string;
+  label: string;
+  actor?: string;
+  tone?: StatusTone;
+};
+
+type RfqLike = {
+  status: string;
+  escalation_reason: string | null;
+  winner_supplier: string | null;
+  winner_total_eur: number | null;
+  decided_at: string | null;
+  invited_suppliers?: string[] | null;
+};
+
+/**
+ * Merge the order's local history (Submitted, Approved, …) with synthesised
+ * supplier-agent and RFQ events so the foreman sees what actually happened —
+ * including supplier declines, failover attempts and "no alternative offer".
+ */
+export function buildOrderTimeline(
+  order: { history: { at: string; label: string; actor?: string }[]; status: string },
+  negotiations: NegotiationRow[] | undefined,
+  rfq?: RfqLike | null,
+): TimelineEvent[] {
+  const events: TimelineEvent[] = (order.history ?? []).map((e) => ({ ...e }));
+  const list = (negotiations ?? []).slice().sort((a, b) => a.sent_at.localeCompare(b.sent_at));
+
+  for (const n of list) {
+    const attempt = n.failover_attempt ?? 0;
+    // Outgoing PO/email to this supplier.
+    events.push({
+      at: n.sent_at,
+      label:
+        attempt > 0
+          ? `Failover #${attempt}: PO sent to ${n.supplier_name}`
+          : `PO sent to ${n.supplier_name}`,
+      tone: attempt > 0 ? "amber" : "indigo",
+    });
+
+    if (!n.last_reply_at) continue;
+    const verdict = (n.classification?.verdict || "").toLowerCase();
+    const s = (n.status || "").toLowerCase();
+    const reasonRaw =
+      n.classification?.summary_en ||
+      n.classification?.summary ||
+      n.reject_reason ||
+      null;
+    const reason = reasonRaw ? `: ${reasonRaw}` : "";
+
+    if (verdict === "declined" || s === "declined" || s === "declined_replaced") {
+      events.push({
+        at: n.last_reply_at,
+        label: `${n.supplier_name} declined the order${reason}`,
+        tone: "rose",
+      });
+    } else if (verdict === "fully_confirmed" || s === "confirmed") {
+      events.push({
+        at: n.confirmed_at || n.last_reply_at,
+        label: `${n.supplier_name} confirmed the order`,
+        tone: "emerald",
+      });
+    } else if (verdict === "confirmed_with_issue" || s === "issues_raised") {
+      events.push({
+        at: n.last_reply_at,
+        label: `${n.supplier_name} confirmed with issues${reason}`,
+        tone: "amber",
+      });
+    } else if (verdict === "needs_clarification" || s === "clarifying" || s === "answering_questions") {
+      events.push({
+        at: n.last_reply_at,
+        label: `${n.supplier_name} asked a clarification${reason}`,
+        tone: "violet",
+      });
+    } else if (s === "needs_user") {
+      events.push({
+        at: n.last_reply_at,
+        label: `${n.supplier_name} needs your input${n.needs_user_reason ? `: ${n.needs_user_reason}` : ""}`,
+        tone: "fuchsia",
+      });
+    }
+  }
+
+  // RFQ outcome — "no alternative offer found" or winner picked.
+  if (rfq) {
+    const rs = (rfq.status || "").toLowerCase();
+    if (rs === "escalated") {
+      const reason = rfq.escalation_reason || "no usable offer received";
+      events.push({
+        at: rfq.decided_at || new Date().toISOString(),
+        label: `No alternative offer found — ${reason}`,
+        tone: "rose",
+      });
+    } else if (rs === "decided" && rfq.winner_supplier) {
+      const total =
+        rfq.winner_total_eur != null
+          ? ` (€${Number(rfq.winner_total_eur).toFixed(2)})`
+          : "";
+      events.push({
+        at: rfq.decided_at || new Date().toISOString(),
+        label: `Best offer: ${rfq.winner_supplier}${total} — PO sent`,
+        tone: "emerald",
+      });
+    }
+  }
+
+  // De-duplicate exact label+timestamp pairs (e.g. local history already had
+  // a "PO sent" entry from auto-approval), then sort chronologically.
+  const seen = new Set<string>();
+  const deduped = events.filter((e) => {
+    const k = `${e.at}::${e.label.toLowerCase()}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  deduped.sort((a, b) => a.at.localeCompare(b.at));
+  return deduped;
+}
+
