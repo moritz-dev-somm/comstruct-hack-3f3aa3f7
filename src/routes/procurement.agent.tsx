@@ -751,6 +751,30 @@ function NeedsAttentionRow({
         <p className="text-xs text-brand">{neg.needs_user_reason}</p>
       )}
 
+      {(neg.supplier_email || phone) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {neg.supplier_email && (
+            <a
+              href={`mailto:${neg.supplier_email}`}
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Mail className="size-3.5" />
+              {neg.supplier_email}
+            </a>
+          )}
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/\s+/g, "")}`}
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Phone className="size-3.5" />
+              {phone}
+            </a>
+          )}
+        </div>
+      )}
+
+
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => approve.mutate()}
