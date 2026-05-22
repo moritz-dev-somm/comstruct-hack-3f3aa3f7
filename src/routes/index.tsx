@@ -54,7 +54,7 @@ import {
   ConeIcon,
 } from "@/components/construction-icons";
 
-const CHOCOLATE_THRESHOLD = 500;
+const REDBULL_THRESHOLD = 500;
 
 export const Route = createFileRoute("/")({
   component: Home,
