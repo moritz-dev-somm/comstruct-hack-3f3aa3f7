@@ -104,7 +104,7 @@ const PRIORITY: Record<DerivedStatus, number> = {
   rejected: 11,
 };
 
-function negToDerived(n: { status: string | null; last_reply_at: string | null }): DerivedStatus {
+export function negotiationToDerived(n: { status: string | null; last_reply_at: string | null }): DerivedStatus {
   const s = (n.status || "").toLowerCase();
   switch (s) {
     case "confirmed": return "confirmed";
