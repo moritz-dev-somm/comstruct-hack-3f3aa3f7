@@ -17,7 +17,9 @@ function CatalogAdmin() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold">Catalog</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{products.length} items across suppliers.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {products.length} items across suppliers.
+          </p>
         </div>
         <div className="flex gap-2">
           <Link
@@ -65,7 +67,9 @@ function CatalogAdmin() {
                 <td className="px-4 py-2 text-muted-foreground">{p.category}</td>
                 <td className="px-4 py-2 text-muted-foreground">{p.supplier ?? "—"}</td>
                 <td className="px-4 py-2 text-muted-foreground">{p.unit}</td>
-                <td className="px-4 py-2 text-right tabular-nums font-semibold">{formatEUR(p.price)}</td>
+                <td className="px-4 py-2 text-right tabular-nums font-semibold">
+                  {formatEUR(p.price)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -91,9 +95,27 @@ const DETECTED = [
 ];
 
 const PREVIEW = [
-  { sku: "WR-4540", name: "Wood screws Torx 4.5×40 (box of 200)", price: "€12.50", unit: "box", cat: "Fasteners" },
-  { sku: "WR-3535", name: "Drywall screws 3.5×35 (box of 500)", price: "€8.90", unit: "box", cat: "Fasteners" },
-  { sku: "WR-CT200", name: "Cable ties 200mm (bag of 100)", price: "€6.20", unit: "bag", cat: "Other" },
+  {
+    sku: "WR-4540",
+    name: "Wood screws Torx 4.5×40 (box of 200)",
+    price: "€12.50",
+    unit: "box",
+    cat: "Fasteners",
+  },
+  {
+    sku: "WR-3535",
+    name: "Drywall screws 3.5×35 (box of 500)",
+    price: "€8.90",
+    unit: "box",
+    cat: "Fasteners",
+  },
+  {
+    sku: "WR-CT200",
+    name: "Cable ties 200mm (bag of 100)",
+    price: "€6.20",
+    unit: "bag",
+    cat: "Other",
+  },
   { sku: "WR-GLV-L", name: "Safety gloves L", price: "€4.80", unit: "pair", cat: "Safety" },
   { sku: "WR-FFP2", name: "Dust masks FFP2", price: "€2.10", unit: "piece", cat: "Safety" },
 ];
@@ -113,7 +135,9 @@ function ImportModal({ onClose }: { onClose: () => void }) {
       <div className="bg-card rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden">
         <div className="px-5 h-12 border-b flex items-center justify-between">
           <h3 className="font-semibold">Import catalog — Step {step} of 3</h3>
-          <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">Cancel</button>
+          <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
+            Cancel
+          </button>
         </div>
         <div className="p-5">
           {step === 1 && (
@@ -161,11 +185,15 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           )}
           {step === 2 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-3">We auto-mapped the columns — adjust if needed.</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                We auto-mapped the columns — adjust if needed.
+              </p>
               <div className="rounded-lg border divide-y">
                 {DETECTED.map((r) => (
                   <div key={r.header} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{r.header}</span>
+                    <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
+                      {r.header}
+                    </span>
                     <span className="text-muted-foreground">→</span>
                     <span className="font-semibold">{r.target}</span>
                     <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/40 rounded-full px-2 py-0.5">
@@ -181,7 +209,12 @@ function ImportModal({ onClose }: { onClose: () => void }) {
               <p className="text-xs text-muted-foreground mb-3">Preview of 5 imported items.</p>
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
-                  <tr><th className="text-left font-medium pb-1">SKU</th><th className="text-left font-medium pb-1">Name</th><th className="text-right font-medium pb-1">Price</th><th className="text-left font-medium pb-1 pl-2">Cat</th></tr>
+                  <tr>
+                    <th className="text-left font-medium pb-1">SKU</th>
+                    <th className="text-left font-medium pb-1">Name</th>
+                    <th className="text-right font-medium pb-1">Price</th>
+                    <th className="text-left font-medium pb-1 pl-2">Cat</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {PREVIEW.map((p) => (
