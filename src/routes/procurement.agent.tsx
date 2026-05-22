@@ -16,6 +16,7 @@ import {
   declineAndReplaceNegotiation,
   humanFollowupNegotiation,
 } from "@/lib/supplier-agent.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/procurement/agent")({
   component: AgentPage,
