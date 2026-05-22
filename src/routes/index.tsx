@@ -36,7 +36,7 @@ import { useTemplates, type TemplateItem } from "@/lib/templates";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
-import { VoiceModeButton } from "@/components/VoiceModeButton";
+
 import { ScanButton } from "@/components/ScanButton";
 import { ProductImage } from "@/components/ProductImage";
 import { HoldButton } from "@/components/HoldButton";
