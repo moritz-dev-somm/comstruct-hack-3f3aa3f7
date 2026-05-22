@@ -1082,6 +1082,7 @@ function ConversationView({
   searchResults,
   searchExtracted,
   categoryTiles,
+  followupBar,
 }: {
   messages: ChatMessage[];
   streaming: boolean;
