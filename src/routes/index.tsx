@@ -36,7 +36,7 @@ import { useTemplates, type TemplateItem } from "@/lib/templates";
 import { useCheckoutDecision, type CheckoutDecision } from "@/lib/budget";
 import { useOrders, tierFor, type ApprovalTier, TIER_THRESHOLDS, PM, CENTRAL } from "@/lib/orders";
 import { VoiceButton } from "@/components/VoiceButton";
-import { VoiceModeButton } from "@/components/VoiceModeButton";
+
 import { ScanButton } from "@/components/ScanButton";
 import { ProductImage } from "@/components/ProductImage";
 import { HoldButton } from "@/components/HoldButton";
@@ -314,8 +314,10 @@ function Home() {
     return [...rec, ...rest];
   }, [recommendedIds, products, selectedCategory]);
 
-  async function send(text: string) {
+  async function send(text: string, opts?: { speak?: boolean }) {
     if (!text.trim() || streaming) return;
+    speakNextReplyRef.current = !!opts?.speak;
+
     const userMsg: ChatMessage = { role: "user", content: text };
     const newHistory = [...messages, userMsg];
     setMessages([...newHistory, { role: "assistant", content: "" }]);
@@ -363,7 +365,16 @@ function Home() {
       console.error(e);
     } finally {
       setStreaming(false);
+      if (speakNextReplyRef.current) {
+        speakNextReplyRef.current = false;
+        setMessages((prev) => {
+          const last = [...prev].reverse().find((m) => m.role === "assistant");
+          if (last?.content) speakAssistantText(last.content);
+          return prev;
+        });
+      }
     }
+
   }
 
   function handleEvent(evt: { type: string; [k: string]: unknown }) {
@@ -436,41 +447,32 @@ function Home() {
     }
   }
 
-  // --- Voice mode (Vapi) transcript bridge ---------------------------------
-  // Mirror live voice turns into the same `messages` state the typed flow
-  // uses, so the on-screen transcript stays in sync with what was said.
-  function appendVoiceUserTurn(text: string) {
-    const t = text.trim();
-    if (!t) return;
-    setMessages((prev) => [...prev, { role: "user", content: t }]);
-  }
-  function appendVoiceAssistantTurn(text: string) {
-    const t = text.trim();
-    if (!t) return;
-    // Re-use the product-token detection so any [[product:SKU:QTY]] markers
-    // the voice agent emits still surface as recommended pills.
-    const re = /\[\[product:([A-Za-z0-9_-]+)(?::(\d+))?\]\]/g;
-    const found: { sku: string; qty: number }[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(t)) !== null) {
-      found.push({ sku: m[1], qty: m[2] ? parseInt(m[2], 10) : 1 });
+  // --- Spoken playback for voice-dictated turns ----------------------------
+  // When the user dictates with the mic, read the assistant's reply out loud
+  // using the browser's built-in SpeechSynthesis. No UI changes.
+  const speakNextReplyRef = useRef(false);
+  function speakAssistantText(raw: string) {
+    if (typeof window === "undefined") return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    // Strip product tokens and markdown so the spoken output is clean.
+    const clean = raw
+      .replace(/\[\[product:[^\]]+\]\]/g, "")
+      .replace(/[`*_#>]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return;
+    try {
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(clean);
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      synth.speak(u);
+    } catch {
+      /* ignore */
     }
-    if (found.length) {
-      setRecommendedIds((prev) => {
-        const set = new Set(prev);
-        const add = found.map((f) => f.sku).filter((s) => !set.has(s));
-        return add.length ? [...prev, ...add] : prev;
-      });
-      setRecommendedQty((prev) => {
-        const next = { ...prev };
-        for (const f of found) next[f.sku] = f.qty;
-        return next;
-      });
-    }
-    setMessages((prev) => [...prev, { role: "assistant", content: t }]);
   }
 
-  // voice handled by <VoiceButton /> and <VoiceModeButton />.
 
   function reset() {
     setMessages([]);
@@ -701,9 +703,8 @@ function Home() {
               }
             }}
             products={products}
-            onVoiceUserTurn={appendVoiceUserTurn}
-            onVoiceAssistantTurn={appendVoiceAssistantTurn}
           />
+
         ) : (
           <ConversationView
             messages={messages}
@@ -756,12 +757,8 @@ function Home() {
               />
             </div>
             <ScanButton size="compact" onResult={(prompt) => send(prompt)} />
-            <VoiceButton size="compact" onTranscript={(t) => send(t)} />
-            <VoiceModeButton
-              size="compact"
-              onUserTranscript={appendVoiceUserTurn}
-              onAssistantTranscript={appendVoiceAssistantTurn}
-            />
+            <VoiceButton size="compact" onTranscript={(t) => send(t, { speak: true })} />
+
           </div>
         </div>
       )}
@@ -815,21 +812,18 @@ function HeroView({
   onAddTemplate,
   categoryTiles,
   products,
-  onVoiceUserTurn,
-  onVoiceAssistantTurn,
 }: {
   input: string;
   setInput: (v: string) => void;
-  send: (v: string) => void;
+  send: (v: string, opts?: { speak?: boolean }) => void;
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onAddQuickOrder: (skus: string[]) => void;
   onAddTemplate: (items: TemplateItem[]) => void;
   categoryTiles: CategoryTileData[];
   products: Product[];
-  onVoiceUserTurn: (text: string) => void;
-  onVoiceAssistantTurn: (text: string) => void;
 }) {
+
   const { templates, hydrated: tplHydrated, remove: removeTemplate } = useTemplates();
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
@@ -847,14 +841,10 @@ function HeroView({
 
         {/* Primary action CTAs — voice (brand) + scan (grey), visually distinct */}
         <div className="mt-8 flex justify-center items-start gap-8">
-          <VoiceButton size="hero" onTranscript={(t) => send(t)} />
-          <VoiceModeButton
-            size="hero"
-            onUserTranscript={onVoiceUserTurn}
-            onAssistantTranscript={onVoiceAssistantTurn}
-          />
+          <VoiceButton size="hero" onTranscript={(t) => send(t, { speak: true })} />
           <ScanButton size="hero" onResult={(prompt) => send(prompt)} />
         </div>
+
 
         <div className="my-6 h-px bg-border" />
 
