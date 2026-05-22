@@ -937,3 +937,56 @@ export function composeHumanReplyEmail(
     htmlNative: blockHtml(parts.messageNative, SIGN[language]),
   });
 }
+
+/* ============================================================
+   10. Handover notice — sent when reply cap is reached
+   ============================================================ */
+
+type HandoverStrings = { subject: string; body: (id: string) => string; sign: string };
+const HANDOVER: Record<SupplierLanguage, HandoverStrings> = {
+  en: {
+    subject: "Handover to our procurement team",
+    body: (id) =>
+      `Thank you for your continued correspondence on order ${id}. To make sure we wrap this up correctly, a member of our procurement team will take over from here and reach out shortly. No further action is needed from you in the meantime.`,
+    sign: "Thanks,",
+  },
+  de: {
+    subject: "Übergabe an unser Beschaffungsteam",
+    body: (id) =>
+      `Vielen Dank für Ihre fortlaufende Korrespondenz zur Bestellung ${id}. Damit wir den Vorgang korrekt abschließen, übernimmt ab jetzt unser Beschaffungsteam und meldet sich in Kürze bei Ihnen. Von Ihrer Seite ist vorerst nichts weiter zu tun.`,
+    sign: "Vielen Dank,",
+  },
+  fr: {
+    subject: "Transfert à notre équipe achats",
+    body: (id) =>
+      `Merci pour vos échanges concernant la commande ${id}. Afin de finaliser correctement ce dossier, un membre de notre équipe achats prend le relais et vous recontactera prochainement. Aucune action n'est requise de votre part pour le moment.`,
+    sign: "Merci,",
+  },
+  it: {
+    subject: "Passaggio al nostro team acquisti",
+    body: (id) =>
+      `Grazie per la corrispondenza relativa all'ordine ${id}. Per chiudere correttamente la pratica, un membro del nostro team acquisti prenderà in carico la conversazione e vi contatterà a breve. Da parte vostra non è richiesta alcuna ulteriore azione per il momento.`,
+    sign: "Grazie,",
+  },
+};
+
+export function composeHandoverNoticeEmail(
+  order: Order,
+  language: SupplierLanguage = "en",
+): ComposedEmail {
+  const en = HANDOVER.en;
+  const native = HANDOVER[language];
+  const textBlock = (s: HandoverStrings, greeting: string) =>
+    `${greeting}\n\n${s.body(order.id)}\n\n${s.sign}\n${COMPANY.agentName}`;
+  const htmlBlock = (s: HandoverStrings, greeting: string) =>
+    `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(s.body(order.id))}</p><p>${escapeHtml(s.sign)}<br/>${escapeHtml(COMPANY.agentName)}</p>`;
+  return assembleBilingual({
+    language,
+    subjectEn: `Re: [${order.id}] ${en.subject}`,
+    subjectNative: native.subject,
+    textEn: textBlock(en, GREETING.en),
+    textNative: textBlock(native, GREETING[language]),
+    htmlEn: htmlBlock(en, GREETING.en),
+    htmlNative: htmlBlock(native, GREETING[language]),
+  });
+}

@@ -280,7 +280,7 @@ Also:
 - shipping_cost_eur: numeric EUR (0 = included). Null if never mentioned.
 - wants_human: true ONLY if supplier explicitly asks to talk to a person.
 
-unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
+unclear_points: ONLY items the supplier left vague IN THE LATEST REPLY that are NOT already resolved by THREAD CONTEXT. Never list anything already in "ALREADY ANSWERED IN PRIOR TURNS" or just answered in "answered_open_questions". NEVER ask for information that was ALREADY GIVEN to the supplier in the ORIGINAL PURCHASE ORDER (delivery address, project name, VAT ID, payment terms, line items, prices, contact details) — that data is on our side, not theirs. If the latest reply is too short or generic to extract anything (e.g. "hi", "ok", "thanks", "noted"), return [] and we will re-ask the ORIGINAL checklist questions verbatim. Max 4, prefer 1. Phrase each in the SUPPLIER'S language as a specific question referencing the exact item/SKU/phrase. [] if nothing is unclear.
 unclear_points_en: the SAME list as unclear_points, but in ENGLISH. Same order, same length. Used for cross-turn matching. [] when unclear_points is [].
 
 Finally pick suggested_outbound (policy may override):
@@ -612,22 +612,35 @@ export async function classifyReply(args: {
     const stillOpen = openQs.filter((q) => !answeredOpenSet.has(q));
     const finalStillOpen = stillOpen.length ? stillOpen : stillOpenModel;
 
-    // Drop unclear_points that just repeat a question the supplier just answered.
+    // Drop unclear_points that just repeat a question the supplier just answered,
+    // OR that ask the supplier about information WE already gave them in the PO
+    // (delivery address, project, VAT, payment terms, line items, contact, prices).
+    const PO_INFO_RE =
+      /(delivery address|shipping address|ship to|site address|where (?:to|do).{0,20}(?:deliver|ship)|adresse|lieferadresse|adresse de livraison|indirizzo di consegna|project (?:name|reference|number)|projektnummer|référence (?:du )?projet|riferimento progetto|vat (?:id|number)|ust-id|umsatzsteuer|numéro de tva|partita iva|payment terms|zahlungsbedingungen|conditions de paiement|termini di pagamento|line items?|item list|positionen|articles?|articoli|quantit|menge|unit price|stückpreis|prix unitaire|prezzo unitario|contact|ansprechpartner|interlocuteur|referente)/i;
     const unclearPointsRaw = Array.isArray(parsed.unclear_points)
       ? parsed.unclear_points.map(String).filter(Boolean)
       : [];
-    const unclearPoints = unclearPointsRaw
-      .filter((p) => !answeredOpenSet.has(p))
-      .filter((p) => !localSignals.answered_fields.some((field) => questionMentionsField(p, field)))
-      .slice(0, 6);
-    const unclearPointsEnRaw = Array.isArray(parsed.unclear_points_en)
-      ? parsed.unclear_points_en.map(String).filter(Boolean)
+    const unclearPointsEnRawAligned = Array.isArray(parsed.unclear_points_en)
+      ? parsed.unclear_points_en.map(String)
       : [];
-    // Align EN array to native array length when model returns mismatched arrays.
-    const unclearPointsEn =
-      unclearPointsEnRaw.length === unclearPoints.length
-        ? unclearPointsEnRaw
-        : unclearPoints.map((p, i) => unclearPointsEnRaw[i] ?? p);
+    const keptIdx: number[] = [];
+    const unclearPoints = unclearPointsRaw
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => !answeredOpenSet.has(p))
+      .filter(({ p }) => !localSignals.answered_fields.some((field) => questionMentionsField(p, field)))
+      .filter(({ p, i }) => {
+        const en = unclearPointsEnRawAligned[i] ?? p;
+        return !PO_INFO_RE.test(p) && !PO_INFO_RE.test(en);
+      })
+      .slice(0, 6)
+      .map(({ p, i }) => {
+        keptIdx.push(i);
+        return p;
+      });
+    // Align EN array to filtered native array using indices we kept.
+    const unclearPointsEn = keptIdx.map(
+      (i) => unclearPointsEnRawAligned[i] ?? unclearPointsRaw[i] ?? "",
+    );
 
     return {
       verdict: (parsed.verdict ?? "unclear") as ReplyClassification["verdict"],

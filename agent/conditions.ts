@@ -5,14 +5,15 @@ import type { ChecklistField, ReplyClassification } from "./agent.server";
  * accumulated state, decide which outbound action the agent should take.
  *
  * Safety rules:
- *  - Hard cap of 5 supplier replies per negotiation → human review.
+ *  - Hard cap of 12 supplier replies per negotiation → handover email + human review.
  *  - Never auto-confirm with unmet checklist or unresolved issues.
  *  - Declines, item-unavailable, supplier-asks-for-human, or any
  *    question we cannot auto-answer → human review (no automatic email).
  *  - Auto-approve only if lead time is reasonable AND shipping cost is low.
  */
 
-export const REPLY_CAP = 5;
+export const REPLY_CAP = 12;
+export const REPLY_LIMIT_REACHED_PREFIX = "Reply limit reached";
 export const AUTO_LEAD_TIME_DAYS_MAX = 14;
 export const AUTO_SHIPPING_EUR_FLOOR = 20;
 export const AUTO_SHIPPING_PERCENT_MAX = 0.05;
@@ -112,7 +113,7 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
   if (state.reply_count >= REPLY_CAP && cls.verdict !== "fully_confirmed") {
     return {
       kind: "escalate_silent",
-      reason: `Reply limit reached (${REPLY_CAP}) — please take over.`,
+      reason: `${REPLY_LIMIT_REACHED_PREFIX} (${REPLY_CAP}) — handing over to a human.`,
     };
   }
 

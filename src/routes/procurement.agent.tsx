@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import {
   Bot, RefreshCw, Mail, X, ChevronDown, ChevronRight, Send,
   Inbox as InboxIcon, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Circle,
-  Clock, UserRound, ShieldAlert,
+  Clock, UserRound, ShieldAlert, Phone,
 } from "lucide-react";
 import {
   listInboxMessages,
@@ -16,6 +16,7 @@ import {
   declineAndReplaceNegotiation,
   humanFollowupNegotiation,
 } from "@/lib/supplier-agent.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/procurement/agent")({
   component: AgentPage,
@@ -328,6 +329,26 @@ function AgentPage() {
     staleTime: 0,
   });
 
+  const suppliersQ = useQuery({
+    queryKey: ["agent-suppliers-phone"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("email, phone, name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const phoneByEmail = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of suppliersQ.data ?? []) {
+      if (s.email && s.phone) m.set(s.email.toLowerCase(), s.phone);
+    }
+    return m;
+  }, [suppliersQ.data]);
+
   const messageMut = useMutation({
     mutationFn: (messageId: string) =>
       getFn({ data: { inboxId: inbox!.inboxId, messageId } }),
@@ -392,6 +413,7 @@ function AgentPage() {
 
       <NeedsAttentionQueue
         items={needsAttention}
+        phoneByEmail={phoneByEmail}
         onChanged={() => {
           negotiationsQ.refetch();
           messagesQ.refetch();
@@ -627,9 +649,11 @@ function Legend() {
 
 function NeedsAttentionQueue({
   items,
+  phoneByEmail,
   onChanged,
 }: {
   items: NegotiationFull[];
+  phoneByEmail: Map<string, string>;
   onChanged: () => void;
 }) {
   if (items.length === 0) return null;
@@ -646,7 +670,12 @@ function NeedsAttentionQueue({
       </div>
       <ul className="divide-y divide-brand/20">
         {items.map((n) => (
-          <NeedsAttentionRow key={n.id} neg={n} onChanged={onChanged} />
+          <NeedsAttentionRow
+            key={n.id}
+            neg={n}
+            phone={n.supplier_email ? phoneByEmail.get(n.supplier_email.toLowerCase()) ?? null : null}
+            onChanged={onChanged}
+          />
         ))}
       </ul>
     </section>
@@ -655,9 +684,11 @@ function NeedsAttentionQueue({
 
 function NeedsAttentionRow({
   neg,
+  phone,
   onChanged,
 }: {
   neg: NegotiationFull;
+  phone: string | null;
   onChanged: () => void;
 }) {
   const [showReply, setShowReply] = useState(false);
@@ -719,6 +750,30 @@ function NeedsAttentionRow({
       {neg.needs_user_reason && (
         <p className="text-xs text-brand">{neg.needs_user_reason}</p>
       )}
+
+      {(neg.supplier_email || phone) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {neg.supplier_email && (
+            <a
+              href={`mailto:${neg.supplier_email}`}
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Mail className="size-3.5" />
+              {neg.supplier_email}
+            </a>
+          )}
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/\s+/g, "")}`}
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Phone className="size-3.5" />
+              {phone}
+            </a>
+          )}
+        </div>
+      )}
+
 
       <div className="flex flex-wrap gap-2">
         <button
