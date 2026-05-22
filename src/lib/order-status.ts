@@ -121,11 +121,23 @@ const PRIORITY: Record<DerivedStatus, number> = {
   rejected: 11,
 };
 
-export function negotiationToDerived(n: { status: string | null; last_reply_at: string | null }): DerivedStatus {
+export function negotiationToDerived(n: {
+  status: string | null;
+  last_reply_at: string | null;
+  classification?: { verdict?: string } | null;
+}): DerivedStatus {
   const s = (n.status || "").toLowerCase();
+  // Verdict from the last classified reply wins over raw status — the agent
+  // sometimes leaves status as "awaiting_reply" while the classifier already
+  // tagged the latest message as a decline / confirmation.
+  const v = (n.classification?.verdict || "").toLowerCase();
+  if (v === "declined") return "declined";
+  if (v === "fully_confirmed" && s !== "needs_user") return "confirmed";
+
   switch (s) {
     case "confirmed": return "confirmed";
     case "declined": return "declined";
+    case "declined_replaced": return "declined";
     case "issues_raised": return "issues_raised";
     case "needs_user": return "action_required";
     case "clarifying": return "clarifying";
@@ -134,6 +146,8 @@ export function negotiationToDerived(n: { status: string | null; last_reply_at: 
     case "sent":
     case "awaiting_reply":
     default:
+      if (v === "needs_clarification") return "clarifying";
+      if (v === "confirmed_with_issue") return "issues_raised";
       return n.last_reply_at ? "clarifying" : "awaiting_first_reply";
   }
 }
