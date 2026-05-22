@@ -19,7 +19,7 @@ import {
   Plus,
   Ruler,
   Search,
-  SlidersHorizontal,
+  
   ShoppingCart,
   X,
   Zap,
@@ -521,13 +521,6 @@ function Home() {
             >
               <ClipboardList className="size-4" />
               Orders
-            </Link>
-            <Link
-              to="/settings"
-              aria-label="Approval rules"
-              className="grid size-10 place-items-center rounded-full border hover:bg-accent"
-            >
-              <SlidersHorizontal className="size-4" />
             </Link>
             <button
               onClick={() => {
@@ -1840,12 +1833,6 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           >
             {ctaLabel}
           </button>
-          <Link
-            to="/settings"
-            className="block text-center text-xs text-muted-foreground hover:text-foreground"
-          >
-            Adjust budget &amp; rules
-          </Link>
         </div>
       </div>
     </div>

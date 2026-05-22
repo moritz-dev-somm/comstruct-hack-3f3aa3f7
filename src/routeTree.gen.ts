@@ -9,12 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProcurementRouteImport } from './routes/procurement'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProcurementIndexRouteImport } from './routes/procurement.index'
+import { Route as ProcurementSettingsRouteImport } from './routes/procurement.settings'
 import { Route as ProcurementOrdersRouteImport } from './routes/procurement.orders'
 import { Route as ProcurementCatalogRouteImport } from './routes/procurement.catalog'
 import { Route as ProcurementAnalyticsRouteImport } from './routes/procurement.analytics'
@@ -29,11 +29,6 @@ import { Route as OrdersOrderIdTrackRouteImport } from './routes/orders.$orderId
 import { Route as ApiPublicAgentTimeoutsRouteImport } from './routes/api/public/agent-timeouts'
 import { Route as ApiPublicAgentmailWebhookRouteImport } from './routes/api/public/agentmail/webhook'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProcurementRoute = ProcurementRouteImport.update({
   id: '/procurement',
   path: '/procurement',
@@ -57,6 +52,11 @@ const IndexRoute = IndexRouteImport.update({
 const ProcurementIndexRoute = ProcurementIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => ProcurementRoute,
+} as any)
+const ProcurementSettingsRoute = ProcurementSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => ProcurementRoute,
 } as any)
 const ProcurementOrdersRoute = ProcurementOrdersRouteImport.update({
@@ -133,7 +133,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
@@ -142,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
+  '/procurement/settings': typeof ProcurementSettingsRoute
   '/procurement/': typeof ProcurementIndexRoute
   '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
@@ -153,7 +153,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
@@ -162,6 +161,7 @@ export interface FileRoutesByTo {
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
+  '/procurement/settings': typeof ProcurementSettingsRoute
   '/procurement': typeof ProcurementIndexRoute
   '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
@@ -175,7 +175,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
   '/procurement': typeof ProcurementRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/hybrid-search': typeof ApiHybridSearchRoute
@@ -184,6 +183,7 @@ export interface FileRoutesById {
   '/procurement/analytics': typeof ProcurementAnalyticsRoute
   '/procurement/catalog': typeof ProcurementCatalogRouteWithChildren
   '/procurement/orders': typeof ProcurementOrdersRouteWithChildren
+  '/procurement/settings': typeof ProcurementSettingsRoute
   '/procurement/': typeof ProcurementIndexRoute
   '/api/public/agent-timeouts': typeof ApiPublicAgentTimeoutsRoute
   '/orders/$orderId/track': typeof OrdersOrderIdTrackRoute
@@ -198,7 +198,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/procurement'
-    | '/settings'
     | '/admin/products'
     | '/api/chat'
     | '/api/hybrid-search'
@@ -207,6 +206,7 @@ export interface FileRouteTypes {
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
+    | '/procurement/settings'
     | '/procurement/'
     | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
@@ -218,7 +218,6 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/orders'
-    | '/settings'
     | '/admin/products'
     | '/api/chat'
     | '/api/hybrid-search'
@@ -227,6 +226,7 @@ export interface FileRouteTypes {
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
+    | '/procurement/settings'
     | '/procurement'
     | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
@@ -239,7 +239,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/procurement'
-    | '/settings'
     | '/admin/products'
     | '/api/chat'
     | '/api/hybrid-search'
@@ -248,6 +247,7 @@ export interface FileRouteTypes {
     | '/procurement/analytics'
     | '/procurement/catalog'
     | '/procurement/orders'
+    | '/procurement/settings'
     | '/procurement/'
     | '/api/public/agent-timeouts'
     | '/orders/$orderId/track'
@@ -261,7 +261,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRouteWithChildren
   ProcurementRoute: typeof ProcurementRouteWithChildren
-  SettingsRoute: typeof SettingsRoute
   AdminProductsRoute: typeof AdminProductsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiHybridSearchRoute: typeof ApiHybridSearchRoute
@@ -272,13 +271,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/procurement': {
       id: '/procurement'
       path: '/procurement'
@@ -312,6 +304,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/procurement/'
       preLoaderRoute: typeof ProcurementIndexRouteImport
+      parentRoute: typeof ProcurementRoute
+    }
+    '/procurement/settings': {
+      id: '/procurement/settings'
+      path: '/settings'
+      fullPath: '/procurement/settings'
+      preLoaderRoute: typeof ProcurementSettingsRouteImport
       parentRoute: typeof ProcurementRoute
     }
     '/procurement/orders': {
@@ -446,6 +445,7 @@ interface ProcurementRouteChildren {
   ProcurementAnalyticsRoute: typeof ProcurementAnalyticsRoute
   ProcurementCatalogRoute: typeof ProcurementCatalogRouteWithChildren
   ProcurementOrdersRoute: typeof ProcurementOrdersRouteWithChildren
+  ProcurementSettingsRoute: typeof ProcurementSettingsRoute
   ProcurementIndexRoute: typeof ProcurementIndexRoute
 }
 
@@ -454,6 +454,7 @@ const ProcurementRouteChildren: ProcurementRouteChildren = {
   ProcurementAnalyticsRoute: ProcurementAnalyticsRoute,
   ProcurementCatalogRoute: ProcurementCatalogRouteWithChildren,
   ProcurementOrdersRoute: ProcurementOrdersRouteWithChildren,
+  ProcurementSettingsRoute: ProcurementSettingsRoute,
   ProcurementIndexRoute: ProcurementIndexRoute,
 }
 
@@ -466,7 +467,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrdersRoute: OrdersRouteWithChildren,
   ProcurementRoute: ProcurementRouteWithChildren,
-  SettingsRoute: SettingsRoute,
   AdminProductsRoute: AdminProductsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiHybridSearchRoute: ApiHybridSearchRoute,
