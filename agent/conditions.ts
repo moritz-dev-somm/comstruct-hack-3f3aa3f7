@@ -112,7 +112,7 @@ export function decideAction(cls: ReplyClassification, state: CounterState): Age
   if (state.reply_count >= REPLY_CAP && cls.verdict !== "fully_confirmed") {
     return {
       kind: "escalate_silent",
-      reason: `Reply limit reached (${REPLY_CAP}) — please take over.`,
+      reason: `${REPLY_LIMIT_REACHED_PREFIX} (${REPLY_CAP}) — handing over to a human.`,
     };
   }
 
