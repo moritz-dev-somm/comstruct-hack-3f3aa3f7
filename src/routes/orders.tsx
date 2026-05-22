@@ -42,7 +42,7 @@ export const Route = createFileRoute("/orders")({
 });
 
 function OrdersPage() {
-  const { orders } = useOrders();
+  const { orders, reject } = useOrders();
   const [openId, setOpenId] = useState<string | null>(orders[0]?.id ?? null);
   const orderIds = useMemo(() => orders.map((o) => o.id), [orders]);
   const negotiationsByOrder = useNegotiationsByOrder(orderIds);
