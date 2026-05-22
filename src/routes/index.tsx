@@ -1444,7 +1444,11 @@ function ProductCard({
                 >
                   −
                 </HoldButton>
-                <span className="px-3 text-base font-bold tabular-nums">{inCart.qty}</span>
+                <QtyInput
+                  value={inCart.qty}
+                  onChange={(n) => cart.setQty(product.sku, n)}
+                  className="w-12 px-2 text-base"
+                />
                 <HoldButton
                   onTick={() => cart.adjust(product.sku, +1)}
                   stopPropagation
