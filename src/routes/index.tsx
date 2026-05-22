@@ -727,6 +727,7 @@ function HeroView({
   onSelectCategory,
   inputRef,
   onAddQuickOrder,
+  onAddTemplate,
   categoryTiles,
   products,
 }: {
@@ -736,6 +737,7 @@ function HeroView({
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onAddQuickOrder: (skus: string[]) => void;
+  onAddTemplate: (items: TemplateItem[]) => void;
   categoryTiles: CategoryTileData[];
   products: Product[];
 }) {
