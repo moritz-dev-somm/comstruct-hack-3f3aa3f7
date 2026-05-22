@@ -12,17 +12,21 @@ const Ctx = createContext<RoleCtx | null>(null);
 const KEY = "comstruct-role";
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>(() => {
-    if (typeof window === "undefined") return null;
+  const [role, setRoleState] = useState<Role>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate from localStorage after mount so SSR and first client render match.
+  useEffect(() => {
     const v = localStorage.getItem(KEY);
-    return v === "foreman" || v === "supervisor" ? v : null;
-  });
+    if (v === "foreman" || v === "supervisor") setRoleState(v);
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     if (role) localStorage.setItem(KEY, role);
     else localStorage.removeItem(KEY);
-  }, [role]);
+  }, [role, hydrated]);
 
   return (
     <Ctx.Provider
