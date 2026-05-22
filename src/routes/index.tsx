@@ -525,14 +525,6 @@ function Home() {
                 <SelectItem value="limmatquai-150">Limmatquai 150</SelectItem>
               </SelectContent>
             </Select>
-            {showCatalog && (
-              <button
-                onClick={reset}
-                className="hidden sm:inline text-xs text-muted-foreground hover:text-foreground shrink-0"
-              >
-                ← new request
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-1.5">
             <LanguageSelector />
@@ -631,6 +623,17 @@ function Home() {
 
         )}
       </main>
+
+      {/* Fixed close-chat button — always visible at top-left while in a conversation */}
+      {showCatalog && (
+        <button
+          onClick={reset}
+          aria-label="Close chat"
+          className="fixed top-20 left-4 z-40 grid size-10 place-items-center rounded-full border bg-background/95 backdrop-blur hover:bg-accent text-foreground"
+        >
+          <X className="size-5" />
+        </button>
+      )}
 
       {/* Fixed bottom bar in conversation mode: chat input + separate, distinct voice button */}
       {inConversation && (
