@@ -801,21 +801,18 @@ function HeroView({
   onAddTemplate,
   categoryTiles,
   products,
-  onVoiceUserTurn,
-  onVoiceAssistantTurn,
 }: {
   input: string;
   setInput: (v: string) => void;
-  send: (v: string) => void;
+  send: (v: string, opts?: { speak?: boolean }) => void;
   onSelectCategory: (c: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onAddQuickOrder: (skus: string[]) => void;
   onAddTemplate: (items: TemplateItem[]) => void;
   categoryTiles: CategoryTileData[];
   products: Product[];
-  onVoiceUserTurn: (text: string) => void;
-  onVoiceAssistantTurn: (text: string) => void;
 }) {
+
   const { templates, hydrated: tplHydrated, remove: removeTemplate } = useTemplates();
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
