@@ -41,6 +41,8 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { useServerFn } from "@tanstack/react-start";
 import { startNegotiationForOrder } from "@/lib/supplier-agent.functions";
 import chocolatesImg from "@/assets/chocolates-incentive.jpg";
+import comstructLogo from "@/assets/comstruct-logo.png";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   IconTile,
   CompassIcon,
@@ -187,6 +189,7 @@ function Home() {
   const [searchExtracted, setSearchExtracted] = useState<HybridExtracted | null>(null);
   const [searching, setSearching] = useState(false);
   const cart = useCart();
+  const [project, setProject] = useState("ramistrasse-101");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { role, logout } = useRole();
@@ -497,20 +500,39 @@ function Home() {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="size-8 rounded-md bg-brand text-brand-foreground grid place-items-center">
-              <HardHat className="size-5" />
-            </div>
-            <div className="leading-tight">
-              <div className="font-semibold text-sm">comstruct</div>
+        <div className="mx-auto max-w-3xl px-4 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={reset}
+              aria-label="comstruct home"
+              className="shrink-0 hover:opacity-80 transition-opacity"
+            >
+              <img
+                src={comstructLogo}
+                alt="comstruct"
+                className="h-8 w-auto"
+              />
+            </button>
+            <Select value={project} onValueChange={setProject}>
+              <SelectTrigger className="h-9 w-[180px] text-xs border-border">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ramistrasse-101">Rämistrasse 101</SelectItem>
+                <SelectItem value="bahnhofstrasse-42">Bahnhofstrasse 42</SelectItem>
+                <SelectItem value="langstrasse-77">Langstrasse 77</SelectItem>
+                <SelectItem value="sechselautenplatz-1">Sechseläutenplatz 1</SelectItem>
+                <SelectItem value="limmatquai-150">Limmatquai 150</SelectItem>
+              </SelectContent>
+            </Select>
+            {showCatalog && (
               <button
                 onClick={reset}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="hidden sm:inline text-xs text-muted-foreground hover:text-foreground shrink-0"
               >
-                {showCatalog ? "← new request" : "Project: Erlenmatt B3"}
+                ← new request
               </button>
-            </div>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <LanguageSelector />
