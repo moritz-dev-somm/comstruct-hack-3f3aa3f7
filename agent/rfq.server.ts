@@ -413,6 +413,8 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
       ok: true,
       rfqId,
       invited: suppliers.map((s) => ({ name: s.name, email: s.email })),
+      items: rfqItems,
+      subtotal: rfqSubtotal,
       dominantCategory: cat,
     };
   } catch (err) {
