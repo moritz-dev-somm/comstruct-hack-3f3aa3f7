@@ -531,18 +531,7 @@ export function StatusPill({ status }: { status: DerivedStatus }) {
   );
 }
 
-function VerdictPill({ verdict }: { verdict: Verdict }) {
-  const m = VERDICT_META[verdict];
-  const Icon = m.Icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border pl-1.5 pr-2 py-0.5 text-[10px] font-semibold ${STATUS_TONE_CLASS[m.tone]}`}
-    >
-      <Icon className="size-3" />
-      {m.label}
-    </span>
-  );
-}
+
 
 const TONE_DOT: Record<StatusTone, string> = {
   neutral: "bg-muted-foreground/40",
