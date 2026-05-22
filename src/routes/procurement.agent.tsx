@@ -408,15 +408,19 @@ function AgentPage() {
   }, [messagesQ.data, negotiationsQ.data, inbox]);
 
 
-  // Map negotiations by thread_id (and by reply_message_id for per-msg verdicts).
+  // Map negotiations by the same key used in buildThreads/threads merge —
+  // thread_id when available, subject fallback otherwise — so status pills
+  // appear on freshly placed orders too.
   const negByThread = useMemo(() => {
     const m = new Map<string, NegotiationFull>();
     if (negotiationsQ.data?.ok !== true) return m;
     for (const n of negotiationsQ.data.negotiations as NegotiationFull[]) {
       if (n.thread_id) m.set(n.thread_id, n);
+      else if (n.subject) m.set(`subj:${normalizeSubject(n.subject)}`, n);
     }
     return m;
   }, [negotiationsQ.data]);
+
 
   const verdictByMessageId = useMemo(() => {
     const m = new Map<string, Verdict>();
