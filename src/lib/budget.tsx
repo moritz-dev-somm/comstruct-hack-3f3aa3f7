@@ -141,13 +141,18 @@ type BudgetCtx = {
 const Ctx = createContext<BudgetCtx | null>(null);
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<BudgetSettings>(loadFromStorage);
+  const [settings, setSettings] = useState<BudgetSettings>(DEFAULTS);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(KEY, JSON.stringify(settings));
-    }
-  }, [settings]);
+    setSettings(loadFromStorage());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(KEY, JSON.stringify(settings));
+  }, [settings, hydrated]);
 
   const setGlobalBudget = useCallback((n: number) => {
     setSettings((s) => ({ ...s, globalBudget: Math.max(0, n) }));

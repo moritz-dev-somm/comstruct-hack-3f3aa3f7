@@ -26,20 +26,21 @@ const Ctx = createContext<CartCtx | null>(null);
 const KEY = "comstruct-cart-v2";
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(localStorage.getItem(KEY) || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(KEY, JSON.stringify(items));
-    }
-  }, [items]);
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) setItems(JSON.parse(raw));
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(KEY, JSON.stringify(items));
+  }, [items, hydrated]);
 
   const add: CartCtx["add"] = (item) => {
     setItems((prev) => {
