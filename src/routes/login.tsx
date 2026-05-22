@@ -122,7 +122,7 @@ function LoginPage() {
         </div>
 
         <div className="relative mt-3 md:mt-auto md:pt-0">
-          <h1 className="text-xl md:text-4xl lg:text-5xl font-semibold leading-[1.1] tracking-tight max-w-[18ch]">
+          <h1 className="text-lg md:text-4xl lg:text-5xl font-semibold leading-[1.1] tracking-tight max-w-[18ch]">
             Order C-materials in plain language.
           </h1>
           <p className="hidden md:block mt-4 text-sm md:text-base text-brand-foreground/75 max-w-[36ch]">
