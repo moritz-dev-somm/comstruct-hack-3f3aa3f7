@@ -73,7 +73,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider
       value={{
         role,
+        hydrated,
         setRole: (r) => setRoleState(r),
+
         signIn,
         logout: () => setRoleState(null),
       }}
