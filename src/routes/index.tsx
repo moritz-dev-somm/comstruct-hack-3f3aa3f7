@@ -1908,7 +1908,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <ChocolateIncentive subtotal={cart.subtotal} />
+          <RedbullIncentive subtotal={cart.subtotal} />
           {cart.items.length === 0 && (
             <div className="text-sm text-muted-foreground text-center py-12">Cart is empty</div>
           )}
