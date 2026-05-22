@@ -339,3 +339,58 @@ export function formatDeliveryLong(iso: string, isoEnd: string): string {
   if (!b || iso === isoEnd) return fmt(a);
   return `${fmt(a)} – ${fmt(b)}`;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Shipping cost display helpers                                     */
+/* ------------------------------------------------------------------ */
+
+export type OrderShipping = {
+  amountEur: number | null;
+  supplier: string | null;
+  tone: StatusTone;
+  label: string;
+  longLabel: string;
+};
+
+const EMPTY_SHIPPING: OrderShipping = {
+  amountEur: null,
+  supplier: null,
+  tone: "neutral",
+  label: "Unknown",
+  longLabel: "Not provided yet",
+};
+
+/**
+ * Pick the most relevant shipping cost across an order's negotiations.
+ * Prefers confirmed negotiations, then the latest one with a numeric value.
+ */
+export function pickShippingForOrder(
+  negotiations: NegotiationRow[] | undefined,
+): OrderShipping {
+  const list = (negotiations ?? []).filter(
+    (n) => typeof n.classification?.shipping_cost_eur === "number",
+  );
+  if (list.length === 0) return EMPTY_SHIPPING;
+
+  const confirmed = list.find((n) => (n.status || "").toLowerCase() === "confirmed");
+  const pick =
+    confirmed ??
+    list.sort((a, b) =>
+      (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
+    )[0];
+
+  const amount = pick.classification!.shipping_cost_eur as number;
+  const isFree = amount === 0;
+  const label = isFree
+    ? "Free"
+    : new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(amount);
+
+  return {
+    amountEur: amount,
+    supplier: pick.supplier_name,
+    tone: (pick.status || "").toLowerCase() === "confirmed" ? "green" : "blue",
+    label,
+    longLabel: isFree ? "Free shipping" : label,
+  };
+}
+

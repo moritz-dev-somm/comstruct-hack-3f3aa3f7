@@ -6,8 +6,7 @@ import {
   ChevronUp,
   ArrowLeft,
   ShoppingCart,
-  Bot,
-  Quote,
+  Truck,
 } from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type Order } from "@/lib/orders";
@@ -19,8 +18,10 @@ import {
   deriveOrderStatus,
   negotiationToDerived,
   pickDeliveryForOrder,
+  pickShippingForOrder,
   type DerivedStatus,
   type OrderDelivery,
+  type OrderShipping,
   type Verdict,
 } from "@/lib/order-status";
 import { SwitchUserButton } from "@/components/SwitchUserButton";
@@ -89,6 +90,7 @@ function OrderRow({
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const derived = deriveOrderStatus(order, negotiations);
   const delivery = pickDeliveryForOrder(negotiations);
+  const shipping = pickShippingForOrder(negotiations);
   const list = negotiations ?? [];
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
@@ -101,6 +103,7 @@ function OrderRow({
             <span className="font-semibold text-sm font-mono">{order.id}</span>
             <StatusPill status={derived} />
             <DeliveryPill delivery={delivery} />
+            <ShippingPill shipping={shipping} />
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
@@ -119,8 +122,11 @@ function OrderRow({
       </button>
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
-          <DeliveryBlock delivery={delivery} />
-          {list.length > 0 && <SupplierAgentBlock negotiations={list} />}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <DeliveryBlock delivery={delivery} />
+            <ShippingBlock shipping={shipping} />
+          </div>
+          {list.length > 0 && <SuppliersStatusBlock negotiations={list} />}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Items</h4>
             <ul className="text-sm space-y-1">
@@ -172,6 +178,18 @@ function DeliveryPill({ delivery }: { delivery: OrderDelivery }) {
   );
 }
 
+function ShippingPill({ shipping }: { shipping: OrderShipping }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[shipping.tone]}`}
+      title={shipping.supplier ? `From ${shipping.supplier}` : undefined}
+    >
+      <Truck className="size-3" />
+      {shipping.label}
+    </span>
+  );
+}
+
 function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
   const confidenceLabel: Record<OrderDelivery["confidence"], string> = {
     high: "high confidence",
@@ -183,7 +201,7 @@ function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
     <div className="rounded-md border bg-background px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Delivery
+          Delivery date
         </h4>
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
           {confidenceLabel[delivery.confidence]}
@@ -205,73 +223,48 @@ function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
   );
 }
 
-/**
- * Per-supplier rollup of what the AI supplier-agent is currently doing for this
- * order. Mirrors the procurement "Supplier agent" tab but condensed for the
- * foreman: one line per supplier with status, last verdict, latest message
- * summary and the supplier's own delivery promise.
- */
-function SupplierAgentBlock({ negotiations }: { negotiations: NegotiationRow[] }) {
-  const sorted = [...negotiations].sort((a, b) =>
-    (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
-  );
+function ShippingBlock({ shipping }: { shipping: OrderShipping }) {
   return (
-    <div className="rounded-md border bg-background">
-      <div className="flex items-center gap-2 px-3 py-2 border-b">
-        <Bot className="size-3.5 text-brand" />
+    <div className="rounded-md border bg-background px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Supplier agent
+          Delivery costs
         </h4>
-        <span className="text-[10px] text-muted-foreground">
-          · {negotiations.length} supplier{negotiations.length === 1 ? "" : "s"}
-        </span>
       </div>
-      <ul className="divide-y">
-        {sorted.map((n) => (
-          <SupplierAgentRow key={n.id} n={n} />
-        ))}
-      </ul>
+      <div className="mt-1 text-sm font-semibold">{shipping.longLabel}</div>
+      {shipping.supplier && (
+        <div className="mt-1 text-xs text-muted-foreground">From {shipping.supplier}</div>
+      )}
     </div>
   );
 }
 
-function SupplierAgentRow({ n }: { n: NegotiationRow }) {
-  const status = negotiationToDerived(n);
-  const verdict = n.classification?.verdict as Verdict | undefined;
-  const summary =
-    n.classification?.summary_en ||
-    n.classification?.summary ||
-    n.needs_user_reason ||
-    null;
-  const lastAt = n.last_reply_at || n.sent_at;
-
+/**
+ * Compact per-supplier status — just a status tag per supplier, no timeline.
+ */
+function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[] }) {
+  const sorted = [...negotiations].sort((a, b) =>
+    (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
+  );
   return (
-    <li className="px-3 py-2.5 space-y-1.5">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="font-medium text-sm truncate">{n.supplier_name}</div>
-        <div className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-          {new Date(lastAt).toLocaleString([], {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <StatusPill status={status} />
-        {verdict && <VerdictPill verdict={verdict} />}
-      </div>
-      {summary && (
-        <p className="text-xs text-muted-foreground line-clamp-2">{summary}</p>
-      )}
-      {n.reply_excerpt && (
-        <div className="text-xs text-muted-foreground/90 flex gap-1.5 items-start pt-0.5">
-          <Quote className="size-3 mt-0.5 shrink-0 opacity-60" />
-          <span className="italic line-clamp-2">"{n.reply_excerpt}"</span>
-        </div>
-      )}
-    </li>
+    <div>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        Suppliers
+      </h4>
+      <ul className="space-y-1.5">
+        {sorted.map((n) => {
+          const status = negotiationToDerived(n);
+          const verdict = n.classification?.verdict as Verdict | undefined;
+          return (
+            <li key={n.id} className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium truncate">{n.supplier_name}</span>
+              <StatusPill status={status} />
+              {verdict && <VerdictPill verdict={verdict} />}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
