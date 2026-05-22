@@ -8,15 +8,33 @@ export type NegotiationStatus =
   | "needs_user"
   | "declined";
 
+export type NegotiationClassification = {
+  verdict?:
+    | "fully_confirmed"
+    | "confirmed_with_issue"
+    | "declined"
+    | "needs_clarification"
+    | "unclear";
+  summary_en?: string;
+  summary?: string;
+  last_action?: string;
+  last_action_reason?: string | null;
+  lead_time?: string | null;
+  shipping_cost_eur?: number | null;
+} | null;
+
 export type NegotiationRow = {
   id: string;
   order_id: string;
   supplier_name: string;
+  subject: string | null;
   status: NegotiationStatus | string;
   needs_user_reason: string | null;
   sent_at: string;
   last_reply_at: string | null;
   confirmed_at: string | null;
+  reply_excerpt: string | null;
+  classification: NegotiationClassification;
   delivery_date_iso: string | null;
   delivery_date_iso_end: string | null;
   delivery_date_confidence: "high" | "medium" | "low" | "unresolved" | null;
@@ -44,7 +62,7 @@ export function useNegotiationsByOrder(orderIds: string[]): Record<string, Negot
       const { data, error } = await supabase
         .from("negotiations")
         .select(
-          "id, order_id, supplier_name, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification",
+          "id, order_id, supplier_name, subject, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, reply_excerpt, classification, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification",
         )
         .in("order_id", orderIds);
       if (cancelled || error || !data) return;

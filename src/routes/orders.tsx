@@ -1,16 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronUp, ArrowLeft, ShoppingCart } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+  ShoppingCart,
+  Bot,
+  Quote,
+} from "lucide-react";
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder, type NegotiationRow } from "@/lib/negotiations";
 import {
   DERIVED_STATUS_META,
   STATUS_TONE_CLASS,
+  VERDICT_META,
   deriveOrderStatus,
+  negotiationToDerived,
   pickDeliveryForOrder,
   type DerivedStatus,
   type OrderDelivery,
+  type Verdict,
 } from "@/lib/order-status";
 import { SwitchUserButton } from "@/components/SwitchUserButton";
 
@@ -78,6 +89,7 @@ function OrderRow({
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const derived = deriveOrderStatus(order, negotiations);
   const delivery = pickDeliveryForOrder(negotiations);
+  const list = negotiations ?? [];
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       <button
@@ -85,13 +97,19 @@ function OrderRow({
         className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-accent/50"
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-sm font-mono">{order.id}</span>
             <StatusPill status={derived} />
             <DeliveryPill delivery={delivery} />
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleString()} · {itemCount} item{itemCount === 1 ? "" : "s"}
+            {list.length > 0 && (
+              <>
+                {" · "}
+                {list.length} supplier{list.length === 1 ? "" : "s"}
+              </>
+            )}
           </div>
         </div>
         <div className="text-right">
@@ -102,6 +120,7 @@ function OrderRow({
       {open && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-4">
           <DeliveryBlock delivery={delivery} />
+          {list.length > 0 && <SupplierAgentBlock negotiations={list} />}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Items</h4>
             <ul className="text-sm space-y-1">
@@ -186,14 +205,103 @@ function DeliveryBlock({ delivery }: { delivery: OrderDelivery }) {
   );
 }
 
+/**
+ * Per-supplier rollup of what the AI supplier-agent is currently doing for this
+ * order. Mirrors the procurement "Supplier agent" tab but condensed for the
+ * foreman: one line per supplier with status, last verdict, latest message
+ * summary and the supplier's own delivery promise.
+ */
+function SupplierAgentBlock({ negotiations }: { negotiations: NegotiationRow[] }) {
+  const sorted = [...negotiations].sort((a, b) =>
+    (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
+  );
+  return (
+    <div className="rounded-md border bg-background">
+      <div className="flex items-center gap-2 px-3 py-2 border-b">
+        <Bot className="size-3.5 text-brand" />
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Supplier agent
+        </h4>
+        <span className="text-[10px] text-muted-foreground">
+          · {negotiations.length} supplier{negotiations.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <ul className="divide-y">
+        {sorted.map((n) => (
+          <SupplierAgentRow key={n.id} n={n} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SupplierAgentRow({ n }: { n: NegotiationRow }) {
+  const status = negotiationToDerived(n);
+  const verdict = n.classification?.verdict as Verdict | undefined;
+  const summary =
+    n.classification?.summary_en ||
+    n.classification?.summary ||
+    n.needs_user_reason ||
+    null;
+  const lastAt = n.last_reply_at || n.sent_at;
+
+  return (
+    <li className="px-3 py-2.5 space-y-1.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="font-medium text-sm truncate">{n.supplier_name}</div>
+        <div className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+          {new Date(lastAt).toLocaleString([], {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <StatusPill status={status} />
+        {verdict && <VerdictPill verdict={verdict} />}
+      </div>
+      {summary && (
+        <p className="text-xs text-muted-foreground line-clamp-2">{summary}</p>
+      )}
+      {n.reply_excerpt && (
+        <div className="text-xs text-muted-foreground/90 flex gap-1.5 items-start pt-0.5">
+          <Quote className="size-3 mt-0.5 shrink-0 opacity-60" />
+          <span className="italic line-clamp-2">"{n.reply_excerpt}"</span>
+        </div>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Compact, icon-led status pill. The icon does most of the visual work so the
+ * label can stay short and still feel informative at a glance.
+ */
 export function StatusPill({ status }: { status: DerivedStatus }) {
   const m = DERIVED_STATUS_META[status];
+  const Icon = m.Icon;
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[m.tone]}`}
+      className={`inline-flex items-center gap-1 rounded-full border pl-1.5 pr-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_TONE_CLASS[m.tone]}`}
+      title={m.hint}
     >
+      <Icon className="size-3" />
       {m.label}
     </span>
   );
 }
 
+function VerdictPill({ verdict }: { verdict: Verdict }) {
+  const m = VERDICT_META[verdict];
+  const Icon = m.Icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border pl-1.5 pr-2 py-0.5 text-[10px] font-semibold ${STATUS_TONE_CLASS[m.tone]}`}
+    >
+      <Icon className="size-3" />
+      {m.label}
+    </span>
+  );
+}

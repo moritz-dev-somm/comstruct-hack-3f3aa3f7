@@ -1,3 +1,20 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  HelpCircle,
+  Clock,
+  Send,
+  ShieldAlert,
+  CircleDashed,
+  FileEdit,
+  Hourglass,
+  PackageCheck,
+  MessageCircleQuestion,
+  RefreshCcw,
+  Sparkles,
+} from "lucide-react";
 import type { Order, OrderStatus } from "./orders";
 import type { NegotiationRow } from "./negotiations";
 
@@ -25,22 +42,44 @@ export type DerivedStatus =
 
 export type StatusTone = "neutral" | "amber" | "green" | "blue" | "teal" | "red";
 
-export const DERIVED_STATUS_META: Record<DerivedStatus, { label: string; tone: StatusTone }> = {
-  draft: { label: "Draft", tone: "neutral" },
-  pending_pm: { label: "Pending PM Approval", tone: "amber" },
-  pending_central: { label: "Pending Central Approval", tone: "amber" },
-  rejected: { label: "Rejected", tone: "red" },
-  sending: { label: "Sending to Supplier", tone: "blue" },
-  awaiting_first_reply: { label: "Awaiting Supplier Reply", tone: "blue" },
-  clarifying: { label: "Clarifying with Supplier", tone: "amber" },
-  following_up: { label: "Following Up on Details", tone: "amber" },
-  answering_questions: { label: "Answered Supplier Questions", tone: "blue" },
-  issues_raised: { label: "Issues Raised", tone: "red" },
-  declined: { label: "Supplier Declined", tone: "red" },
-  action_required: { label: "Action Required", tone: "amber" },
-  partially_confirmed: { label: "Partially Confirmed", tone: "teal" },
-  confirmed: { label: "Confirmed by Supplier", tone: "green" },
-  delivered: { label: "Delivered", tone: "teal" },
+export const DERIVED_STATUS_META: Record<
+  DerivedStatus,
+  { label: string; short: string; hint: string; tone: StatusTone; Icon: LucideIcon }
+> = {
+  draft:               { label: "Draft",                       short: "Draft",        hint: "Not submitted yet",                              tone: "neutral", Icon: FileEdit },
+  pending_pm:          { label: "Pending PM approval",         short: "PM review",    hint: "Waiting for project manager",                    tone: "amber",   Icon: Hourglass },
+  pending_central:     { label: "Pending central approval",    short: "Central",      hint: "Waiting for central procurement",                tone: "amber",   Icon: Hourglass },
+  rejected:            { label: "Rejected",                    short: "Rejected",     hint: "Order was rejected",                             tone: "red",     Icon: XCircle },
+  sending:             { label: "Sending to supplier",         short: "Sending",      hint: "Agent is dispatching the PO",                    tone: "blue",    Icon: Send },
+  awaiting_first_reply:{ label: "Waiting on supplier",         short: "Waiting",      hint: "Agent is awaiting first reply",                  tone: "blue",    Icon: Clock },
+  clarifying:          { label: "Clarifying with supplier",    short: "Clarifying",   hint: "Agent is resolving open points",                 tone: "amber",   Icon: MessageCircleQuestion },
+  following_up:        { label: "Following up",                short: "Following up", hint: "Agent sent a reminder to the supplier",          tone: "amber",   Icon: RefreshCcw },
+  answering_questions: { label: "Answering supplier questions",short: "Q&A",          hint: "Agent is answering supplier's questions",        tone: "blue",    Icon: HelpCircle },
+  issues_raised:       { label: "Issues raised",               short: "Issues",       hint: "Supplier flagged problems with the order",       tone: "red",     Icon: AlertTriangle },
+  declined:            { label: "Supplier declined",           short: "Declined",     hint: "Supplier cannot fulfil this order",              tone: "red",     Icon: XCircle },
+  action_required:     { label: "Needs your input",            short: "Needs you",    hint: "Agent can't proceed without you",                tone: "amber",   Icon: ShieldAlert },
+  partially_confirmed: { label: "Partially confirmed",         short: "Part. conf.",  hint: "Some suppliers confirmed, others pending",       tone: "teal",    Icon: CircleDashed },
+  confirmed:           { label: "Confirmed by supplier",       short: "Confirmed",    hint: "Supplier confirmed the full order",              tone: "green",   Icon: CheckCircle2 },
+  delivered:           { label: "Delivered",                   short: "Delivered",    hint: "Materials received on site",                     tone: "teal",    Icon: PackageCheck },
+};
+
+/** Verdict the agent extracted from the most recent supplier reply. */
+export type Verdict =
+  | "fully_confirmed"
+  | "confirmed_with_issue"
+  | "declined"
+  | "needs_clarification"
+  | "unclear";
+
+export const VERDICT_META: Record<
+  Verdict,
+  { label: string; tone: StatusTone; Icon: LucideIcon }
+> = {
+  fully_confirmed:     { label: "Supplier confirmed",   tone: "green",   Icon: CheckCircle2 },
+  confirmed_with_issue:{ label: "Confirmed w/ issue",   tone: "amber",   Icon: AlertTriangle },
+  declined:            { label: "Supplier declined",    tone: "red",     Icon: XCircle },
+  needs_clarification: { label: "Supplier asked back",  tone: "blue",    Icon: HelpCircle },
+  unclear:             { label: "Reply unclear",        tone: "neutral", Icon: Sparkles },
 };
 
 /**
@@ -65,7 +104,7 @@ const PRIORITY: Record<DerivedStatus, number> = {
   rejected: 11,
 };
 
-function negToDerived(n: { status: string | null; last_reply_at: string | null }): DerivedStatus {
+export function negotiationToDerived(n: { status: string | null; last_reply_at: string | null }): DerivedStatus {
   const s = (n.status || "").toLowerCase();
   switch (s) {
     case "confirmed": return "confirmed";
@@ -96,7 +135,7 @@ export function deriveOrderStatus(
   const list = negotiations ?? [];
   if (list.length === 0) return "sending";
 
-  const derivedList = list.map(negToDerived);
+  const derivedList = list.map(negotiationToDerived);
   const confirmedCount = derivedList.filter((d) => d === "confirmed").length;
   if (confirmedCount > 0 && confirmedCount < derivedList.length) {
     // Mix of confirmed + still-open — surface the worst open one, but if
