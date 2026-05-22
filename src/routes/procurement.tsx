@@ -71,14 +71,17 @@ function ProcurementLayout() {
           {nav.map((n) => {
             const active = n.to === "/procurement"
               ? pathname === "/procurement" || pathname === "/procurement/"
-              : pathname.startsWith(n.to);
+              : n.to === "/procurement/catalog"
+                ? pathname === "/procurement/catalog" || pathname === "/procurement/catalog/"
+                : pathname.startsWith(n.to);
+            const indent = "indent" in n && n.indent;
             return (
               <Link
                 key={n.to}
                 to={n.to}
                 className={`flex items-center gap-2.5 px-3 h-9 rounded-md text-sm font-medium transition-colors ${
-                  active ? "bg-brand text-brand-foreground" : "hover:bg-accent"
-                }`}
+                  indent ? "ml-4" : ""
+                } ${active ? "bg-brand text-brand-foreground" : "hover:bg-accent"}`}
               >
                 <n.icon className="size-4" />
                 <span className="flex-1">{n.label}</span>
