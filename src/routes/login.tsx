@@ -89,7 +89,8 @@ function LoginPage() {
     },
   };
 
-  const demo = DEMO_USERS[tab];
+
+
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:grid md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.25fr_1fr]">
