@@ -45,47 +45,69 @@ export const Route = createFileRoute("/orders")({
   }),
 });
 
+type AttentionStage = "decide" | "rejected";
+
 type AttentionInfo = {
-  kind: "needs_user" | "rfq_failed";
+  /**
+   * `decide` – the supplier reply is potentially acceptable (price change,
+   * delivery slip, clarification). The foreman must confirm or decline.
+   * `rejected` – the supplier flat-out cannot fulfil the order, or the
+   * foreman has just declined a `decide` item. Only path forward is to
+   * cancel or look for alternatives.
+   */
+  stage: AttentionStage;
   title: string;
   problem: string;
+  /** Negotiation row to act on when stage = "decide". */
+  negotiationId?: string;
 };
 
 function computeAttention(
   order: Order,
   negotiations: NegotiationRow[] | undefined,
-  rfq: RfqRow | null,
+  _rfq: RfqRow | null,
 ): AttentionInfo | null {
   // Cancelled / rejected orders are no longer actionable.
   if (order.status === "rejected") return null;
 
-
   const list = negotiations ?? [];
   const needsUserNeg = list.find((n) => (n.status || "").toLowerCase() === "needs_user");
   if (needsUserNeg) {
+    const verdict = (needsUserNeg.classification?.verdict || "").toLowerCase();
     const reason =
       needsUserNeg.needs_user_reason ||
       needsUserNeg.classification?.summary_en ||
       needsUserNeg.classification?.summary ||
       "Supplier raised a point the agent can't resolve on its own.";
+
+    // Hard "declined" verdicts skip the confirm/decline step.
+    if (verdict === "declined") {
+      return {
+        stage: "rejected",
+        title: `${needsUserNeg.supplier_name} declined the order`,
+        problem: reason,
+      };
+    }
     return {
-      kind: "needs_user",
-      title: `${needsUserNeg.supplier_name} is blocked — needs your decision`,
+      stage: "decide",
+      title: `${needsUserNeg.supplier_name} needs your decision`,
       problem: reason,
+      negotiationId: needsUserNeg.id,
     };
   }
   if (order.status === "rfq_failed") {
     return {
-      kind: "rfq_failed",
+      stage: "rejected",
       title: "No supplier could fulfil this order",
       problem:
-        rfq?.escalation_reason ||
+        _rfq?.escalation_reason ||
         order.rejectionReason ||
         "The agent contacted alternative suppliers but none could match the requested items.",
     };
   }
   return null;
 }
+
 
 function OrdersPage() {
   const { orders, reject } = useOrders();
