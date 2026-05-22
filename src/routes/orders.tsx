@@ -336,6 +336,12 @@ function AttentionItem({
   const effectiveStage: AttentionStage =
     info.stage === "decide" && declined ? "rejected" : info.stage;
 
+  // When the foreman has declined, the problem text should reflect that
+  // it's now a "supplier won't fulfil" situation rather than a pending
+  // confirmation.
+  const displayedProblem =
+    info.stage === "decide" && declined ? "Declined — pick how to continue" : info.problem;
+
   return (
     <li className="rounded-lg border border-brand/30 bg-background p-3 space-y-2">
       <button
@@ -344,9 +350,9 @@ function AttentionItem({
         className="block w-full text-left"
       >
         <div className="text-xs font-mono text-muted-foreground">{order.id}</div>
-        <div className="text-sm font-semibold text-brand">{info.title}</div>
-        <p className="text-sm text-foreground/85 mt-0.5">{info.problem}</p>
+        <p className="text-sm font-semibold text-foreground mt-0.5">{displayedProblem}</p>
       </button>
+
       <div className="flex flex-wrap gap-2">
         {effectiveStage === "decide" ? (
           <>
