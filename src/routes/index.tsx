@@ -1143,6 +1143,9 @@ function ConversationView({
                 {f}
               </SuggestionButton>
             ))}
+          </div>
+        )}
+
       </div>
 
       {/* Follow-up input — inline between conversation and catalog results */}
@@ -1153,6 +1156,7 @@ function ConversationView({
           </div>
         </div>
       )}
+
 
 
 
