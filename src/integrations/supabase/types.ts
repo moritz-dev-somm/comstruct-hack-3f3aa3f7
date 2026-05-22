@@ -137,6 +137,39 @@ export type Database = {
         }
         Relationships: []
       }
+      product_imports: {
+        Row: {
+          created_at: string
+          error: string | null
+          filename: string
+          id: string
+          mime_type: string | null
+          row_count: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          filename: string
+          id?: string
+          mime_type?: string | null
+          row_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          filename?: string
+          id?: string
+          mime_type?: string | null
+          row_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           attributes: Json
@@ -150,6 +183,8 @@ export type Database = {
           hazardous: boolean
           id: string
           image_url: string | null
+          import_batch_id: string | null
+          import_source_filename: string | null
           keywords: string[]
           keywords_en: string[]
           name: string
@@ -179,6 +214,8 @@ export type Database = {
           hazardous?: boolean
           id?: string
           image_url?: string | null
+          import_batch_id?: string | null
+          import_source_filename?: string | null
           keywords?: string[]
           keywords_en?: string[]
           name: string
@@ -208,6 +245,8 @@ export type Database = {
           hazardous?: boolean
           id?: string
           image_url?: string | null
+          import_batch_id?: string | null
+          import_source_filename?: string | null
           keywords?: string[]
           keywords_en?: string[]
           name?: string
