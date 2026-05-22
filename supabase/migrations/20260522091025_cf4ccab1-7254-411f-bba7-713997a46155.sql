@@ -1,0 +1,2 @@
+ALTER TABLE public.negotiations ADD COLUMN IF NOT EXISTS last_progress_at timestamptz;
+UPDATE public.negotiations SET last_progress_at = COALESCE(last_reply_at, sent_at) WHERE last_progress_at IS NULL;

@@ -65,6 +65,7 @@ export type Database = {
           inbox_id: string
           last_inbound_from: string | null
           last_processed_message_id: string | null
+          last_progress_at: string | null
           last_reply_at: string | null
           message_id: string | null
           needs_user_reason: string | null
@@ -102,6 +103,7 @@ export type Database = {
           inbox_id: string
           last_inbound_from?: string | null
           last_processed_message_id?: string | null
+          last_progress_at?: string | null
           last_reply_at?: string | null
           message_id?: string | null
           needs_user_reason?: string | null
@@ -139,6 +141,7 @@ export type Database = {
           inbox_id?: string
           last_inbound_from?: string | null
           last_processed_message_id?: string | null
+          last_progress_at?: string | null
           last_reply_at?: string | null
           message_id?: string | null
           needs_user_reason?: string | null
