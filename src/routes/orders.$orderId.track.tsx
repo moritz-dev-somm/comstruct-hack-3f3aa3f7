@@ -67,6 +67,12 @@ function stateFor(status: OrderStatus): Record<StepKey, StepState> {
       return { placed: "done", accepted: "done", preparing: "done", shipped: "done", received: "active" };
     case "rejected":
       return { placed: "done", accepted: "pending", preparing: "pending", shipped: "pending", received: "pending" };
+    case "rfq_in_progress":
+      return { placed: "done", accepted: "done", preparing: "active", shipped: "pending", received: "pending" };
+    case "rfq_failed":
+      return { placed: "done", accepted: "active", preparing: "pending", shipped: "pending", received: "pending" };
+    default:
+      return { placed: "done", accepted: "pending", preparing: "pending", shipped: "pending", received: "pending" };
   }
 }
 
