@@ -428,7 +428,8 @@ export const Route = createFileRoute("/api/public/agentmail/webhook")({
 
         switch (action.kind) {
           case "send_confirmation": {
-            const email = composeConfirmationEmail(order, { leadTime: cls.lead_time }, lang);
+            const leadTime = formatDeliveryForLang(delivery.iso, delivery.isoEnd, lang) ?? cls.lead_time ?? null;
+            const email = composeConfirmationEmail(order, { leadTime }, lang);
             await reply(email);
             outboundText = email.text;
             nextStatus = "confirmed";
