@@ -98,12 +98,10 @@ type SearchIntent = {
 };
 
 async function extractIntents(userMessage: string, apiKey: string): Promise<SearchIntent[]> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
+  const url = "https://api.openai.com/v1/chat/completions";
+  const model = "gpt-5.4-mini";
+
+
 
   const sys = `You parse construction-site foreman requests into search intents for a C-material catalog.
 Return JSON: { "search_queries": [ { "q": string, "category_filter": string|null, "requested_quantity": number|null } ] }.
@@ -123,7 +121,7 @@ Set category_filter ONLY when the user explicitly names a category or the item i
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -253,17 +251,13 @@ async function fetchProductsBySkus(skus: string[]): Promise<ProductRow[]> {
 
 /** Embed a short query string using the same 1536-dim model as /api/hybrid-search. */
 async function embedQuery(text: string, apiKey: string): Promise<number[] | null> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/embeddings"
-    : "https://ai.gateway.lovable.dev/v1/embeddings";
-  const model = useOpenAI ? "text-embedding-3-small" : "openai/text-embedding-3-small";
+  const url = "https://api.openai.com/v1/embeddings";
+  const model = "text-embedding-3-small";
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ model, input: text, dimensions: 1536 }),
@@ -365,12 +359,8 @@ async function expandQueryToKeywords(
   userMessage: string,
   apiKey: string,
 ): Promise<SearchIntent[]> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
+  const url = "https://api.openai.com/v1/chat/completions";
+  const model = "gpt-5.4-mini";
 
   const sys = `You expand a construction foreman's vague request into concrete C-material product keywords likely to exist in a supplier catalog.
 
@@ -386,7 +376,7 @@ Use the same language as the user.`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -541,16 +531,12 @@ function scrub(text: string): string {
 type ToolAcc = { id?: string; name?: string; args: string };
 
 async function callGateway(messages: ChatMsg[], apiKey: string) {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
+  const url = "https://api.openai.com/v1/chat/completions";
+  const model = "gpt-5.4-mini";
   return fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${useOpenAI ? openaiKey : apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -570,9 +556,9 @@ export const Route = createFileRoute("/api/chat")({
         const messages: ChatMsg[] = Array.isArray(body.messages) ? body.messages : [];
         const cart = body.cart ?? [];
 
-        const apiKey = process.env.LOVABLE_API_KEY ?? "";
-        if (!apiKey && !process.env.OPENAI_API_KEY) {
-          return new Response("Missing LOVABLE_API_KEY or OPENAI_API_KEY", { status: 500 });
+        const apiKey = process.env.OPENAI_API_KEY ?? "";
+        if (!apiKey) {
+          return new Response("Missing OPENAI_API_KEY", { status: 500 });
         }
 
         const lastUser = [...messages].reverse().find((m) => m.role === "user");

@@ -1,11 +1,11 @@
 // Server-only helpers for the product database import feature.
-// Parses Excel/CSV/PDF files into product rows and enriches them via Lovable AI.
+// Parses Excel/CSV/PDF files into product rows and enriches them via OpenAI.
 
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const ENRICH_MODEL = "google/gemini-2.5-flash";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const ENRICH_MODEL = "gpt-5.4-mini";
 
 export type ParsedRow = {
   name: string;
@@ -98,8 +98,8 @@ export function parseCsv(base64: string): ParsedRow[] {
 }
 
 export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing");
 
   const tool = {
     type: "function",
@@ -133,7 +133,7 @@ export async function parsePdfWithLLM(base64: string): Promise<ParsedRow[]> {
     },
   };
 
-  const res = await fetch(LOVABLE_AI_URL, {
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -253,8 +253,8 @@ const enrichTool = {
 };
 
 export async function enrichRow(row: ParsedRow): Promise<EnrichedRow> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing");
 
   const prompt = `You are a construction-materials expert. Enrich the following product so it can be added to a job-site catalog.
 
@@ -271,7 +271,7 @@ Map the category to ONE of: ${SITE_CATEGORIES.join(", ")}. Generate German + Eng
 
 Reply ONLY via the save_product_info tool call.`;
 
-  const res = await fetch(LOVABLE_AI_URL, {
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({

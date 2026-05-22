@@ -47,14 +47,10 @@ type Extracted = {
 };
 
 async function extractFromChat(messages: ChatMsg[]): Promise<Extracted> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const apiKey = useOpenAI ? openaiKey! : process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("Missing LOVABLE_API_KEY or OPENAI_API_KEY");
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = useOpenAI ? "gpt-5.4-mini" : "openai/gpt-5.4-mini";
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
+  const url = "https://api.openai.com/v1/chat/completions";
+  const model = "gpt-5.4-mini";
 
   const systemPrompt = `You analyze a construction site procurement chat between a foreman and an assistant. Distill what the foreman ultimately needs to BUY. Be concise and technical — no conversational filler.
 
@@ -130,15 +126,10 @@ Return ONE call to extract_search_terms with:
 }
 
 async function embed(text: string): Promise<number[]> {
-  // Lovable AI Gateway supports OpenAI 3-small at 1536 dims natively.
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const useOpenAI = !!openaiKey;
-  const apiKey = useOpenAI ? openaiKey! : process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("Missing LOVABLE_API_KEY or OPENAI_API_KEY");
-  const url = useOpenAI
-    ? "https://api.openai.com/v1/embeddings"
-    : "https://ai.gateway.lovable.dev/v1/embeddings";
-  const model = useOpenAI ? "text-embedding-3-small" : "openai/text-embedding-3-small";
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
+  const url = "https://api.openai.com/v1/embeddings";
+  const model = "text-embedding-3-small";
 
   const res = await fetch(url, {
     method: "POST",
