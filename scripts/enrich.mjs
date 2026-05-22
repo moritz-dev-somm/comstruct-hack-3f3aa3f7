@@ -67,10 +67,10 @@ Erzeuge: (1) eine knappe Beschreibung, (2) relevante technische Attribute passen
 
 Antworte ausschließlich über den Tool-Call save_product_info.`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
