@@ -334,7 +334,7 @@ function renderOrderHtml(s: OrderStrings, order: Order, ctx: OrderEmailContext):
     <li>${escapeHtml(s.shippingCosts)}</li>
   </ul>
   <p>${escapeHtml(s.flagDiscrepancy)}<br/>${escapeHtml(s.needResponse)}</p>
-  <p>${escapeHtml(s.thanks)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(COMPANY.contact)} · ${escapeHtml(COMPANY.phone)}</p>`;
+  <p>${escapeHtml(s.thanks)}<br/>${escapeHtml(COMPANY.agentName)}<br/>${escapeHtml(resolveContact(ctx.agentEmail))} · ${escapeHtml(COMPANY.phone)}</p>`;
 }
 
 export function composeOrderEmail(order: Order, ctx: OrderEmailContext): ComposedEmail {
