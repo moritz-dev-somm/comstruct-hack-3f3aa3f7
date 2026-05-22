@@ -20,7 +20,6 @@ export const Route = createFileRoute("/procurement/catalog")({
 
 function CatalogAdmin() {
   const { data: products = [] } = useProducts();
-  const [importOpen, setImportOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (pathname !== "/procurement/catalog" && pathname !== "/procurement/catalog/") {
@@ -43,12 +42,12 @@ function CatalogAdmin() {
           >
             <ExternalLink className="size-4" /> Full editor
           </Link>
-          <button
-            onClick={() => setImportOpen(true)}
+          <Link
+            to="/procurement/catalog/manage"
             className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
           >
             <Upload className="size-4" /> Import catalog
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -95,8 +94,6 @@ function CatalogAdmin() {
           </div>
         )}
       </div>
-
-      {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
     </div>
   );
 }
