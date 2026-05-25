@@ -319,7 +319,7 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
 
     if (!pick.qualifies) {
       // Order doesn't meet the discount criteria (no ≥2 suppliers share the
-      // exact same products totalling ≥ €200). Do NOT fan out and do NOT
+      // exact same products totalling ≥ €500). Do NOT fan out and do NOT
       // create a bogus RFQ row — caller should fall back to a direct PO.
       return { ok: false, error: "not_qualifying", reason: pick.reason };
     }
