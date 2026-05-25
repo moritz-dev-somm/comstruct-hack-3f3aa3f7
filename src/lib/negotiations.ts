@@ -45,6 +45,9 @@ export type NegotiationRow = {
   failover_attempt: number | null;
   clarification_count: number | null;
   followup_count: number | null;
+  order_snapshot?: {
+    items?: Array<{ productId?: string; supplier?: string | null }>;
+  } | null;
 };
 
 /**
@@ -67,7 +70,7 @@ export function useNegotiationsByOrder(orderIds: string[]): Record<string, Negot
       const { data, error } = await supabase
         .from("negotiations")
         .select(
-          "id, order_id, supplier_name, subject, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, reply_excerpt, classification, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification, reject_reason, failover_of, failover_attempt, clarification_count, followup_count",
+          "id, order_id, supplier_name, subject, status, needs_user_reason, sent_at, last_reply_at, confirmed_at, reply_excerpt, classification, delivery_date_iso, delivery_date_iso_end, delivery_date_confidence, delivery_date_raw, delivery_date_needs_clarification, reject_reason, failover_of, failover_attempt, clarification_count, followup_count, order_snapshot",
         )
         .in("order_id", orderIds);
       if (cancelled || error || !data) return;

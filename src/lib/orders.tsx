@@ -198,12 +198,13 @@ function seedDemo(): Order[] {
   return demo;
 }
 
-function nextOrderId(orders: Order[]): string {
-  const nums = orders
-    .map((o) => parseInt(o.id.replace("ORD-", ""), 10))
-    .filter((n) => Number.isFinite(n));
-  const max = nums.length ? Math.max(...nums) : 2840;
-  return `ORD-${max + 1}`;
+function nextOrderId(_orders: Order[]): string {
+  // Order IDs are also used to join live supplier-agent rows from the backend.
+  // Local sequential IDs were reused after localStorage resets, which made old
+  // supplier rows appear on new orders. Use a timestamp + entropy instead.
+  const stamp = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `ORD-${stamp}-${rand}`;
 }
 
 export function OrdersProvider({ children }: { children: ReactNode }) {

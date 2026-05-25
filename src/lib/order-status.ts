@@ -419,6 +419,53 @@ export type TimelineEvent = {
   tone?: StatusTone;
 };
 
+function isSameSupplier(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
+}
+
+type NegotiationDisplayOrder = {
+  createdAt: string;
+  items?: Array<{ productId?: string; supplier?: string | null }>;
+};
+
+export function filterNegotiationsForOrder(
+  order: NegotiationDisplayOrder,
+  negotiations: NegotiationRow[] | undefined,
+): NegotiationRow[] {
+  const supplierByKey = new Map(
+    (order.items ?? [])
+      .filter((i) => i.supplier && i.supplier.trim())
+      .map((i) => [i.productId, i.supplier!.trim().toLowerCase()]),
+  );
+  const originalSuppliers = new Set(
+    (order.items ?? [])
+      .map((i) => (i.supplier || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const createdAtMs = new Date(order.createdAt).getTime();
+  const lowerBoundMs = Number.isFinite(createdAtMs) ? createdAtMs - 5 * 60_000 : 0;
+
+  return (negotiations ?? []).filter((n) => {
+    if ((n.failover_attempt ?? 0) !== 0) return false;
+
+    const supplierKey = (n.supplier_name || "").trim().toLowerCase();
+    if (originalSuppliers.size > 0 && !originalSuppliers.has(supplierKey)) return false;
+
+    const sentAtMs = new Date(n.sent_at).getTime();
+    if (Number.isFinite(sentAtMs) && sentAtMs < lowerBoundMs) return false;
+
+    const snapshotItems = n.order_snapshot?.items;
+    if (Array.isArray(snapshotItems) && snapshotItems.length > 0 && supplierByKey.size > 0) {
+      return snapshotItems.some((item) => {
+        if (!item.productId) return false;
+        return isSameSupplier(item.supplier, supplierByKey.get(item.productId));
+      });
+    }
+
+    return true;
+  });
+}
+
 type RfqLike = {
   status: string;
   escalation_reason: string | null;
@@ -435,9 +482,10 @@ type RfqLike = {
  */
 export function buildOrderTimeline(
   order: {
+    createdAt: string;
     history: { at: string; label: string; actor?: string }[];
     status: string;
-    items?: { supplier?: string | null }[];
+    items?: { productId?: string; supplier?: string | null }[];
   },
   negotiations: NegotiationRow[] | undefined,
   rfq?: RfqLike | null,
@@ -457,8 +505,7 @@ export function buildOrderTimeline(
     originalSuppliers.size === 0 ||
     originalSuppliers.has((name || "").trim().toLowerCase());
 
-  const list = (negotiations ?? [])
-    .filter((n) => (n.failover_attempt ?? 0) === 0 && isOriginal(n.supplier_name))
+  const list = filterNegotiationsForOrder(order, negotiations)
     .slice()
     .sort((a, b) => a.sent_at.localeCompare(b.sent_at));
 

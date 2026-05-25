@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, Download, Package, Truck, CreditCard, MapPin, Chec
 import { formatEUR } from "@/lib/catalog";
 import { useOrders, STATUS_META, tierLabel, type Order } from "@/lib/orders";
 import { useNegotiationsByOrder } from "@/lib/negotiations";
-import { deriveOrderStatus } from "@/lib/order-status";
+import { deriveOrderStatus, filterNegotiationsForOrder } from "@/lib/order-status";
 import { downloadPurchaseOrdersBySupplier, openFirstPurchaseOrderPdf } from "@/lib/po-pdf";
 import { useSuppliers, supplierContactMap } from "@/lib/suppliers";
 import { useMemo } from "react";
@@ -47,6 +47,7 @@ function OrderDetail() {
   const shipping = 0;
   const total = +(order.subtotal + tax + shipping).toFixed(2);
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
+  const negotiations = filterNegotiationsForOrder(order, negotiationsByOrder[order.id]);
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl">
@@ -58,7 +59,7 @@ function OrderDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold font-mono">{order.id}</h1>
-            <StatusPill status={deriveOrderStatus(order, negotiationsByOrder[order.id])} />
+            <StatusPill status={deriveOrderStatus(order, negotiations)} />
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             Placed {new Date(order.createdAt).toLocaleString()} · {tierLabel(order.tier)}
