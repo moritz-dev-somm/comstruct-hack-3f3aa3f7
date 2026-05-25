@@ -468,7 +468,7 @@ function OrderRow({
 
 
 
-          {list.length > 0 && <SuppliersStatusBlock negotiations={list} />}
+          {list.length > 0 && <SuppliersStatusBlock negotiations={list} order={order} />}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Items</h4>
             <ul className="text-sm space-y-1">
