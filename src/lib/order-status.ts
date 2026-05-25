@@ -550,8 +550,10 @@ export function buildOrderTimeline(
     }
   }
 
-  // RFQ outcome — "no alternative offer found" or winner picked.
-  if (rfq) {
+  // RFQ outcome — "no alternative offer found" or winner picked. Only show
+  // when the winning supplier was an original cart supplier; otherwise this
+  // would expose alternate-supplier outreach the foreman didn't ask for.
+  if (rfq && isOriginal(rfq.winner_supplier ?? null)) {
     const rs = (rfq.status || "").toLowerCase();
     if (rs === "escalated") {
       const reason = rfq.escalation_reason || "no usable offer received";
