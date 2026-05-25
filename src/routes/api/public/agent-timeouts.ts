@@ -11,7 +11,13 @@ import { adminClient } from "@agent/agent.server";
 export const Route = createFileRoute("/api/public/agent-timeouts")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const apiKey = request.headers.get("apikey");
+        const expected = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+        if (expected && apiKey !== expected) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
         const sb = adminClient();
         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -56,6 +62,7 @@ export const Route = createFileRoute("/api/public/agent-timeouts")({
             .update({
               status: "needs_user",
               needs_user_reason: `No progress from ${r.supplier_name ?? "supplier"} for 24h.`,
+              last_progress_at: new Date().toISOString(),
             })
             .eq("id", r.id);
           if (!upErr) flipped++;
