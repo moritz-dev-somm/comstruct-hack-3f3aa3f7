@@ -423,8 +423,13 @@ function isSameSupplier(a: string | null | undefined, b: string | null | undefin
   return (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
 }
 
+type NegotiationDisplayOrder = {
+  createdAt: string;
+  items?: Array<{ productId?: string; supplier?: string | null }>;
+};
+
 export function filterNegotiationsForOrder(
-  order: Pick<Order, "items" | "createdAt">,
+  order: NegotiationDisplayOrder,
   negotiations: NegotiationRow[] | undefined,
 ): NegotiationRow[] {
   const supplierByKey = new Map(
@@ -445,8 +450,7 @@ export function filterNegotiationsForOrder(
     const sentAtMs = new Date(n.sent_at).getTime();
     if (Number.isFinite(sentAtMs) && sentAtMs < lowerBoundMs) return false;
 
-    const snapshotItems = (n as unknown as { order_snapshot?: { items?: Array<{ productId?: string; supplier?: string | null }> } })
-      .order_snapshot?.items;
+    const snapshotItems = n.order_snapshot?.items;
     if (Array.isArray(snapshotItems) && snapshotItems.length > 0 && supplierByKey.size > 0) {
       return snapshotItems.some((item) => {
         if (!item.productId) return false;
