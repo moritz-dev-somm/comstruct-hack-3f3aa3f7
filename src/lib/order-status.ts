@@ -474,6 +474,7 @@ type RfqLike = {
  */
 export function buildOrderTimeline(
   order: {
+    createdAt: string;
     history: { at: string; label: string; actor?: string }[];
     status: string;
     items?: { supplier?: string | null }[];
@@ -496,8 +497,7 @@ export function buildOrderTimeline(
     originalSuppliers.size === 0 ||
     originalSuppliers.has((name || "").trim().toLowerCase());
 
-  const list = (negotiations ?? [])
-    .filter((n) => (n.failover_attempt ?? 0) === 0 && isOriginal(n.supplier_name))
+  const list = filterNegotiationsForOrder(order as Pick<Order, "items" | "createdAt">, negotiations)
     .slice()
     .sort((a, b) => a.sent_at.localeCompare(b.sent_at));
 
