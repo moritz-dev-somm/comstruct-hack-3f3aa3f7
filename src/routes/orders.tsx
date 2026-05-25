@@ -25,6 +25,7 @@ import {
   STATUS_TONE_CLASS,
   buildOrderTimeline,
   deriveOrderStatus,
+  filterNegotiationsForOrder,
   pickDeliveryForOrder,
   pickShippingForOrder,
   type DerivedStatus,
@@ -167,7 +168,7 @@ function OrdersPage() {
   const attentions = useMemo(() => {
     return orders
       .map((o) => {
-        const negs = negotiationsByOrder[o.id];
+        const negs = filterNegotiationsForOrder(o, negotiationsByOrder[o.id]);
         const rfq = rfqsByOrder[o.id]?.rfq ?? null;
         const info = computeAttention(o, negs, rfq);
         return info ? { order: o, info } : null;
@@ -418,11 +419,11 @@ function OrderRow({
   onToggle: () => void;
 }) {
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
-  const derived = deriveOrderStatus(order, negotiations);
-  const delivery = pickDeliveryForOrder(negotiations);
-  const shipping = pickShippingForOrder(negotiations);
-  const list = negotiations ?? [];
-  const timeline = buildOrderTimeline(order, negotiations, rfq);
+  const list = filterNegotiationsForOrder(order, negotiations);
+  const derived = deriveOrderStatus(order, list);
+  const delivery = pickDeliveryForOrder(list);
+  const shipping = pickShippingForOrder(list);
+  const timeline = buildOrderTimeline(order, list, rfq);
 
   const hasDelivery = delivery.iso != null || delivery.needsClarification;
   const hasShipping = shipping.amountEur != null;
