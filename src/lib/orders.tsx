@@ -287,7 +287,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       prev.map((o) => {
         if (o.id !== id) return o;
         const now = new Date().toISOString();
-        // ≥ €200 → enter RFQ flow instead of immediate PO.
+        // ≥ €500 → enter RFQ flow instead of immediate PO.
         if (o.subtotal >= RFQ_THRESHOLD_EUR) {
           return {
             ...o,
