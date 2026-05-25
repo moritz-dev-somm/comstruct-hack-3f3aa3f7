@@ -419,6 +419,45 @@ export type TimelineEvent = {
   tone?: StatusTone;
 };
 
+function isSameSupplier(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
+}
+
+export function filterNegotiationsForOrder(
+  order: Pick<Order, "items" | "createdAt">,
+  negotiations: NegotiationRow[] | undefined,
+): NegotiationRow[] {
+  const supplierByKey = new Map(
+    (order.items ?? [])
+      .filter((i) => i.supplier && i.supplier.trim())
+      .map((i) => [i.productId, i.supplier!.trim().toLowerCase()]),
+  );
+  const originalSuppliers = new Set(supplierByKey.values());
+  const createdAtMs = new Date(order.createdAt).getTime();
+  const lowerBoundMs = Number.isFinite(createdAtMs) ? createdAtMs - 5 * 60_000 : 0;
+
+  return (negotiations ?? []).filter((n) => {
+    if ((n.failover_attempt ?? 0) !== 0) return false;
+
+    const supplierKey = (n.supplier_name || "").trim().toLowerCase();
+    if (originalSuppliers.size > 0 && !originalSuppliers.has(supplierKey)) return false;
+
+    const sentAtMs = new Date(n.sent_at).getTime();
+    if (Number.isFinite(sentAtMs) && sentAtMs < lowerBoundMs) return false;
+
+    const snapshotItems = (n as unknown as { order_snapshot?: { items?: Array<{ productId?: string; supplier?: string | null }> } })
+      .order_snapshot?.items;
+    if (Array.isArray(snapshotItems) && snapshotItems.length > 0 && supplierByKey.size > 0) {
+      return snapshotItems.some((item) => {
+        if (!item.productId) return false;
+        return isSameSupplier(item.supplier, supplierByKey.get(item.productId));
+      });
+    }
+
+    return true;
+  });
+}
+
 type RfqLike = {
   status: string;
   escalation_reason: string | null;
