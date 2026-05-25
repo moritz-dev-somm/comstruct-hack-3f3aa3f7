@@ -56,6 +56,10 @@ export const ensureAgentInbox = createServerFn({ method: "POST" })
 
 const FALLBACK_SUPPLIER_NAME = "Generisch";
 
+function normalizeSupplierName(name: string | null | undefined): string {
+  return (name || FALLBACK_SUPPLIER_NAME).trim().toLowerCase();
+}
+
 type SupplierLang = "en" | "de" | "fr" | "it";
 
 async function resolveSupplierContact(
@@ -100,13 +104,15 @@ export const startNegotiationForOrder = createServerFn({ method: "POST" })
       const sb = adminClient();
       const am = agentMail();
 
-      // Group items by supplier (fallback for items with no supplier).
-      const groups = new Map<string, typeof data.order.items>();
+      // Group items by their original supplier only. Case/spacing variants of
+      // the same supplier collapse to one outbound PO/contact.
+      const groups = new Map<string, { display: string; items: typeof data.order.items }>();
       for (const it of data.order.items) {
-        const key = (it.supplier && it.supplier.trim()) || FALLBACK_SUPPLIER_NAME;
-        const arr = groups.get(key) ?? [];
-        arr.push(it);
-        groups.set(key, arr);
+        const display = (it.supplier && it.supplier.trim()) || FALLBACK_SUPPLIER_NAME;
+        const key = normalizeSupplierName(display);
+        const group = groups.get(key) ?? { display, items: [] };
+        group.items.push(it);
+        groups.set(key, group);
       }
 
       const attachmentByName = new Map(
@@ -115,9 +121,25 @@ export const startNegotiationForOrder = createServerFn({ method: "POST" })
 
       const results: Array<{ supplier: string; email: string; negotiationId?: string; error?: string }> = [];
 
-      for (const [supplierName, items] of groups) {
+      for (const { display: supplierName, items } of groups.values()) {
         const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
         const contact = await resolveSupplierContact(sb, supplierName);
+
+        const { data: existing } = await sb
+          .from("negotiations")
+          .select("id, supplier_name, supplier_email")
+          .eq("order_id", data.order.id)
+          .ilike("supplier_name", contact.name)
+          .maybeSingle();
+        if (existing) {
+          results.push({
+            supplier: (existing as { supplier_name: string }).supplier_name,
+            email: (existing as { supplier_email: string }).supplier_email,
+            negotiationId: (existing as { id: string }).id,
+          });
+          continue;
+        }
+
         const email = composeOrderEmail(data.order as unknown as Order, {
           supplierName: contact.name,
           items: items as Order["items"],
