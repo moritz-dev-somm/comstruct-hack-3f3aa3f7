@@ -437,7 +437,11 @@ export function filterNegotiationsForOrder(
       .filter((i) => i.supplier && i.supplier.trim())
       .map((i) => [i.productId, i.supplier!.trim().toLowerCase()]),
   );
-  const originalSuppliers = new Set(supplierByKey.values());
+  const originalSuppliers = new Set(
+    (order.items ?? [])
+      .map((i) => (i.supplier || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
   const createdAtMs = new Date(order.createdAt).getTime();
   const lowerBoundMs = Number.isFinite(createdAtMs) ? createdAtMs - 5 * 60_000 : 0;
 
@@ -481,7 +485,7 @@ export function buildOrderTimeline(
     createdAt: string;
     history: { at: string; label: string; actor?: string }[];
     status: string;
-    items?: { supplier?: string | null }[];
+    items?: { productId?: string; supplier?: string | null }[];
   },
   negotiations: NegotiationRow[] | undefined,
   rfq?: RfqLike | null,
