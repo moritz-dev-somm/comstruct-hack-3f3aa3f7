@@ -130,6 +130,7 @@ export const startNegotiationForOrder = createServerFn({ method: "POST" })
           .select("id, supplier_name, supplier_email")
           .eq("order_id", data.order.id)
           .ilike("supplier_name", contact.name)
+          .limit(1)
           .maybeSingle();
         if (existing) {
           results.push({
