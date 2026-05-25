@@ -25,7 +25,7 @@ import {
   type SupplierLanguage,
 } from "./templates";
 
-export const RFQ_THRESHOLD_EUR = 200;
+export const RFQ_THRESHOLD_EUR = 500;
 export const RFQ_DEADLINE_HOURS = 24;
 
 type SupportedLang = SupplierLanguage;
