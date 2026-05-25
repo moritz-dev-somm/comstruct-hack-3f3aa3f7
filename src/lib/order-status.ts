@@ -434,12 +434,33 @@ type RfqLike = {
  * including supplier declines, failover attempts and "no alternative offer".
  */
 export function buildOrderTimeline(
-  order: { history: { at: string; label: string; actor?: string }[]; status: string },
+  order: {
+    history: { at: string; label: string; actor?: string }[];
+    status: string;
+    items?: { supplier?: string | null }[];
+  },
   negotiations: NegotiationRow[] | undefined,
   rfq?: RfqLike | null,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = (order.history ?? []).map((e) => ({ ...e }));
-  const list = (negotiations ?? []).slice().sort((a, b) => a.sent_at.localeCompare(b.sent_at));
+
+  // Only surface suppliers that were already in the foreman's cart for this
+  // order. We hide failover attempts and RFQ-added bidders from the timeline
+  // even if the agent created negotiation rows for them server-side, so a
+  // low-value order never reads as if we contacted other suppliers.
+  const originalSuppliers = new Set(
+    (order.items ?? [])
+      .map((i) => (i.supplier || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const isOriginal = (name: string | null | undefined) =>
+    originalSuppliers.size === 0 ||
+    originalSuppliers.has((name || "").trim().toLowerCase());
+
+  const list = (negotiations ?? [])
+    .filter((n) => (n.failover_attempt ?? 0) === 0 && isOriginal(n.supplier_name))
+    .slice()
+    .sort((a, b) => a.sent_at.localeCompare(b.sent_at));
 
   // Suppliers already mentioned by an existing "PO sent to X" history entry —
   // skip the synthesised PO event for them to avoid duplicates.
@@ -450,16 +471,12 @@ export function buildOrderTimeline(
   }
 
   for (const n of list) {
-    const attempt = n.failover_attempt ?? 0;
     const supplierKey = (n.supplier_name || "").trim().toLowerCase();
-    if (attempt > 0 || !poSentSuppliers.has(supplierKey)) {
+    if (!poSentSuppliers.has(supplierKey)) {
       events.push({
         at: n.sent_at,
-        label:
-          attempt > 0
-            ? `Failover #${attempt}: PO sent to ${n.supplier_name}`
-            : `PO sent to ${n.supplier_name}`,
-        tone: attempt > 0 ? "amber" : "indigo",
+        label: `PO sent to ${n.supplier_name}`,
+        tone: "indigo",
       });
       poSentSuppliers.add(supplierKey);
     }
