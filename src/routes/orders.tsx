@@ -547,8 +547,20 @@ function ShippingBlock({ shipping }: { shipping: OrderShipping }) {
  * of the order represents the order's overall state; we don't repeat status
  * or verdict tags per supplier here.
  */
-function SuppliersStatusBlock({ negotiations }: { negotiations: NegotiationRow[] }) {
-  const sorted = [...negotiations].sort((a, b) =>
+function SuppliersStatusBlock({ negotiations, order }: { negotiations: NegotiationRow[]; order: Order }) {
+  const originalSuppliers = new Set(
+    order.items
+      .map((i) => (i.supplier || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const filtered = negotiations.filter(
+    (n) =>
+      (n.failover_attempt ?? 0) === 0 &&
+      (originalSuppliers.size === 0 ||
+        originalSuppliers.has((n.supplier_name || "").trim().toLowerCase())),
+  );
+  if (filtered.length === 0) return null;
+  const sorted = [...filtered].sort((a, b) =>
     (b.last_reply_at || b.sent_at).localeCompare(a.last_reply_at || a.sent_at),
   );
   return (
