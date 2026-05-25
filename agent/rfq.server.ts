@@ -1,7 +1,7 @@
 /**
  * RFQ (Request-For-Quote) flow.
  *
- * Triggered after PM/Central approval of orders ≥ €200. Instead of sending
+ * Triggered after PM/Central approval of orders ≥ €500. Instead of sending
  * the PO straight to the original supplier, we fan out a discount RFQ to
  * the top suppliers in the order's dominant category, wait up to 24h
  * (or close early when all invited suppliers responded), then auto-place
