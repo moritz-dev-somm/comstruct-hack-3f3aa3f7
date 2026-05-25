@@ -501,7 +501,7 @@ export function buildOrderTimeline(
     originalSuppliers.size === 0 ||
     originalSuppliers.has((name || "").trim().toLowerCase());
 
-  const list = filterNegotiationsForOrder(order as Pick<Order, "items" | "createdAt">, negotiations)
+  const list = filterNegotiationsForOrder(order, negotiations)
     .slice()
     .sort((a, b) => a.sent_at.localeCompare(b.sent_at));
 
