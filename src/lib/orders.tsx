@@ -114,7 +114,7 @@ export const STATUS_META: Record<
  * after PM/Central approval instead of an immediate PO. Kept in sync with
  * `RFQ_THRESHOLD_EUR` in `agent/rfq.server.ts`.
  */
-export const RFQ_THRESHOLD_EUR = 200;
+export const RFQ_THRESHOLD_EUR = 500;
 
 type OrdersCtx = {
   orders: Order[];
@@ -287,7 +287,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       prev.map((o) => {
         if (o.id !== id) return o;
         const now = new Date().toISOString();
-        // ≥ €200 → enter RFQ flow instead of immediate PO.
+        // ≥ €500 → enter RFQ flow instead of immediate PO.
         if (o.subtotal >= RFQ_THRESHOLD_EUR) {
           return {
             ...o,

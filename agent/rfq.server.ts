@@ -1,7 +1,7 @@
 /**
  * RFQ (Request-For-Quote) flow.
  *
- * Triggered after PM/Central approval of orders ≥ €200. Instead of sending
+ * Triggered after PM/Central approval of orders ≥ €500. Instead of sending
  * the PO straight to the original supplier, we fan out a discount RFQ to
  * the top suppliers in the order's dominant category, wait up to 24h
  * (or close early when all invited suppliers responded), then auto-place
@@ -25,7 +25,7 @@ import {
   type SupplierLanguage,
 } from "./templates";
 
-export const RFQ_THRESHOLD_EUR = 200;
+export const RFQ_THRESHOLD_EUR = 500;
 export const RFQ_DEADLINE_HOURS = 24;
 
 type SupportedLang = SupplierLanguage;
@@ -319,7 +319,7 @@ export async function startRfqForOrder(order: Order): Promise<RfqStartResult> {
 
     if (!pick.qualifies) {
       // Order doesn't meet the discount criteria (no ≥2 suppliers share the
-      // exact same products totalling ≥ €200). Do NOT fan out and do NOT
+      // exact same products totalling ≥ €500). Do NOT fan out and do NOT
       // create a bogus RFQ row — caller should fall back to a direct PO.
       return { ok: false, error: "not_qualifying", reason: pick.reason };
     }
